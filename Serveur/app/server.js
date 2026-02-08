@@ -1,0 +1,165 @@
+// server.js v3.0 - Refactorisé avec hearbeat + monitoring centralisés
+
+import { WebSocketServer } from "ws";
+import http from "http";
+
+// ============= IMPORTS MÉTIER =============
+import { createGame, findCardById } from '../domain/game/state.js';
+import { mapSlotFromClientToServer, mapSlotForClient } from '../domain/game/slots.js';
+import { getTableSlots } from '../domain/game/SlotManager.js';
+import { applyMove } from '../domain/game/MoveApplier.js';
+import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot } from '../domain/game/Regles.js';
+import { initTurnForGame, endTurnAfterBenchPlay } from '../domain/game/turn.js';
+import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
+import { verifyOrCreateUser } from '../domain/auth/usersStore.js';
+import { emitSlotState, emitFullState } from '../domain/session/index.js';
+
+// ============= IMPORTS HANDLERS =============
+import { handleLogin } from '../handlers/auth/login.js';
+import { handleLogout } from '../handlers/auth/logout.js';
+import { handleInvite, handleInviteResponse } from '../handlers/lobby/invite.js';
+import { handleReadyForGame } from '../handlers/game/readyForGame.js';
+import { handleJoinGame } from '../handlers/game/joinGame.js';
+import { handleSpectateGame } from '../handlers/game/spectateGame.js';
+import { handleMoveRequest } from '../handlers/game/moveRequest.js';
+import { handleLeaveGame, handleAckGameEnd } from '../handlers/game/gameEnd.js';
+
+// ============= IMPORTS APP =============
+import { createServerContext } from './context.js';
+import { createRouter } from './router.js';
+import { createWSManager } from '../net/wsManager.js';
+
+// ============= IMPORTS NETWORK =============
+import { stopHeartbeatManager } from '../net/heartbeat.js';
+import { metrics, createMetricsMiddleware } from '../net/monitoring.js';
+
+// ============= INITIALISATION =============
+
+// 1️⃣ Créer le contexte (état + helpers)
+const { baseCtx, loginCtx, onSocketClose } = createServerContext({
+  createGame,
+  emitSlotState,
+  emitFullState,
+  getTableSlots,
+  findCardById,
+  mapSlotFromClientToServer,
+  mapSlotForClient,
+  validateMove,
+  applyMove,
+  initTurnForGame,
+  isBenchSlot,
+  endTurnAfterBenchPlay,
+  refillHandIfEmpty,
+  hasWonByEmptyDeckSlot,
+  saveGameState,
+  loadGameState,
+  deleteGameState,
+  verifyOrCreateUser,
+});
+
+// 2️⃣ Créer le HTTP server (pour metrics + WebSocket)
+const httpServer = http.createServer((req, res) => {
+  // Health check + Metrics endpoint
+  if (req.method === 'GET' && req.url === '/metrics') {
+    const snapshot = metrics.getSnapshot();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(snapshot, null, 2));
+    return;
+  }
+
+  // Health check simple
+  if (req.method === 'GET' && req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
+    return;
+  }
+
+  // 404 pour tout le reste
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Not found' }));
+});
+
+// 3️⃣ Créer le websocket server attaché au HTTP server
+const wss = new WebSocketServer({ server: httpServer });
+
+// 4️⃣ Créer le wsManager
+const wsManager = createWSManager({ wss, trace: console.log });
+
+// 5️⃣ Créer le router (avec contexte + handlers)
+const router = createRouter({
+  state: baseCtx.state,
+  sendResponse: baseCtx.sendResponse,
+  wsManager,
+  baseCtx,
+  loginCtx,
+  handleLogin,
+  handleLogout,
+  handleInvite,
+  handleInviteResponse,
+  handleReadyForGame,
+  handleJoinGame,
+  handleSpectateGame,
+  handleMoveRequest,
+  handleLeaveGame,
+  handleAckGameEnd,
+  metrics, // Passer les métriques au router
+});
+
+// ============= WEBSOCKET EVENTS =============
+
+wss.on("connection", async (ws) => {
+  console.log("✅ Client connecté");
+  metrics.recordConnection();
+  
+  // Init heartbeat + meta
+  wsManager.initClient(ws);
+
+  // Wrapper le onMessage avec metrics
+  const onMessageWithMetrics = createMetricsMiddleware(
+    (ws, msg) => router.onMessage(ws, msg),
+    metrics
+  );
+
+  ws.on("message", async (msg) => {
+    try {
+      await onMessageWithMetrics(ws, msg.toString());
+      metrics.recordMessageSent();
+    } catch (err) {
+      console.error("[MESSAGE_ERROR]", err);
+    }
+  });
+
+  ws.on("close", () => {
+    console.log("❌ Client déconnecté");
+    metrics.recordDisconnection();
+    wsManager.unregisterClient(ws);
+    onSocketClose(ws);
+  });
+
+  ws.on("error", (err) => {
+    console.error("[WS_ERROR]", err.message);
+  });
+});
+
+// ============= HEARTBEAT =============
+const heartbeatTimer = wsManager.startHeartbeat();
+
+// ============= GRACEFUL SHUTDOWN =============
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down...');
+  stopHeartbeatManager(heartbeatTimer);
+  wss.close(() => {
+    httpServer.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  });
+});
+
+// ============= DÉMARRAGE =============
+const PORT = process.env.WSS_PORT || 3000;
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server listening on http://localhost:${PORT}`);
+  console.log(`📊 Metrics available at http://localhost:${PORT}/metrics`);
+  console.log(`❤️ Health check at http://localhost:${PORT}/health`);
+});

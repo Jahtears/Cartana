@@ -1,0 +1,14 @@
+// shared/constants.js
+
+export const GAME_MESSAGE = {
+  TURN_START: "TURN_START",
+  MOVE_OK: "MOVE_OK",
+  MOVE_DENIED: "MOVE_DENIED",
+};
+
+export const MESSAGE_COLORS = {
+  [GAME_MESSAGE.TURN_START]: "#00FF00",
+  [GAME_MESSAGE.MOVE_OK]: "#00FF00",
+  [GAME_MESSAGE.MOVE_DENIED]: "#FF3B30",
+
+};

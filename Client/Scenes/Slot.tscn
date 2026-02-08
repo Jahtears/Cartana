@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://b226wuvssddhp"]
+
+[ext_resource type="Script" uid="uid://dmpqjiex0mj7f" path="res://Client/game/Slot.gd" id="1_vqo0j"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_vqo0j"]
+size = Vector2(80, 120)
+
+[node name="Slot" type="Area2D" unique_id=1242857216]
+script = ExtResource("1_vqo0j")
+
+[node name="Background" type="ColorRect" parent="." unique_id=2096042009]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -40.0
+offset_top = -60.0
+offset_right = 40.0
+offset_bottom = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.5, 0.5, 0.5, 1)
+metadata/_edit_use_anchors_ = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=2128279505]
+shape = SubResource("RectangleShape2D_vqo0j")

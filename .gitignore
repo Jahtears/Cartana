@@ -1,0 +1,75 @@
+############################
+# GODOT
+############################
+
+# Fichiers générés automatiquement
+.import/
+export.cfg
+export_presets.cfg
+
+# Cache Godot
+.godot/
+
+# UID Godot (générés automatiquement)
+*.uid
+
+############################
+# NODE / SERVEUR
+############################
+
+# Dépendances
+Serveur/node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environnements
+.env
+.env.*
+
+# Sauvegardes sensibles
+Serveur/app/saves/Saves.json
+Serveur/app/saves/Users.json
+
+# Tests
+coverage/
+Serveur/__tests__/coverage/
+
+############################
+# VISUAL STUDIO CODE
+############################
+
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+############################
+# SYSTEME / OS
+############################
+
+.DS_Store
+Thumbs.db
+
+############################
+# ARCHIVES / TEMP
+############################
+
+.old/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.zip
+*.tar
+*.tar.gz
+
+############################
+# GIT / META
+############################
+
+# Évite de réinclure des fichiers supprimés
+*.orig

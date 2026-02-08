@@ -1,0 +1,83 @@
+[gd_scene format=3 uid="uid://dqxpcbdewi0rn"]
+
+[ext_resource type="Script" uid="uid://dgt60tw50p0bn" path="res://Client/game/Carte.gd" id="1_d822b"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_d822b"]
+size = Vector2(80, 119)
+
+[node name="Carte" type="Node2D" unique_id=616561034]
+z_index = 1
+script = ExtResource("1_d822b")
+
+[node name="Area2D" type="Area2D" parent="." unique_id=759047316]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1962022393]
+shape = SubResource("RectangleShape2D_d822b")
+
+[node name="Front" type="ColorRect" parent="." unique_id=1607568628]
+custom_minimum_size = Vector2(80, 120)
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -40.0
+offset_top = -60.0
+offset_right = 40.0
+offset_bottom = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Top" type="HBoxContainer" parent="Front" unique_id=2121051954]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 4.0
+offset_right = 8.0
+offset_bottom = 4.0
+theme_override_constants/separation = 4
+
+[node name="ValeurT" type="Label" parent="Front/Top" unique_id=405271007]
+layout_mode = 2
+text = "1"
+metadata/_edit_use_anchors_ = true
+
+[node name="SymboleT" type="Label" parent="Front/Top" unique_id=1530344608]
+layout_mode = 2
+text = "1"
+metadata/_edit_use_anchors_ = true
+
+[node name="Bottom" type="HBoxContainer" parent="Front" unique_id=728136189]
+layout_mode = 0
+offset_left = 72.0
+offset_top = 116.0
+offset_right = 72.0
+offset_bottom = 116.0
+rotation = 3.1415927
+theme_override_constants/separation = 4
+
+[node name="ValeurB" type="Label" parent="Front/Bottom" unique_id=1544765221]
+layout_mode = 2
+text = "1"
+metadata/_edit_use_anchors_ = true
+
+[node name="SymboleB" type="Label" parent="Front/Bottom" unique_id=1917012804]
+layout_mode = 2
+text = "1"
+metadata/_edit_use_anchors_ = true
+
+[node name="Back" type="ColorRect" parent="." unique_id=121205494]
+custom_minimum_size = Vector2(80, 120)
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -40.0
+offset_top = -60.0
+offset_right = 40.0
+offset_bottom = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=175487624]
+speed_scale = -4.0
+
+[connection signal="input_event" from="Area2D" to="." method="_on_area_2d_input_event"]

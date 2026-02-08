@@ -1,0 +1,112 @@
+[gd_scene format=3 uid="uid://c66ia4ov7exkk"]
+
+[ext_resource type="Script" uid="uid://wchtc61g24w7" path="res://Client/game/Game.gd" id="1_gl6un"]
+
+[node name="Game" type="Control" unique_id=1275755059]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_gl6un")
+
+[node name="Player1" type="Node2D" parent="." unique_id=454715143]
+position = Vector2(100, 512)
+
+[node name="Deck" type="Node2D" parent="Player1" unique_id=981971225]
+
+[node name="Main" type="Node2D" parent="Player1" unique_id=815628620]
+position = Vector2(284, 0)
+
+[node name="Banc" type="Node2D" parent="Player1" unique_id=2027055223]
+position = Vector2(668, 0)
+
+[node name="Player2" type="Node2D" parent="." unique_id=1913036080]
+position = Vector2(1052, 128)
+
+[node name="Deck" type="Node2D" parent="Player2" unique_id=499380588]
+
+[node name="Main" type="Node2D" parent="Player2" unique_id=102794893]
+position = Vector2(-364, 0)
+
+[node name="Banc" type="Node2D" parent="Player2" unique_id=1264971019]
+position = Vector2(-956, 0)
+
+[node name="Pioche" type="Node2D" parent="." unique_id=1627437833]
+position = Vector2(1056, 320)
+
+[node name="Table" type="Node2D" parent="." unique_id=1829673620]
+position = Vector2(528, 320)
+
+[node name="Background" type="ColorRect" parent="." unique_id=1459192478]
+light_mask = 0
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.039215688, 0.47843137, 0.16470589, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1132234811]
+z_index = -1
+z_as_relative = false
+layout_mode = 0
+offset_left = 576.0
+offset_top = 400.0
+offset_right = 576.0
+offset_bottom = 400.0
+mouse_filter = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="VBoxContainer" unique_id=857968040]
+layout_mode = 2
+mouse_filter = 2
+use_top_left = true
+
+[node name="GameMessage" type="RichTextLabel" parent="VBoxContainer/CenterContainer" unique_id=440980212]
+layout_mode = 2
+mouse_filter = 2
+bbcode_enabled = true
+fit_content = true
+autowrap_mode = 0
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Timer" type="Timer" parent="VBoxContainer" unique_id=2053246925]
+wait_time = 2.0
+one_shot = true
+
+[node name="Quitter" type="Button" parent="." unique_id=881340491]
+layout_mode = 0
+offset_left = 1072.0
+offset_top = 16.0
+offset_right = 1136.0
+offset_bottom = 47.0
+text = "Quitter"
+
+[node name="TimeBar" type="ProgressBar" parent="." unique_id=1818865610]
+z_index = -1
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -56.0
+offset_top = -232.0
+offset_right = 44.0
+offset_bottom = -205.0
+grow_horizontal = 2
+grow_vertical = 0
+show_percentage = false
+
+[node name="DragLayer" type="CanvasLayer" parent="." unique_id=623595508]
+
+[node name="DragRoot" type="Node2D" parent="DragLayer" unique_id=341452031]
+
+[connection signal="timeout" from="VBoxContainer/Timer" to="." method="_on_timer_timeout"]
+[connection signal="pressed" from="Quitter" to="." method="_on_quitter_pressed"]

@@ -1,0 +1,71 @@
+############################
+# NORMALISATION DES FINS DE LIGNE
+############################
+
+# Tous les fichiers texte en LF
+* text=auto eol=lf
+
+# Scripts Windows éventuels
+*.bat eol=crlf
+*.cmd eol=crlf
+
+############################
+# GODOT
+############################
+
+# Les scènes et ressources doivent être traitées comme texte
+*.tscn text
+*.tres text
+*.gd text
+*.cfg text
+*.import text
+
+# UID Godot = binaire
+*.uid binary
+
+############################
+# CODE / CONFIG
+############################
+
+*.js text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.html text
+*.css text
+*.ts text
+*.jsx text
+*.tsx text
+
+############################
+# BINAIRES
+############################
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.zip binary
+*.tar binary
+*.tar.gz binary
+
+############################
+# DIFFS OPTIMISÉS
+############################
+
+# Godot : meilleure lisibilité des diffs
+*.tscn diff
+*.tres diff
+*.gd diff
+
+############################
+# UNICODE
+############################
+
+# Force UTF‑8 partout
+* working-tree-encoding=UTF-8

@@ -1,0 +1,71 @@
+[gd_scene format=3 uid="uid://t68rndibd2bb"]
+
+[ext_resource type="Script" uid="uid://142xkmiceo5w" path="res://Client/ui/Lobby.gd" id="1_ll2xe"]
+
+[node name="Lobby" type="Control" unique_id=155415047]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(352, 240)
+script = ExtResource("1_ll2xe")
+
+[node name="PlayerNameLabel" type="Label" parent="." unique_id=2064866708]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -48.0
+offset_top = -152.0
+offset_right = 52.0
+offset_bottom = -52.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="PlayersBox" type="ColorRect" parent="." unique_id=183429981]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -192.0
+offset_top = 48.0
+offset_right = -192.0
+offset_bottom = 48.0
+grow_horizontal = 2
+size_flags_vertical = 8
+
+[node name="PlayersList" type="GridContainer" parent="PlayersBox" unique_id=1527846370]
+layout_mode = 0
+offset_left = -64.0
+offset_right = -64.0
+offset_bottom = 200.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 4
+
+[node name="GameBox" type="ColorRect" parent="." unique_id=1596528923]
+layout_mode = 1
+offset_left = 65.0
+offset_top = 61.0
+offset_right = 65.0
+offset_bottom = 61.0
+size_flags_vertical = 8
+
+[node name="GameList" type="GridContainer" parent="GameBox" unique_id=1098180103]
+layout_mode = 0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Deconnexion" type="Button" parent="." unique_id=1298183396]
+layout_mode = 0
+offset_left = 520.0
+offset_top = 608.0
+offset_right = 634.0
+offset_bottom = 639.0
+text = "Déconnexion "
+
+[connection signal="pressed" from="Deconnexion" to="." method="_on_deconnexion_pressed"]

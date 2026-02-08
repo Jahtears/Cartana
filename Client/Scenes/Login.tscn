@@ -1,0 +1,58 @@
+[gd_scene format=3 uid="uid://ch2kmbeayc3df"]
+
+[ext_resource type="Script" uid="uid://cksl68l1onqra" path="res://Client/ui/Login.gd" id="1_leum0"]
+
+[node name="Login" type="Control" unique_id=1391658166]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -96.0
+offset_right = -240.0
+offset_bottom = -96.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_leum0")
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=1784001404]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 240.0
+offset_top = 96.0
+offset_right = 240.0
+offset_bottom = 96.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=1420200539]
+layout_mode = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="Menu_deroulant" type="OptionButton" parent="CenterContainer/VBoxContainer" unique_id=756849620]
+layout_mode = 2
+
+[node name="Username_input" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=298740430]
+layout_mode = 2
+placeholder_text = "Identifant"
+
+[node name="Pin_input" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=6927831]
+layout_mode = 2
+placeholder_text = "PIN"
+max_length = 4
+secret = true
+
+[node name="Login_button" type="Button" parent="CenterContainer/VBoxContainer" unique_id=1658283452]
+layout_mode = 2
+text = "Connexion"
+
+[node name="Error_dialog" type="AcceptDialog" parent="." unique_id=891669693]
+oversampling_override = 1.0
+size = Vector2i(174, 100)
+dialog_text = "Erreur de connexion"
+
+[connection signal="text_submitted" from="CenterContainer/VBoxContainer/Username_input" to="." method="_on_username_input_text_submitted"]
+[connection signal="text_submitted" from="CenterContainer/VBoxContainer/Pin_input" to="." method="_on_pin_input_text_submitted"]
+[connection signal="pressed" from="CenterContainer/VBoxContainer/Login_button" to="." method="_on_login_button_pressed"]
