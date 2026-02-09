@@ -62,7 +62,7 @@ func _enter_drag_layer() -> void:
 	global_position = gpos
 
 	# z_index raisonnable (pas nécessaire si CanvasLayer layer=10)
-	z_index = 2000  # <= 4096
+	z_index = 2000
 	drag_root.move_child(self, drag_root.get_child_count() - 1)
 
 	_in_drag_layer = true

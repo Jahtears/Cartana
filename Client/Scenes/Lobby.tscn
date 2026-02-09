@@ -68,4 +68,15 @@ offset_right = 634.0
 offset_bottom = 639.0
 text = "Déconnexion "
 
+[node name="Background" type="ColorRect" parent="." unique_id=357516596]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.6745098, 0.3254902, 0.26666668, 1)
+
 [connection signal="pressed" from="Deconnexion" to="." method="_on_deconnexion_pressed"]

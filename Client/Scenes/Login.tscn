@@ -53,6 +53,21 @@ oversampling_override = 1.0
 size = Vector2i(174, 100)
 dialog_text = "Erreur de connexion"
 
+[node name="Background" type="ColorRect" parent="." unique_id=1949501948]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 240.0
+offset_top = 96.0
+offset_right = 240.0
+offset_bottom = 96.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.13333334, 0.5254902, 0.5764706, 1)
+
 [connection signal="text_submitted" from="CenterContainer/VBoxContainer/Username_input" to="." method="_on_username_input_text_submitted"]
 [connection signal="text_submitted" from="CenterContainer/VBoxContainer/Pin_input" to="." method="_on_pin_input_text_submitted"]
 [connection signal="pressed" from="CenterContainer/VBoxContainer/Login_button" to="." method="_on_login_button_pressed"]
