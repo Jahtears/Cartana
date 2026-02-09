@@ -166,9 +166,17 @@ func _on_evt(type: String, data: Dictionary) -> void:
 # ---------------------------------------------------------
 #  RES (réponses à des requêtes)
 # ---------------------------------------------------------
+
 func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error: Dictionary) -> void:
 	if type != "move_request":
 		return
+
+	# ✅ NOUVEAU: Reset move pending flag
+	var card_id = _data.get("card_id", "")
+	if card_id != "":
+		var card = cards.get(card_id)
+		if card and card.has_method("_reset_move_pending"):
+			card._reset_move_pending()
 
 	if ok:
 		_show_message({
@@ -187,6 +195,8 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 				"card_id": String(details.get("card_id", "")),
 				"from_slot_id": String(details.get("from_slot_id", ""))
 			})
+
+# Ajouter cette méthode à Carte.gd pour être appelée depuis Game.gd
 
 # ---------------------------------------------------------
 #  SNAPSHOT (full resync)

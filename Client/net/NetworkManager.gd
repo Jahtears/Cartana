@@ -1,4 +1,4 @@
-# NetworkManager.gd v2.0 - Queue + Retry + Priorité + Heartbeat
+# NetworkManager.gd v2.1 - Avec reconnexion automatique
 
 extends Node
 
@@ -13,6 +13,11 @@ const MAX_RETRIES = 3
 const RETRY_DELAY_MS = 500
 const MAX_QUEUE_SIZE = 100
 const HEARTBEAT_CHECK_MS = 5000
+
+# ✅ NOUVEAU: Reconnexion automatique
+const RECONNECT_INITIAL_DELAY_SEC = 3.0
+const RECONNECT_MAX_DELAY_SEC = 30.0
+const RECONNECT_BACKOFF_MULTIPLIER = 1.5
 
 # ============= STATE =============
 var _ws := WebSocketPeer.new()
@@ -30,6 +35,12 @@ var _pending_requests: Dictionary = {}
 # Priorité
 enum RequestPriority { LOW = 0, NORMAL = 5, HIGH = 8, CRITICAL = 10 }
 
+# ✅ NOUVEAU: Reconnexion state
+var _reconnect_timer: Timer = null
+var _reconnect_delay_sec: float = RECONNECT_INITIAL_DELAY_SEC
+var _reconnect_attempts: int = 0
+var _max_reconnect_attempts: int = 10
+
 # ============= LIFECYCLE =============
 
 func _ready() -> void:
@@ -37,10 +48,13 @@ func _ready() -> void:
 
 func connect_to_server(url: String = "ws://localhost:3000") -> void:
 	_url = url
+	_reset_reconnect_state()
 	var err := _ws.connect_to_url(url)
 	if err != OK:
 		push_error("WebSocket connect error: %s" % err)
+		_schedule_reconnect()
 		return
+	print("[NET] Connecting to %s" % url)
 
 func is_open() -> bool:
 	return _ws.get_ready_state() == WebSocketPeer.STATE_OPEN
@@ -48,8 +62,51 @@ func is_open() -> bool:
 func close(code: int = 1000, reason: String = "") -> void:
 	_request_queue.clear()
 	_pending_requests.clear()
+	_cancel_reconnect_timer()
 	if is_open():
 		_ws.close(code, reason)
+
+# ✅ NOUVEAU: Reset reconnect state
+func _reset_reconnect_state() -> void:
+	_reconnect_delay_sec = RECONNECT_INITIAL_DELAY_SEC
+	_reconnect_attempts = 0
+	_cancel_reconnect_timer()
+
+# ✅ NOUVEAU: Annuler timer de reconnexion
+func _cancel_reconnect_timer() -> void:
+	if _reconnect_timer:
+		_reconnect_timer.queue_free()
+		_reconnect_timer = null
+
+# ✅ NOUVEAU: Planifier reconnexion avec backoff exponentiel
+func _schedule_reconnect() -> void:
+	if _reconnect_attempts >= _max_reconnect_attempts:
+		push_error("[NET] Max reconnect attempts reached (%d)" % _max_reconnect_attempts)
+		disconnected.emit(1000, "Max reconnect attempts exceeded")
+		return
+	
+	_cancel_reconnect_timer()
+	
+	# Backoff exponentiel: 3s → 4.5s → 6.7s → ... → 30s (max)
+	_reconnect_delay_sec = minf(
+		_reconnect_delay_sec * RECONNECT_BACKOFF_MULTIPLIER,
+		RECONNECT_MAX_DELAY_SEC
+	)
+	_reconnect_attempts += 1
+	
+	print("[NET] Scheduling reconnect attempt %d in %.1fs" % [_reconnect_attempts, _reconnect_delay_sec])
+	
+	_reconnect_timer = Timer.new()
+	add_child(_reconnect_timer)
+	_reconnect_timer.one_shot = true
+	_reconnect_timer.wait_time = _reconnect_delay_sec
+	_reconnect_timer.timeout.connect(_on_reconnect_timeout)
+	_reconnect_timer.start()
+
+func _on_reconnect_timeout() -> void:
+	print("[NET] Attempting reconnect #%d" % _reconnect_attempts)
+	_reconnect_timer = null
+	connect_to_server(_url)
 
 # ============= PROCESS LOOP =============
 
@@ -61,12 +118,16 @@ func _process(_delta: float) -> void:
 		if not _was_open:
 			_was_open = true
 			_last_pong_ms = Time.get_ticks_msec()
+			_reset_reconnect_state()  # ✅ Reset backoff on success
 			_drain_queue()
 			connected.emit()
+			print("[NET] Connected to server")
 	elif st == WebSocketPeer.STATE_CLOSED:
 		if _was_open:
 			_was_open = false
-			disconnected.emit(0, "")
+			disconnected.emit(0, "Connection lost")
+			print("[NET] Connection closed, scheduling reconnect")
+			_schedule_reconnect()  # ✅ Reconnect auto
 		return
 
 	# Recevoir les messages
@@ -277,7 +338,9 @@ func get_queue_stats() -> Dictionary:
 		"queue_size": _request_queue.size(),
 		"pending_requests": _pending_requests.size(),
 		"is_open": is_open(),
-		"server_clock_offset_ms": server_clock_offset_ms
+		"server_clock_offset_ms": server_clock_offset_ms,
+		"reconnect_attempts": _reconnect_attempts,
+		"reconnect_next_delay_sec": _reconnect_delay_sec,
 	}
 
 func get_pending_request(rid: String) -> Dictionary:

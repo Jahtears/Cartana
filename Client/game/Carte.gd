@@ -1,4 +1,5 @@
-#Carte.gd v1.1.2
+#Carte.gd v1.2
+
 extends Node2D
 
 @export var valeur: String = ""
@@ -16,25 +17,26 @@ var _in_drag_layer := false
 var _drag_original_parent: Node = null
 var _drag_original_z: int = 0
 
-const DRAG_Z := 10 # évite le dépassement CANVAS_ITEM_Z_MAX
-const MIN_OVERLAP_AREA := 200.0 # seuil anti “accrochage” trop sensible
+const DRAG_Z := 3000
+const MIN_OVERLAP_AREA := 200.0
 
 var _current_preview_slot: Node2D = null
-var slot: Node2D = null # assigné par Slot.snap_card()
+var slot: Node2D = null
+
+var _slot_cache: Array = []
+var _slot_cache_valid := false
+var _last_drag_frame := -1
+
 const HitboxUtil = preload("res://Client/game/helpers/hitbox.gd")
-const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
-static var _active_drag_card: Node = null
 
 func _ready() -> void:
 	update_card()
 
 func _get_drag_root() -> Node:
-	# 1) via groupe (recommandé)
 	var nodes := get_tree().get_nodes_in_group("drag_root")
 	if nodes.size() > 0:
 		return nodes[0]
 
-	# 2) fallback via chemin standard
 	var scene := get_tree().current_scene
 	if scene:
 		var n := scene.get_node_or_null("DragLayer/DragRoot")
@@ -43,11 +45,18 @@ func _get_drag_root() -> Node:
 
 	return null
 
+func _can_drag() -> bool:
+	if not draggable:
+		return false
+	if not _can_interact():
+		return false
+	if dragging:
+		return false
+	return true
 
 func _enter_drag_layer() -> void:
 	var drag_root := _get_drag_root()
 	if drag_root == null:
-		# fallback : au pire move_to_front dans le parent actuel
 		move_to_front()
 		return
 
@@ -55,7 +64,6 @@ func _enter_drag_layer() -> void:
 	_drag_original_z = z_index
 	_drag_from_slot = slot
 
-	# Important : éviter "ghost" dans stacked_cards du slot d'origine
 	if _drag_from_slot != null and _drag_from_slot != self and _drag_from_slot.has_method("_remove_card_ref"):
 		_drag_from_slot.call("_remove_card_ref", self)
 
@@ -64,15 +72,15 @@ func _enter_drag_layer() -> void:
 	global_position = gpos
 
 	drag_root.move_child(self, drag_root.get_child_count() - 1)
+	z_index = DRAG_Z
 
 	_in_drag_layer = true
+	_slot_cache_valid = false
 
-
-func _leave_drag_layer_to_original() -> void:	
+func _leave_drag_layer_to_original() -> void:
 	if not _in_drag_layer:
 		return
 
-	# Si on a toujours un slot valide, on revient proprement via snap
 	if is_instance_valid(_drag_from_slot):
 		_drag_from_slot.snap_card(self, false)
 	elif _drag_original_parent != null:
@@ -82,6 +90,7 @@ func _leave_drag_layer_to_original() -> void:
 
 	z_index = _drag_original_z
 	_in_drag_layer = false
+	_slot_cache_valid = false
 
 func set_card_data(v: String, c: String, d: bool, d_couleur: String, can_drag: bool = true) -> void:
 	valeur = v
@@ -133,9 +142,6 @@ func _show_back() -> void:
 	$Front.visible = false
 	$Back.visible = true
 
-# ---------------------------------------------------------
-# Helpers d'état (nouvelle API)
-# ---------------------------------------------------------
 func _is_game_end() -> bool:
 	return Global.result.size() > 0
 
@@ -146,52 +152,14 @@ func _can_interact() -> bool:
 		return false
 	return true
 
-func _release_drag_lock() -> void:
-	if _active_drag_card == self:
-		_active_drag_card = null
 
-func _is_hand_card() -> bool:
-	if slot == null:
-		return false
-
-	var slot_id: String = ""
-	if slot.has_method("get_slot_id"):
-		slot_id = String(slot.call("get_slot_id"))
-	else:
-		slot_id = String(slot.get("slot_id"))
-
-	var parsed: Dictionary = SlotIdHelper.parse_slot_id(slot_id)
-	return String(parsed.get("type", "")) == "HAND"
-
-func _can_start_drag(mouse_pos: Vector2) -> bool:
-	if _active_drag_card != null and _active_drag_card != self:
-		return false
-	if not _is_hand_card():
-		return true
-	if slot == null:
-		return true
-
-	var siblings: Array = []
-	for child in slot.get_children():
-		if child is Node2D and child.has_method("get_card_id"):
-			siblings.append(child)
-
-	var topmost: Node2D = HitboxUtil.pick_topmost_node_at_point(siblings, mouse_pos)
-	return topmost == self
-
-# ---------------------------------------------------------
-# INPUT / DRAG
-# ---------------------------------------------------------
 func _on_area_2d_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and draggable:
-			if not _can_interact():
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+			if not _can_drag():
 				return
-			var mouse_pos: Vector2 = get_global_mouse_position()
-			if not _can_start_drag(mouse_pos):
-				return
-			_start_drag(mouse_pos)
+			_start_drag(get_global_mouse_position())
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -205,12 +173,14 @@ func _process(_delta: float) -> void:
 		return
 
 	global_position = get_global_mouse_position() - drag_offset
-	_preview_slot_under_card()
-
+	
+	var frame = get_tree().get_frame()
+	if frame - _last_drag_frame >= 2:
+		_preview_slot_under_card()
+		_last_drag_frame = frame
 
 func _start_drag(mouse_pos: Vector2) -> void:
 	dragging = true
-	_active_drag_card = self
 	drag_offset = mouse_pos - global_position
 	original_position = global_position
 
@@ -223,8 +193,6 @@ func _start_drag(mouse_pos: Vector2) -> void:
 			_current_preview_slot.call("on_card_exit_preview")
 	_current_preview_slot = null
 
-
-
 func _rollback_drag() -> void:
 	_leave_drag_layer_to_original()
 	global_position = original_position
@@ -232,7 +200,6 @@ func _rollback_drag() -> void:
 	if _current_preview_slot != null and _current_preview_slot.has_method("on_card_exit_preview"):
 		_current_preview_slot.call("on_card_exit_preview")
 	_current_preview_slot = null
-	_release_drag_lock()
 
 func _end_drag() -> void:
 	dragging = false
@@ -246,38 +213,41 @@ func _end_drag() -> void:
 		if _current_preview_slot.has_method("get_slot_id"):
 			to_slot_id = String(_current_preview_slot.call("get_slot_id"))
 		send_move_card_to_server(get_card_id(), to_slot_id)
-		# On NE rollback PAS ici : on attend la resync serveur (card_update)
 	else:
 		_rollback_drag()
 
-	# Nettoyage preview
 	if _current_preview_slot != null:
 		if _current_preview_slot.has_method("on_card_exit_preview"):
 			_current_preview_slot.call("on_card_exit_preview")
 	_current_preview_slot = null
-	_release_drag_lock()
 
-# ---------------------------------------------------------
-# HELPERS
-# ---------------------------------------------------------
 func get_card_id() -> String:
 	if has_meta("card_id"):
 		return String(get_meta("card_id"))
 	return String(name)
 
 func _preview_slot_under_card() -> void:
+	if not _slot_cache_valid:
+		_slot_cache = get_tree().get_nodes_in_group("slots")
+		_slot_cache_valid = true
+	
 	var card_rect := _get_card_rect_global()
-	var slots: Array = get_tree().get_nodes_in_group("slots")
-
 	var best_slot: Node = null
 	var best_area := 0.0
 
-	for s in slots:
-		if s == null:
+	for s in _slot_cache:
+		if s == null or not is_instance_valid(s):
 			continue
-		var slot_rect: Rect2 = HitboxUtil.rect_from_collision_shape_2d(s)
+		
+		var slot_rect: Rect2
+		if s.has_method("get_cached_rect"):
+			slot_rect = s.call("get_cached_rect")
+		else:
+			slot_rect = HitboxUtil.rect_from_collision_shape_2d(s)
+		
 		if slot_rect.size == Vector2.ZERO:
 			continue
+		
 		var inter := _rect_intersection(card_rect, slot_rect)
 		var area := inter.size.x * inter.size.y
 
@@ -285,37 +255,11 @@ func _preview_slot_under_card() -> void:
 			best_area = area
 			best_slot = s
 
-	# seuil pour éviter de “coller” à un slot juste en frôlant
 	if best_area < MIN_OVERLAP_AREA:
 		best_slot = null
 
 	_set_preview_slot(best_slot)
 
-# ---------------------------------------------------------
-# NETWORK
-# ---------------------------------------------------------
-func send_move_card_to_server(card_id: String, new_slot_id: String) -> void:
-	# Hard guard
-	if not _can_interact():
-		_rollback_drag()
-		return
-
-	var from_slot_id: String = ""
-	if slot != null:
-		if slot.has_method("get_slot_id"):
-			from_slot_id = String(slot.call("get_slot_id"))
-		else:
-			from_slot_id = String(slot.slot_id)
-
-	if from_slot_id == "" or new_slot_id == "":
-		_rollback_drag()
-		return
-
-	NetworkManager.request("move_request", {
-		"card_id": card_id,
-		"from_slot_id": from_slot_id,
-		"to_slot_id": new_slot_id
-	})
 func _get_card_rect_global() -> Rect2:
 	var size := Vector2(80, 120)
 	var shape = $Area2D/CollisionShape2D.shape
@@ -340,7 +284,6 @@ func _set_preview_slot(new_slot: Node) -> void:
 	if _current_preview_slot == new_slot:
 		return
 
-	# clear ancien
 	if _current_preview_slot != null:
 		if _current_preview_slot.has_method("_set_preview"):
 			_current_preview_slot.call("_set_preview", false)
@@ -349,12 +292,69 @@ func _set_preview_slot(new_slot: Node) -> void:
 
 	_current_preview_slot = new_slot
 
-	# set nouveau
 	if _current_preview_slot != null:
 		if _current_preview_slot.has_method("_set_preview"):
 			_current_preview_slot.call("_set_preview", true)
 		elif _current_preview_slot.has_method("on_card_enter_preview"):
 			_current_preview_slot.call("on_card_enter_preview")
 
-func _exit_tree() -> void:
-	_release_drag_lock()
+
+func send_move_card_to_server(card_id: String, new_slot_id: String) -> void:
+	if _move_pending:
+		print("[CARD] Move already pending, ignoring duplicate request")
+		return
+	
+	if not _can_interact():
+		_rollback_drag()
+		return
+
+	var from_slot_id: String = ""
+	if slot != null:
+		if slot.has_method("get_slot_id"):
+			from_slot_id = String(slot.call("get_slot_id"))
+		else:
+			from_slot_id = String(slot.slot_id)
+
+	if from_slot_id == "" or new_slot_id == "":
+		_rollback_drag()
+		return
+
+	_move_pending = true
+	_start_move_timeout()
+
+	print("[CARD] Sending move request: %s -> %s" % [from_slot_id, new_slot_id])
+	
+	NetworkManager.request("move_request", {
+		"card_id": card_id,
+		"from_slot_id": from_slot_id,
+		"to_slot_id": new_slot_id
+	})
+
+func _start_move_timeout() -> void:
+	_clear_move_timeout()
+	_move_request_timeout = Timer.new()
+	add_child(_move_request_timeout)
+	_move_request_timeout.one_shot = true
+	_move_request_timeout.wait_time = 5.0  # 5s timeout
+	_move_request_timeout.timeout.connect(_on_move_timeout)
+	_move_request_timeout.start()
+
+func _on_move_timeout() -> void:
+	print("[CARD] Move request timeout, resetting pending flag")
+	_clear_move_timeout()
+	_move_pending = false
+
+func _clear_move_timeout() -> void:
+	if _move_request_timeout:
+		_move_request_timeout.queue_free()
+		_move_request_timeout = null
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_clear_move_timeout()
+# Ajouter à Carte.gd
+
+func _reset_move_pending() -> void:
+	_move_pending = false
+	_clear_move_timeout()
+	print("[CARD] Move pending flag reset")

@@ -5,7 +5,9 @@ import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from "../../net
  
  export function handleSpectateGame(ctx, ws, req, data, actor) {
    const {
-    state,
+     sendResponse,
+     emitStartGameToUser,
+     state,
      refreshLobby,
 
      attachSpectator,
