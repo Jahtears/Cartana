@@ -105,6 +105,7 @@ grow_vertical = 0
 show_percentage = false
 
 [node name="DragLayer" type="CanvasLayer" parent="." unique_id=623595508]
+layer = 10
 
 [node name="DragRoot" type="Node2D" parent="DragLayer" unique_id=341452031]
 

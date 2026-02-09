@@ -11,7 +11,14 @@ const TimebarUtil = preload("res://Client/game/helpers/timebar.gd")
 
 const MAIN_COUNT := 1
 const BANC_COUNT := 4
-const SPACING := 100
+const MIN_SLOT_SPACING := 64.0
+const MAX_SLOT_SPACING := 120.0
+const SLOT_WIDTH := 80.0
+const SIDE_MARGIN := 100.0
+const PLAYER_TOP_Y_RATIO := 0.18
+const PLAYER_BOTTOM_Y_RATIO := 0.82
+const TABLE_Y_RATIO := 0.5
+const PIOCHE_RIGHT_MARGIN := 80.0
 const START_POS := Vector2.ZERO
 
 static var TIMEBAR_GREEN: Color = Color.from_hsv(0.333, 0.85, 0.95, 1.0)
@@ -28,8 +35,20 @@ var cards: Dictionary = {}                          # card_id -> Node
 var _is_changing_scene := false
 var opponent_name: String = ""
 var allowed_table_slots: Dictionary = {}            # IDs table autorisés (format 0:TABLE:index)
+var _slot_spacing: float = 100.0
+var _table_spacing: int = 100
 
 @onready var time_bar: ProgressBar = $TimeBar
+@onready var player1_root: Node2D = $Player1
+@onready var player2_root: Node2D = $Player2
+@onready var player1_deck: Node2D = $Player1/Deck
+@onready var player1_main: Node2D = $Player1/Main
+@onready var player1_banc: Node2D = $Player1/Banc
+@onready var player2_deck: Node2D = $Player2/Deck
+@onready var player2_main: Node2D = $Player2/Main
+@onready var player2_banc: Node2D = $Player2/Banc
+@onready var pioche_root: Node2D = $Pioche
+@onready var table_root: Node2D = $Table
 
 var _card_ctx: Dictionary = {}
 var _timebar_state: Dictionary = {
@@ -49,6 +68,8 @@ var _timebar_colors: Dictionary = {
 }
 
 func _ready() -> void:
+	_connect_layout_signals()
+	_relayout_board()
 	_setup_player($Player1, 1)
 	_setup_player($Player2, 2)
 	_setup_Pioche($Pioche)
@@ -119,7 +140,7 @@ func _on_evt(type: String, data: Dictionary) -> void:
 
 		"table_sync":
 			if slots_ready:
-				TableSyncHelper.sync_table_slots($Table, slot_scene, slots_by_id, allowed_table_slots, data.get("slots", []), SPACING, START_POS)
+				TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, data.get("slots", []), _table_spacing, START_POS)
 			else:
 				pending_events.append({"type": type, "data": data})
 
@@ -175,7 +196,7 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 		if s and s.has_method("clear_slot"):
 			s.clear_slot()
 
-	TableSyncHelper.sync_table_slots($Table, slot_scene, slots_by_id, allowed_table_slots, data.get("table", []), SPACING, START_POS)
+	TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, data.get("table", []), _table_spacing, START_POS)
 
 	var slots_dict: Dictionary = data.get("slots", {})
 	for k in slots_dict.keys():
@@ -297,7 +318,7 @@ func _reset_board_state() -> void:
 		if s and s.has_method("clear_slot"):
 			s.clear_slot()
 
-	TableSyncHelper.sync_table_slots($Table, slot_scene, slots_by_id, allowed_table_slots, ["0:TABLE:1"], SPACING, START_POS)
+	TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, ["0:TABLE:1"], _table_spacing, START_POS)
 
 	for k in cards.keys():
 		var c = cards[k]
@@ -318,9 +339,9 @@ func _setup_player(player: Node, id: int) -> void:
 	var banc = player.get_node("Banc")
 	_create_slot(deck, "%d:DECK:1" % id, START_POS)
 	for i in range(MAIN_COUNT):
-		_create_slot(main, "%d:HAND:%d" % [id, i + 1], START_POS + Vector2(i * SPACING, 0))
+		_create_slot(main, "%d:HAND:%d" % [id, i + 1], START_POS + Vector2(i * _slot_spacing, 0))
 	for i in range(BANC_COUNT):
-		_create_slot(banc, "%d:BENCH:%d" % [id, i + 1], START_POS + Vector2(i * SPACING, 0))
+		_create_slot(banc, "%d:BENCH:%d" % [id, i + 1], START_POS + Vector2(i * _slot_spacing, 0))
 
 func _setup_Pioche(pioche: Node) -> void:
 	_create_slot(pioche, "0:PILE:1", START_POS)
@@ -362,6 +383,69 @@ func _create_slot(parent: Node, slot_name: String, pos: Vector2) -> void:
 # ---------------------------------------------------------
 func _find_slot_by_id(slot_id: String) -> Node:
 	return slots_by_id.get(slot_id, null)
+
+func _connect_layout_signals() -> void:
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_on_viewport_size_changed):
+		vp.size_changed.connect(_on_viewport_size_changed)
+
+func _on_viewport_size_changed() -> void:
+	_relayout_board()
+
+func _relayout_board() -> void:
+	var view_size := get_viewport_rect().size
+	if view_size == Vector2.ZERO:
+		return
+
+	var vw := view_size.x
+	var vh := view_size.y
+	_slot_spacing = clampf(vw * 0.085, MIN_SLOT_SPACING, MAX_SLOT_SPACING)
+	var edge_left_center := SIDE_MARGIN + SLOT_WIDTH * 0.5
+	var edge_right_center := vw - SIDE_MARGIN - SLOT_WIDTH * 0.5
+	var bench_steps: int = maxi(BANC_COUNT - 1, 1)
+	var center_keepout := SLOT_WIDTH * 1.2
+	var table_center_x: float = vw * 0.5
+	var max_spacing_from_edges: float = (edge_right_center - (table_center_x + center_keepout)) / float(bench_steps)
+	_slot_spacing = minf(_slot_spacing, maxf(56.0, max_spacing_from_edges))
+	_table_spacing = int(round(_slot_spacing))
+
+	var bench_span := float(BANC_COUNT - 1) * _slot_spacing
+	var p1_deck_center := edge_left_center
+	var p1_bench_start := edge_right_center - bench_span
+	var p1_main_center: float = (p1_deck_center + table_center_x) * 0.6
+
+	var p2_bench_start := edge_left_center
+	var p2_deck_center := edge_right_center
+	var p2_main_center: float = (p2_deck_center + table_center_x) * 0.45
+
+	player1_root.position = Vector2(0, clampf(vh * PLAYER_BOTTOM_Y_RATIO, vh * 0.65, vh - 80.0))
+	player2_root.position = Vector2(0, clampf(vh * PLAYER_TOP_Y_RATIO, 80.0, vh * 0.35))
+	player1_deck.position = Vector2(p1_deck_center, 0)
+	player1_main.position = Vector2(p1_main_center, 0)
+	player1_banc.position = Vector2(p1_bench_start, 0)
+
+	player2_banc.position = Vector2(p2_bench_start, 0)
+	player2_main.position = Vector2(p2_main_center, 0)
+	player2_deck.position = Vector2(p2_deck_center, 0)
+
+	table_root.position = Vector2(table_center_x, vh * TABLE_Y_RATIO)
+	pioche_root.position = Vector2(maxf(vw - PIOCHE_RIGHT_MARGIN, edge_right_center), vh * TABLE_Y_RATIO)
+
+	_update_slot_rows()
+	TableSyncHelper.update_table_positions(table_root, _table_spacing, START_POS)
+
+func _update_slot_rows() -> void:
+	_update_row_positions(1, "HAND", MAIN_COUNT)
+	_update_row_positions(1, "BENCH", BANC_COUNT)
+	_update_row_positions(2, "HAND", MAIN_COUNT)
+	_update_row_positions(2, "BENCH", BANC_COUNT)
+
+func _update_row_positions(player_id: int, slot_type: String, count: int) -> void:
+	for i in range(count):
+		var slot_id := "%d:%s:%d" % [player_id, slot_type, i + 1]
+		var slot := _find_slot_by_id(slot_id)
+		if slot != null:
+			slot.position = START_POS + Vector2(i * _slot_spacing, 0)
 
 # ---------------------------------------------------------
 #  UI MESSAGE

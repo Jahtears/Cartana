@@ -73,9 +73,9 @@ static func _update_timebar_fill_by_ratio(state: Dictionary, time_bar: ProgressB
 		2:
 			c = colors.get("spec", Color(0.85, 0.85, 0.85))
 		0:
-			c = _timebar_gradient_drama(ratio, colors)
+			c = _timebar_gradient(ratio, colors)
 		1:
-			c = _timebar_gradient_drama(0.0, colors)
+			c = _timebar_gradient(0.0, colors)
 		_:
 			return
 
@@ -90,11 +90,10 @@ static func _update_timebar_fill_by_ratio(state: Dictionary, time_bar: ProgressB
 	else:
 		time_bar.self_modulate = c
 
-static func _timebar_gradient_drama(ratio: float, colors: Dictionary) -> Color:
+static func _timebar_gradient(ratio: float, colors: Dictionary) -> Color:
 	ratio = clampf(ratio, 0.0, 1.0)
 
 	var green: Color = colors.get("green", Color.from_hsv(0.333, 0.85, 0.95, 1.0))
-	var yellow: Color = colors.get("yellow", Color.from_hsv(0.166, 0.85, 0.95, 1.0))
 	var orange: Color = colors.get("orange", Color.from_hsv(0.083, 0.85, 0.95, 1.0))
 	var red: Color = colors.get("red", Color.from_hsv(0.000, 0.85, 0.95, 1.0))
 

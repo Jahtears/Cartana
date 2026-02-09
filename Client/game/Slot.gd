@@ -11,8 +11,11 @@ var preview_active := false
 
 const CASCADE_BANC := Vector2(0, 24)
 const CASCADE_TABLE := Vector2(0, 0)
-const CASCADE_MAIN := Vector2(85, 0)
 const CASCADE_DEFAULT := Vector2(0, 0)
+const HAND_FAN_X_STEP := 60.0
+const HAND_FAN_CENTER_LIFT := 20.0
+const HAND_FAN_MAX_ANGLE_DEG := 50.0
+const HAND_FAN_MAX_CARDS := 5
 
 func _ready():
 	add_to_group("slots")
@@ -128,17 +131,15 @@ func clear_slot() -> void:
 func _layout_stack(animate: bool) -> void:
 	var step := CASCADE_DEFAULT
 	var base_offset := Vector2.ZERO
+	var target_rot := 0.0
 	var parsed := SlotIdHelper.parse_slot_id(get_slot_id())
 	var stype := String(parsed.get("type", ""))
+	var player_id := int(parsed.get("player", 0))
 
 	if stype == "BENCH":
 		step = CASCADE_BANC
 	elif stype == "HAND":
-		step = CASCADE_MAIN
-		# Centre la main autour du slot (sinon ça part juste vers la droite)
-		var n := stacked_cards.size()
-		if n > 1:
-			base_offset = -step * float(n - 1) * 0.5
+		step = Vector2.ZERO
 	elif stype == "TABLE":
 		step = CASCADE_TABLE
 
@@ -148,10 +149,32 @@ func _layout_stack(animate: bool) -> void:
 			continue
 
 		var target_pos := base_offset + (step * i)
+		target_rot = 0.0
+
+		if stype == "HAND":
+			var n: int = stacked_cards.size()
+			if n > 1:
+				var t: float = float(i) / float(n - 1) # [0..1]
+				var centered: float = t * 2.0 - 1.0     # [-1..1]
+				var arc: float = 1.0 - centered * centered
+				var fan_count: int = mini(n, HAND_FAN_MAX_CARDS)
+				var x_radius: float = HAND_FAN_X_STEP * float(maxi(1, fan_count - 1)) * 0.5
+				var vertical_sign: float = -1.0 if player_id == 1 else 1.0
+				var angle_sign: float = 1.0 if player_id == 1 else -1.0
+				target_pos = Vector2(centered * x_radius, vertical_sign * HAND_FAN_CENTER_LIFT * arc)
+				target_rot = deg_to_rad(angle_sign * centered * HAND_FAN_MAX_ANGLE_DEG)
+			else:
+				target_pos = Vector2.ZERO
+				target_rot = 0.0
+
 		c.z_index = i
 
 		if animate:
 			var t := c.create_tween()
+			t.set_parallel(true)
 			t.tween_property(c, "position", target_pos, 0.12)
+			t.tween_property(c, "rotation", target_rot, 0.12)
+			c.set_meta("_snap_tween", t)
 		else:
 			c.position = target_pos
+			c.rotation = target_rot

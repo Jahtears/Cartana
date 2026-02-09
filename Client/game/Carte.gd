@@ -22,6 +22,8 @@ const MIN_OVERLAP_AREA := 200.0 # seuil anti “accrochage” trop sensible
 var _current_preview_slot: Node2D = null
 var slot: Node2D = null # assigné par Slot.snap_card()
 const HitboxUtil = preload("res://Client/game/helpers/hitbox.gd")
+const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
+static var _active_drag_card: Node = null
 
 func _ready() -> void:
 	update_card()
@@ -61,14 +63,12 @@ func _enter_drag_layer() -> void:
 	reparent(drag_root)
 	global_position = gpos
 
-	# z_index raisonnable (pas nécessaire si CanvasLayer layer=10)
-	z_index = 2000
 	drag_root.move_child(self, drag_root.get_child_count() - 1)
 
 	_in_drag_layer = true
 
 
-func _leave_drag_layer_to_original() -> void:
+func _leave_drag_layer_to_original() -> void:	
 	if not _in_drag_layer:
 		return
 
@@ -146,6 +146,39 @@ func _can_interact() -> bool:
 		return false
 	return true
 
+func _release_drag_lock() -> void:
+	if _active_drag_card == self:
+		_active_drag_card = null
+
+func _is_hand_card() -> bool:
+	if slot == null:
+		return false
+
+	var slot_id: String = ""
+	if slot.has_method("get_slot_id"):
+		slot_id = String(slot.call("get_slot_id"))
+	else:
+		slot_id = String(slot.get("slot_id"))
+
+	var parsed: Dictionary = SlotIdHelper.parse_slot_id(slot_id)
+	return String(parsed.get("type", "")) == "HAND"
+
+func _can_start_drag(mouse_pos: Vector2) -> bool:
+	if _active_drag_card != null and _active_drag_card != self:
+		return false
+	if not _is_hand_card():
+		return true
+	if slot == null:
+		return true
+
+	var siblings: Array = []
+	for child in slot.get_children():
+		if child is Node2D and child.has_method("get_card_id"):
+			siblings.append(child)
+
+	var topmost: Node2D = HitboxUtil.pick_topmost_node_at_point(siblings, mouse_pos)
+	return topmost == self
+
 # ---------------------------------------------------------
 # INPUT / DRAG
 # ---------------------------------------------------------
@@ -155,7 +188,10 @@ func _on_area_2d_input_event(_viewport: Node, event: InputEvent, _shape_idx: int
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and draggable:
 			if not _can_interact():
 				return
-			_start_drag(get_global_mouse_position())
+			var mouse_pos: Vector2 = get_global_mouse_position()
+			if not _can_start_drag(mouse_pos):
+				return
+			_start_drag(mouse_pos)
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -174,6 +210,7 @@ func _process(_delta: float) -> void:
 
 func _start_drag(mouse_pos: Vector2) -> void:
 	dragging = true
+	_active_drag_card = self
 	drag_offset = mouse_pos - global_position
 	original_position = global_position
 
@@ -195,6 +232,7 @@ func _rollback_drag() -> void:
 	if _current_preview_slot != null and _current_preview_slot.has_method("on_card_exit_preview"):
 		_current_preview_slot.call("on_card_exit_preview")
 	_current_preview_slot = null
+	_release_drag_lock()
 
 func _end_drag() -> void:
 	dragging = false
@@ -217,6 +255,7 @@ func _end_drag() -> void:
 		if _current_preview_slot.has_method("on_card_exit_preview"):
 			_current_preview_slot.call("on_card_exit_preview")
 	_current_preview_slot = null
+	_release_drag_lock()
 
 # ---------------------------------------------------------
 # HELPERS
@@ -316,3 +355,6 @@ func _set_preview_slot(new_slot: Node) -> void:
 			_current_preview_slot.call("_set_preview", true)
 		elif _current_preview_slot.has_method("on_card_enter_preview"):
 			_current_preview_slot.call("on_card_enter_preview")
+
+func _exit_tree() -> void:
+	_release_drag_lock()
