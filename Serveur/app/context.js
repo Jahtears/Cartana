@@ -19,6 +19,7 @@ export function createServerContext(deps) {
     initTurnForGame,
     isBenchSlot,
     endTurnAfterBenchPlay,
+    timeoutTurnIfExpired,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
     saveGameState,
@@ -145,6 +146,39 @@ export function createServerContext(deps) {
     }
   }
 
+  function expireTurnIfNeeded(game_id, now = Date.now()) {
+    if (typeof timeoutTurnIfExpired !== "function") return false;
+
+    const game = state.getGame(game_id);
+    if (!game?.turn) return false;
+
+    const meta = state.gameMeta.get(game_id);
+    if (meta?.pause?.active || meta?.result) return false;
+
+    const expired = timeoutTurnIfExpired(game, now);
+    if (!expired) return false;
+
+    const prev = String(expired.prev ?? "").trim();
+    const next = String(expired.next ?? "").trim();
+
+    if (prev) {
+      sendEventToUser(prev, "show_game_message", {
+        text: "Temps ecoule.",
+        code: "WARN",
+      });
+    }
+    if (next) {
+      sendEventToUser(next, "show_game_message", {
+        text: "A vous de jouer.",
+        code: "TURN_START",
+      });
+    }
+
+    saveGameState(game_id, game);
+    emitSnapshotsToAudience(game_id, { reason: "turn_timeout" });
+    return expired;
+  }
+
   // ========================
   // PRESENCE (disconnect/reconnect)
   // ========================
@@ -216,6 +250,7 @@ export function createServerContext(deps) {
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
     withGameUpdate,
+    expireTurnIfNeeded,
 
     // Persist (sauvegarde)
     saveGameState,
