@@ -9,7 +9,7 @@ import { mapSlotFromClientToServer, mapSlotForClient } from '../domain/game/slot
 import { getTableSlots } from '../domain/game/SlotManager.js';
 import { applyMove } from '../domain/game/MoveApplier.js';
 import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot } from '../domain/game/Regles.js';
-import { initTurnForGame, endTurnAfterBenchPlay } from '../domain/game/turn.js';
+import { initTurnForGame, endTurnAfterBenchPlay, timeoutTurnIfExpired } from '../domain/game/turn.js';
 import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
 import { verifyOrCreateUser } from '../domain/auth/usersStore.js';
 import { emitSlotState, emitFullState } from '../domain/session/index.js';
@@ -49,6 +49,7 @@ const { baseCtx, loginCtx, onSocketClose } = createServerContext({
   initTurnForGame,
   isBenchSlot,
   endTurnAfterBenchPlay,
+  timeoutTurnIfExpired,
   refillHandIfEmpty,
   hasWonByEmptyDeckSlot,
   saveGameState,
@@ -144,10 +145,29 @@ wss.on("connection", async (ws) => {
 // ============= HEARTBEAT =============
 const heartbeatTimer = wsManager.startHeartbeat();
 
+// ============= TURN EXPIRY LOOP =============
+const TURN_EXPIRY_INTERVAL_MS = 250;
+const turnExpiryTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [game_id, game] of baseCtx.state.games.entries()) {
+    if (!game?.turn) continue;
+    try {
+      baseCtx.expireTurnIfNeeded?.(game_id, now);
+    } catch (err) {
+      console.error("[TURN_EXPIRY_ERROR]", { game_id, error: err?.message ?? String(err) });
+    }
+  }
+}, TURN_EXPIRY_INTERVAL_MS);
+
+if (typeof turnExpiryTimer.unref === "function") {
+  turnExpiryTimer.unref();
+}
+
 // ============= GRACEFUL SHUTDOWN =============
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down...');
   stopHeartbeatManager(heartbeatTimer);
+  clearInterval(turnExpiryTimer);
   wss.close(() => {
     httpServer.close(() => {
       console.log('Server closed');
