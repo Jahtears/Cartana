@@ -2,6 +2,7 @@
 
 import { ensureGameMeta } from "../../domain/game/meta.js";
 import { GAME_MESSAGE, MESSAGE_COLORS } from "../../shared/constants.js";
+import { toUiMessage } from "../../shared/uiMessage.js";
 import { getExistingGameOrRes, getGameIdFromDataOrMapping } from "../../net/guards.js";
 import { resBadRequest, resForbidden } from "../../net/transport.js";
 import { saveGameState } from "../../domain/session/Saves.js";
@@ -59,10 +60,22 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
 
     if (starter) {
       withGameUpdate(game_id, (fx) => {
-      fx.message("show_game_message", {
-        reason: reason || "A vous de commencer",
-        color: MESSAGE_COLORS[GAME_MESSAGE.TURN_START],
-      }, { to: starter });
+      // Contrat UI "show_game_message":
+      // - text: libelle affiche
+      // - code: identifiant semantique (couleur cote client)
+      // - color: fallback legacy
+      fx.message(
+        "show_game_message",
+        toUiMessage(
+          {
+            text: reason || "A vous de commencer",
+            code: GAME_MESSAGE.TURN_START,
+            color: MESSAGE_COLORS[GAME_MESSAGE.TURN_START],
+          },
+          { code: GAME_MESSAGE.INFO }
+        ),
+        { to: starter }
+      );
       }, ctx.trace);
     }
 

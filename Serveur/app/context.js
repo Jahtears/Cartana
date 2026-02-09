@@ -132,8 +132,30 @@ export function createServerContext(deps) {
     // Exécuter le callback avec le builder
     callback(fx);
 
-    // Broadcaster les mises à jour
-    emitSnapshotsToAudience(game_id, game);
+    // Emettre les messages applicatifs accumulés (show_game_message, etc.)
+    if (fx.messages.length) {
+      const specs = state.gameSpectators.get(game_id);
+      const audience = [
+        ...(Array.isArray(game.players) ? game.players : []),
+        ...(specs ? Array.from(specs) : []),
+      ];
+
+      for (const msg of fx.messages) {
+        const type = String(msg?.type ?? "").trim();
+        if (!type) continue;
+        const data = msg?.data && typeof msg.data === "object" ? msg.data : {};
+        const to = msg?.opts?.to ?? null;
+        const recipients = Array.isArray(to) ? to : (to ? [to] : audience);
+        const uniqueRecipients = new Set(recipients.filter(Boolean).map((u) => String(u)));
+
+        for (const username of uniqueRecipients) {
+          sendEventToUser(username, type, data);
+        }
+      }
+    }
+
+    // Broadcaster les mises à jour d'état (snapshot)
+    emitSnapshotsToAudience(game_id, { reason: "with_game_update" });
   }
 
   function notifyOpponent(game_id, game, evtType, data) {

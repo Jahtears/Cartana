@@ -2,6 +2,7 @@
 import { ensureGameMeta } from "../domain/game/meta.js";
 import { SlotId } from "../domain/game/SlotManager.js";
 import { slotIdToNewString } from "../domain/game/slots.js";
+import { toUiMessage } from "../shared/uiMessage.js";
 
 function slotKey(slot_id) {
   if (slot_id instanceof SlotId) return slot_id.toString();
@@ -168,7 +169,11 @@ export function createFlush(bc, trace) {
 
   const message = (type, data, { to = null } = {}) => {
     if (!type) return;
-    messages.push({ type, data: data ?? {}, to });
+    const payload =
+      type === "show_game_message"
+        ? toUiMessage(data ?? {})
+        : (data ?? {});
+    messages.push({ type, data: payload, to });
   };
 
   const flush = () => {

@@ -73,11 +73,25 @@ export function createTransport({ wsByUser }) {
     for (const ws of wsByUser.values()) sendEvent(ws, type, data);
   }
 
+  // Alias API (compat: ancienne + nouvelle nomenclature)
+  const sendRes = sendResponse;
+  const sendEvtSocket = sendEvent;
+  const sendEvtUser = sendEventToUser;
+  const sendEvtLobby = sendLobbyEvent;
+
   return { 
+    // New aliases
+    sendRes,
+    sendEvtSocket,
+    sendEvtUser,
+    sendEvtLobby,
+
+    // Legacy names
     sendResponse, 
     sendEvent, 
     sendEventToUser, 
     sendLobbyEvent,
+
     safeSend, // Exporter pour usage interne si needed
     wsIsOpen,  // Exporter pour vérifications
   };
