@@ -3,6 +3,7 @@ import { emitGameEndThenSnapshot } from "../../net/broadcast.js";
 import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../../net/guards.js";
 import { resBadRequest, resNotFound } from "../../net/transport.js";
 import { orchestrateMove } from "../../domain/game/moveOrchestrator.js";
+import { ensureGameMeta } from "../../domain/game/meta.js";
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
   const {
@@ -26,9 +27,14 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const pg = getPlayerGameOrRes(ctx, ws, req, actor);
   if (!pg) return true;
   const { game_id, game } = pg;
+  const meta = ensureGameMeta(ctx.state.gameMeta, game_id, { initialSent: !!game?.turn });
 
   if (rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, "Spectateur: déplacement interdit")) return true;
   if (rejectIfEndedOrRes(ctx, ws, req, game_id, game)) return true;
+  if (meta.pause?.active) {
+    sendResponse(ws, req, false, { code: "GAME_PAUSED", message: "Partie en pause: adversaire déconnecté" });
+    return true;
+  }
 
   // ✅ TURN EXPIRY CHECK
   if (typeof expireTurnIfNeeded === "function") {

@@ -32,7 +32,44 @@ export function createPresence(ctx) {
 
     // misc
     notifyOpponent,
+    emitStartGameToUser,
+    emitSnapshotsToAudience,
   } = ctx;
+
+  function pauseTurnForDisconnect(game, meta) {
+    if (!game?.turn || !meta) return false;
+    if (meta.pause?.active) return false;
+
+    const now = Date.now();
+    const endsAt = Number(game.turn.endsAt ?? now);
+    const remainingMs = Math.max(0, endsAt - now);
+
+    meta.pause = {
+      active: true,
+      startedAt: now,
+      remainingMs,
+    };
+    game.turn.paused = true;
+    game.turn.remainingMs = remainingMs;
+    return true;
+  }
+
+  function resumeTurnAfterReconnect(game, meta) {
+    if (!game?.turn || !meta?.pause?.active) return false;
+
+    const now = Date.now();
+    const remainingMs = Math.max(0, Number(meta.pause.remainingMs ?? game.turn.remainingMs ?? 0));
+
+    game.turn.endsAt = now + remainingMs;
+    game.turn.paused = false;
+    game.turn.remainingMs = 0;
+    meta.pause = {
+      active: false,
+      startedAt: 0,
+      remainingMs: 0,
+    };
+    return true;
+  }
 
   function handleDisconnect(username) {
     const spectate_id = userToSpectate.get(username);
@@ -51,8 +88,12 @@ export function createPresence(ctx) {
     const meta = ensureGameMeta(gameMeta, game_id, { initialSent: false });
     meta.disconnected.add(username);
     meta.lastSeen[username] = Date.now();
+    const paused = pauseTurnForDisconnect(game, meta);
 
     saveGameState(game_id, game);
+    if (paused && typeof emitSnapshotsToAudience === "function") {
+      emitSnapshotsToAudience(game_id, { reason: "opponent_disconnect_pause" });
+    }
 
     for (const p of game.players) {
       if (p !== username) {
@@ -87,13 +128,25 @@ export function createPresence(ctx) {
     const meta = ensureGameMeta(gameMeta, game_id, { initialSent: !!game.turn });
     meta.disconnected.delete(username);
     meta.lastSeen[username] = Date.now();
+    let resumed = false;
+    if (meta.disconnected.size === 0) {
+      resumed = resumeTurnAfterReconnect(game, meta);
+    }
+
+    // Retour direct en game pour le joueur reconnecté.
+    if (typeof emitStartGameToUser === "function") {
+      emitStartGameToUser(username, game_id, { spectator: false });
+    }
+    if (resumed && typeof emitSnapshotsToAudience === "function") {
+      emitSnapshotsToAudience(game_id, { reason: "opponent_rejoined_resume" });
+    }
 
     if (typeof notifyOpponent === "function") {
-      notifyOpponent(game_id, game, "opponent_online", { username, where: "lobby" });
+      notifyOpponent(game_id, game, "opponent_rejoined", { game_id, username });
     } else {
       for (const p of game.players) {
         if (p !== username) {
-          sendEventToUser(p, "opponent_online", { game_id, username, where: "lobby" });
+          sendEventToUser(p, "opponent_rejoined", { game_id, username });
         }
       }
     }

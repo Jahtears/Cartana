@@ -41,7 +41,9 @@ function computeTurnSig(game) {
     String(t.current ?? ""),
     String(t.number ?? ""),
     String(t.endsAt ?? ""),
-    String(t.durationMs ?? "")
+    String(t.durationMs ?? ""),
+    String(!!t.paused),
+    String(t.remainingMs ?? "")
   ].join("|");
 }
 
@@ -105,10 +107,14 @@ export function createBroadcaster({
       turnNumber: t.number,
       endsAt: t.endsAt ?? null,
       durationMs: t.durationMs ?? null,
+      paused: !!t.paused,
+      remainingMs: Number(t.remainingMs ?? 0),
       serverNow: Date.now()
     } : {
       endsAt: 0,
       durationMs: 0,
+      paused: false,
+      remainingMs: 0,
       serverNow: Date.now()
     });
   };

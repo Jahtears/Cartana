@@ -88,6 +88,8 @@ export function initTurnForGame(game) {
   game.turn = { current: starter, number: 1 };
   game.turn.durationMs = TURN_MS;
   game.turn.endsAt = Date.now() + TURN_MS;
+  game.turn.paused = false;
+  game.turn.remainingMs = 0;
 
   console.log("[TURN] INIT", {
     starter,
@@ -164,6 +166,8 @@ export function endTurnAfterBenchPlay(game, actor) {
   // ✅ timebar serveur
   game.turn.durationMs = TURN_MS;
   game.turn.endsAt = Date.now() + TURN_MS;
+  game.turn.paused = false;
+  game.turn.remainingMs = 0;
 
   console.log("[TURN] SWITCH", { endedBy: actor, next, turnNumber: game.turn.number });
 

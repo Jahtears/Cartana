@@ -33,6 +33,10 @@ var slots_by_id: Dictionary = {}                    # slot_id -> Node
 var pending_events: Array[Dictionary] = []          # events arrivés avant slots_ready
 var cards: Dictionary = {}                          # card_id -> Node
 var _is_changing_scene := false
+var _game_end_prompted := false
+var _leave_sent := false
+var _disconnect_prompt_seq := 0
+var _opponent_disconnected := false
 var opponent_name: String = ""
 var allowed_table_slots: Dictionary = {}            # IDs table autorisés (format 0:TABLE:index)
 var _slot_spacing: float = 100.0
@@ -55,6 +59,8 @@ var _timebar_state: Dictionary = {
 	"turn_current": "",
 	"turn_ends_at_ms": 0,
 	"turn_duration_ms": 0,
+	"turn_paused": false,
+	"turn_remaining_ms": 0,
 	"timebar_mode": -1,
 	"timebar_fill_sb": null,
 	"timebar_last_color": Color(-1, -1, -1, -1),
@@ -84,6 +90,10 @@ func _ready() -> void:
 		NetworkManager.evt.connect(_on_evt)
 	if not NetworkManager.response.is_connected(_on_response):
 		NetworkManager.response.connect(_on_response)
+	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and not PopupUi.action_selected.is_connected(_on_popup_action):
+		PopupUi.action_selected.connect(_on_popup_action)
+	if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
+		PopupUi.hide()
 
 	# ready dès que la scène Game est chargée
 	# - joueur: {} suffit
@@ -130,6 +140,12 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			slots_ready = true
 			pending_events.clear()
 			_is_changing_scene = false
+			_game_end_prompted = false
+			_leave_sent = false
+			_opponent_disconnected = false
+			_disconnect_prompt_seq += 1
+			if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
+				PopupUi.hide()
 
 			# 4) Ready même sans reload de scène
 			if Global.current_game_id != "":
@@ -159,15 +175,49 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			_show_message(data)
 		"game_end":
 			Global.result = data.duplicate()
+			var merged := data.duplicate(true)
+			merged["game_id"] = String(merged.get("game_id", String(Global.current_game_id)))
+			_on_game_end(merged)
+		"invite_request":
+			var from_user := String(data.get("from", ""))
+			if from_user != "":
+				PopupUi.show_invite_request(from_user, {
+					"flow": "invite_request",
+					"from": from_user
+				})
+		"invite_response":
+			var invite_msg := String(data.get("message", ""))
+			if invite_msg != "":
+				PopupUi.show_info(invite_msg)
 		"turn_update":
-			# data: { current, turnNumber, endsAt, durationMs, endedBy? }
+			# data: { current, turnNumber, endsAt, durationMs, paused?, remainingMs?, endedBy? }
 			_set_turn_timer(data)
+		"opponent_disconnected":
+			var who := String(data.get("username", ""))
+			_opponent_disconnected = true
+			_show_message({"reason": "%s s'est déconnecté." % who, "color": Color(1.0, 0.8, 0.2)})
+			_schedule_disconnect_choice(who)
+		"opponent_rejoined":
+			var who := String(data.get("username", ""))
+			_opponent_disconnected = false
+			_disconnect_prompt_seq += 1
+			if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
+				PopupUi.hide()
+			_show_message({"reason": "%s a rejoint la partie." % who, "color": Color(0.6, 1.0, 0.6)})
 
 # ---------------------------------------------------------
 #  RES (réponses à des requêtes)
 # ---------------------------------------------------------
 
 func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error: Dictionary) -> void:
+	if type == "login":
+		if ok and String(Global.current_game_id) != "":
+			if bool(Global.is_spectator):
+				NetworkManager.request("ready_for_game", {"game_id": String(Global.current_game_id)})
+			else:
+				NetworkManager.request("ready_for_game", {})
+		return
+
 	if type != "move_request":
 		return
 
@@ -195,8 +245,6 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 				"card_id": String(details.get("card_id", "")),
 				"from_slot_id": String(details.get("from_slot_id", ""))
 			})
-
-# Ajouter cette méthode à Carte.gd pour être appelée depuis Game.gd
 
 # ---------------------------------------------------------
 #  SNAPSHOT (full resync)
@@ -241,9 +289,9 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 #  GAME END (unifié + ack_game_end)
 # ---------------------------------------------------------
 func _on_game_end(data: Dictionary) -> void:
-	if _is_changing_scene:
+	if _game_end_prompted:
 		return
-	_is_changing_scene = true
+	_game_end_prompted = true
 	Global.ended = data.duplicate()
 	var winner := String(data.get("winner", ""))
 	var reason := String(data.get("reason", ""))
@@ -262,8 +310,11 @@ func _on_game_end(data: Dictionary) -> void:
 		PopupUi.show_confirm(
 			msg,
 			"Retour lobby", "Rester",
-			Callable(self, "_ack_end_and_go_lobby"),
-			Callable()
+			{
+				"yes_action_id": "game_end_leave",
+				"no_action_id": "game_end_stay",
+				"game_id": String(Global.current_game_id),
+			}
 		)
 	else:
 		await get_tree().create_timer(0.6).timeout
@@ -279,7 +330,7 @@ func _ack_end_and_go_lobby() -> void:
 	Global.is_spectator = false
 	Global.result = {}
 
-	get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
+	await _go_to_lobby_safe()
 
 # ---------------------------------------------------------
 #  SLOT_STATE (diff granulaire)
@@ -502,10 +553,93 @@ func _set_turn_timer(turn: Dictionary) -> void:
 #  Quitter (bouton Game)
 # ---------------------------------------------------------
 func _on_quitter_pressed() -> void:
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and PopupUi.has_method("confirm_quit_to_lobby"):
-		PopupUi.confirm_quit_to_lobby()
+	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and PopupUi.has_method("show_confirm"):
+		PopupUi.show_confirm(
+			"Quitter la partie et revenir au lobby ?",
+			"Annuler",
+			"Quitter",
+			{
+				"yes_action_id": "quit_cancel",
+				"no_action_id": "quit_confirm",
+			}
+		)
 	else:
-		get_tree().change_scene_to_file("res://Scenes/Lobby.tscn")
+		await _leave_current_and_go_lobby()
+
+func _show_pause_choice(msg: String) -> void:
+	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and PopupUi.has_method("show_confirm"):
+		PopupUi.show_confirm(
+			msg,
+			"Attendre",
+			"Retour lobby",
+			{
+				"yes_action_id": "pause_wait",
+				"no_action_id": "pause_leave",
+			}
+		)
+
+func _schedule_disconnect_choice(who: String) -> void:
+	_disconnect_prompt_seq += 1
+	var seq := _disconnect_prompt_seq
+	var timer := get_tree().create_timer(5.0)
+	timer.timeout.connect(func() -> void:
+		if seq != _disconnect_prompt_seq:
+			return
+		if not _opponent_disconnected:
+			return
+		_show_pause_choice("%s s'est déconnecté.\nAttendre ou revenir au lobby ?" % who)
+	)
+
+func _on_popup_action(action_id: String, _payload: Dictionary) -> void:
+	var flow := String(_payload.get("flow", ""))
+	if flow == "invite_request":
+		var from_user := String(_payload.get("from", ""))
+		if from_user == "":
+			return
+		if action_id == "confirm_yes":
+			NetworkManager.request("invite_response", {"to": from_user, "accepted": true})
+		elif action_id == "confirm_no":
+			NetworkManager.request("invite_response", {"to": from_user, "accepted": false})
+		return
+
+	match action_id:
+		"quit_confirm", "pause_leave":
+			await _leave_current_and_go_lobby()
+		"game_end_leave":
+			await _ack_end_and_go_lobby()
+		_:
+			pass
+
+func _leave_current_and_go_lobby() -> void:
+	if _leave_sent:
+		return
+	_leave_sent = true
+
+	var gid := String(Global.current_game_id)
+	if gid != "":
+		var has_result := (Global.result is Dictionary and (Global.result as Dictionary).size() > 0)
+
+		if has_result:
+			await NetworkManager.request_async("ack_game_end", {"game_id": gid}, 4.0)
+		else:
+			if Global.is_spectator:
+				await NetworkManager.request_async("ack_game_end", {"game_id": gid}, 4.0)
+			else:
+				NetworkManager.request("leave_game", {"game_id": gid})
+
+	Global.reset_game_state()
+	await _go_to_lobby_safe()
+
+func _go_to_lobby_safe() -> void:
+	if _is_changing_scene:
+		return
+	_is_changing_scene = true
+
+	get_viewport().gui_disable_input = true
+	await get_tree().process_frame
+	get_viewport().gui_disable_input = false
+
+	get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
 
 func _exit_tree() -> void:
 	if String(Global.current_game_id) != "":
@@ -515,6 +649,8 @@ func _exit_tree() -> void:
 		NetworkManager.evt.disconnect(_on_evt)
 	if NetworkManager.response.is_connected(_on_response):
 		NetworkManager.response.disconnect(_on_response)
+	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and PopupUi.action_selected.is_connected(_on_popup_action):
+		PopupUi.action_selected.disconnect(_on_popup_action)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:

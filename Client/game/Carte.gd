@@ -22,7 +22,8 @@ const MIN_OVERLAP_AREA := 200.0
 
 var _current_preview_slot: Node2D = null
 var slot: Node2D = null
-
+var _move_pending := false
+var _move_request_timeout: Timer = null
 var _slot_cache: Array = []
 var _slot_cache_valid := false
 var _last_drag_frame := -1
@@ -260,6 +261,31 @@ func _preview_slot_under_card() -> void:
 
 	_set_preview_slot(best_slot)
 
+# ---------------------------------------------------------
+# NETWORK
+# ---------------------------------------------------------
+func send_move_card_to_server(card_id: String, new_slot_id: String) -> void:
+	# Hard guard
+	if not _can_interact():
+		_rollback_drag()
+		return
+
+	var from_slot_id: String = ""
+	if slot != null:
+		if slot.has_method("get_slot_id"):
+			from_slot_id = String(slot.call("get_slot_id"))
+		else:
+			from_slot_id = String(slot.slot_id)
+
+	if from_slot_id == "" or new_slot_id == "":
+		_rollback_drag()
+		return
+
+	NetworkManager.request("move_request", {
+		"card_id": card_id,
+		"from_slot_id": from_slot_id,
+		"to_slot_id": new_slot_id
+	})
 func _get_card_rect_global() -> Rect2:
 	var size := Vector2(80, 120)
 	var shape = $Area2D/CollisionShape2D.shape
@@ -297,64 +323,3 @@ func _set_preview_slot(new_slot: Node) -> void:
 			_current_preview_slot.call("_set_preview", true)
 		elif _current_preview_slot.has_method("on_card_enter_preview"):
 			_current_preview_slot.call("on_card_enter_preview")
-
-
-func send_move_card_to_server(card_id: String, new_slot_id: String) -> void:
-	if _move_pending:
-		print("[CARD] Move already pending, ignoring duplicate request")
-		return
-	
-	if not _can_interact():
-		_rollback_drag()
-		return
-
-	var from_slot_id: String = ""
-	if slot != null:
-		if slot.has_method("get_slot_id"):
-			from_slot_id = String(slot.call("get_slot_id"))
-		else:
-			from_slot_id = String(slot.slot_id)
-
-	if from_slot_id == "" or new_slot_id == "":
-		_rollback_drag()
-		return
-
-	_move_pending = true
-	_start_move_timeout()
-
-	print("[CARD] Sending move request: %s -> %s" % [from_slot_id, new_slot_id])
-	
-	NetworkManager.request("move_request", {
-		"card_id": card_id,
-		"from_slot_id": from_slot_id,
-		"to_slot_id": new_slot_id
-	})
-
-func _start_move_timeout() -> void:
-	_clear_move_timeout()
-	_move_request_timeout = Timer.new()
-	add_child(_move_request_timeout)
-	_move_request_timeout.one_shot = true
-	_move_request_timeout.wait_time = 5.0  # 5s timeout
-	_move_request_timeout.timeout.connect(_on_move_timeout)
-	_move_request_timeout.start()
-
-func _on_move_timeout() -> void:
-	print("[CARD] Move request timeout, resetting pending flag")
-	_clear_move_timeout()
-	_move_pending = false
-
-func _clear_move_timeout() -> void:
-	if _move_request_timeout:
-		_move_request_timeout.queue_free()
-		_move_request_timeout = null
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		_clear_move_timeout()
-# Ajouter à Carte.gd
-
-func _reset_move_pending() -> void:
-	_move_pending = false
-	_clear_move_timeout()
-	print("[CARD] Move pending flag reset")

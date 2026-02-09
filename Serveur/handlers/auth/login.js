@@ -5,11 +5,10 @@ export async function handleLogin(ctx, ws, req, data) {
   const {
     state,
     verifyOrCreateUser,
-    setUserActivity,
-    Activity,
     getUserStatus,
     sendResponse,
     refreshLobby,
+    handleReconnect,
   } = ctx;
 
   // Safely handle undefined data
@@ -36,9 +35,9 @@ export async function handleLogin(ctx, ws, req, data) {
 
     state.registerUser(username, ws);
 
-    // Set user as ONLINE
-    if (setUserActivity && Activity) {
-      setUserActivity(username, Activity.ONLINE);
+    // Reconnexion: restaurer présence in-game si mapping existant.
+    if (typeof handleReconnect === "function") {
+      handleReconnect(username);
     }
 
     sendResponse(ws, req, true, { username, status: getUserStatus(username) });

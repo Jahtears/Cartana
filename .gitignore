@@ -36,7 +36,7 @@ Serveur/app/saves/Users.json
 
 # Tests
 coverage/
-Serveur/__tests__/coverage/
+Serveur/__tests__
 
 ############################
 # VISUAL STUDIO CODE

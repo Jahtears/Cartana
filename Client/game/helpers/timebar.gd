@@ -6,6 +6,8 @@ static func set_turn_timer(state: Dictionary, turn: Dictionary, sync_server_cloc
 	state["turn_current"] = String(turn.get("current", ""))
 	state["turn_ends_at_ms"] = int(turn.get("endsAt", 0))
 	state["turn_duration_ms"] = int(turn.get("durationMs", 0))
+	state["turn_paused"] = bool(turn.get("paused", false))
+	state["turn_remaining_ms"] = int(turn.get("remainingMs", 0))
 
 	var server_epoch := int(turn.get("serverNow", 0))
 	if server_epoch > 0 and sync_server_clock.is_valid():
@@ -39,12 +41,16 @@ static func update_timebar(state: Dictionary, time_bar: ProgressBar, server_now_
 
 	time_bar.visible = true
 
-	var now := 0
-	if server_now_ms.is_valid():
-		now = int(server_now_ms.call())
-	var remaining := float(ends_at - now)
-	if remaining < 0.0:
-		remaining = 0.0
+	var remaining := 0.0
+	if bool(state.get("turn_paused", false)):
+		remaining = maxf(float(state.get("turn_remaining_ms", 0)), 0.0)
+	else:
+		var now := 0
+		if server_now_ms.is_valid():
+			now = int(server_now_ms.call())
+		remaining = float(ends_at - now)
+		if remaining < 0.0:
+			remaining = 0.0
 
 	var ratio := clampf(remaining / float(duration), 0.0, 1.0)
 

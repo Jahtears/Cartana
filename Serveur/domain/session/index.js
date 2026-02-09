@@ -31,8 +31,8 @@ function isTableSlotLike(slot_id) {
   return false;
 }
 
-function buildSlotStateForUser(game, username, slot_id, view) {
-  const disableDrag = view === "spectator";
+function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag = false } = {}) {
+  const disableDrag = view === "spectator" || !!forceDisableDrag;
 
   const clientSlot = slotIdToNewString(
     view === "spectator" ? slot_id : mapSlotForClient(slot_id, username, game)
@@ -102,7 +102,7 @@ function buildSlotStateForUser(game, username, slot_id, view) {
   return { slot_id: clientSlot, cards };
 }
 
-function buildStateSnapshotForUser(game, username, view, { result = null } = {}) {
+function buildStateSnapshotForUser(game, username, view, { result = null, forceDisableDrag = false } = {}) {
   const tableSlotIds = getTableSlots(game);
 
   const table = tableSlotIds.map((slotId) =>
@@ -120,12 +120,12 @@ function buildStateSnapshotForUser(game, username, view, { result = null } = {})
   const T = tableSlotIds;
 
   for (const slot_id of nonT) {
-    const { slot_id: clientSlot, cards } = buildSlotStateForUser(game, username, slot_id, view);
+    const { slot_id: clientSlot, cards } = buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag });
     slots[clientSlot] = cards;
   }
 
   for (const slot_id of T) {
-    const { slot_id: clientSlot, cards } = buildSlotStateForUser(game, username, slot_id, view);
+    const { slot_id: clientSlot, cards } = buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag });
     slots[clientSlot] = cards;
   }
 
@@ -135,6 +135,8 @@ function buildStateSnapshotForUser(game, username, view, { result = null } = {})
         turnNumber: game.turn.number,
         endsAt: game.turn.endsAt ?? null,
         durationMs: game.turn.durationMs ?? null,
+        paused: !!game.turn.paused,
+        remainingMs: Number(game.turn.remainingMs ?? 0),
         serverNow: Date.now(),
       }
     : null;
@@ -171,12 +173,14 @@ export function emitFullState(game, username, wsByUser, sendEvent, { view = "pla
   if (!ws) return;
 
   let result = null;
+  let forceDisableDrag = false;
   if (gameMeta && game_id) {
     const meta = gameMeta.get(game_id) || {};
     result = meta.result ?? null;
+    forceDisableDrag = !!meta?.pause?.active;
   }
 
-  const snapshot = buildStateSnapshotForUser(game, username, view, { result });
+  const snapshot = buildStateSnapshotForUser(game, username, view, { result, forceDisableDrag });
 
   sendEvent(ws, "state_snapshot", snapshot);
 }

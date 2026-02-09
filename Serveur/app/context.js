@@ -4,6 +4,7 @@ import { createTransport } from "../net/transport.js";
 import { createRoles } from "../domain/roles/roles.js";
 import { createLobbyLists } from "../domain/lobby/lists.js";
 import { createGameNotifier, emitSlotState, emitFullState } from "../domain/session/index.js";
+import { createPresence } from "../domain/session/presence.js";
 import { createStateManager } from "./stateManager.js";
 
 export function createServerContext(deps) {
@@ -136,34 +137,34 @@ export function createServerContext(deps) {
 
   function notifyOpponent(game_id, game, evtType, data) {
     if (!game) return;
+    const actor = String(data?.username ?? "");
     for (const player of game.players ?? []) {
-      if (player.username) {
-        sendEventToUser(player.username, evtType, data);
-      }
+      const username = typeof player === "string" ? player : String(player?.username ?? "");
+      if (!username || username === actor) continue;
+      sendEventToUser(username, evtType, data);
     }
   }
 
   // ========================
-  // SOCKET CLOSE HANDLER
+  // PRESENCE (disconnect/reconnect)
   // ========================
-  function onSocketClose(ws) {
-    const user = state.getUsername(ws);
-    if (!user) return;
-
-    state.unregisterUser(user, ws);
-    clearInvitesForUser(user);
-
-    const game_id = state.getUserGame(user);
-    if (game_id) {
-      const game = state.getGame(game_id);
-      if (game) {
-        // Gérer le départ du joueur
-        setUserActivity(user, Activity.OFFLINE);
-      }
-    }
-
-    refreshLobby();
-  }
+  const { handleReconnect, onSocketClose } = createPresence({
+    games: state.games,
+    gameMeta: state.gameMeta,
+    userToGame: state.userToGame,
+    userToSpectate: state.userToSpectate,
+    userByWs: state.userByWs,
+    wsByUser: state.wsByUser,
+    detachSpectator,
+    clearInvitesForUser,
+    sendEventToUser,
+    saveGameState,
+    loadGameState,
+    refreshLobby,
+    notifyOpponent,
+    emitStartGameToUser,
+    emitSnapshotsToAudience,
+  });
 
   // ========================
   // BASE CONTEXT (pour handlers)
@@ -224,6 +225,7 @@ export function createServerContext(deps) {
     // Helpers
     generateGameID,
     notifyOpponent,
+    handleReconnect,
   };
 
   // ========================

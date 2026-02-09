@@ -19,9 +19,9 @@ export function handleLogout(ctx, ws, req, data, actor) {
     clearInvitesForUser(user);
   }
 
-  // Set activity to offline
+  // Sortie explicite de session: retour lobby + detach des mappings.
   if (typeof setUserActivity === "function") {
-    setUserActivity(user, Activity.OFFLINE, null);
+    setUserActivity(user, Activity.LOBBY, null);
   }
 
   // Refresh lobby for other players

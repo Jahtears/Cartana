@@ -40,6 +40,9 @@ var _reconnect_timer: Timer = null
 var _reconnect_delay_sec: float = RECONNECT_INITIAL_DELAY_SEC
 var _reconnect_attempts: int = 0
 var _max_reconnect_attempts: int = 10
+var _auth_credentials: Dictionary = {}
+var _is_authenticated: bool = false
+var _login_in_flight: bool = false
 
 # ============= LIFECYCLE =============
 
@@ -63,8 +66,31 @@ func close(code: int = 1000, reason: String = "") -> void:
 	_request_queue.clear()
 	_pending_requests.clear()
 	_cancel_reconnect_timer()
+	_is_authenticated = false
+	_login_in_flight = false
 	if is_open():
 		_ws.close(code, reason)
+
+func set_login_credentials(username: String, pin: String) -> void:
+	var user := username.strip_edges()
+	var pin_value := pin.strip_edges()
+	if user == "" or pin_value == "":
+		return
+	_auth_credentials = {"username": user, "pin": pin_value}
+
+func clear_login_credentials() -> void:
+	_auth_credentials.clear()
+	_is_authenticated = false
+	_login_in_flight = false
+
+func has_login_credentials() -> bool:
+	return String(_auth_credentials.get("username", "")) != "" and String(_auth_credentials.get("pin", "")) != ""
+
+func _try_auto_login() -> void:
+	if _is_authenticated or _login_in_flight or not has_login_credentials():
+		return
+	_login_in_flight = true
+	request("login", _auth_credentials.duplicate(true), RequestPriority.CRITICAL)
 
 # ✅ NOUVEAU: Reset reconnect state
 func _reset_reconnect_state() -> void:
@@ -119,12 +145,17 @@ func _process(_delta: float) -> void:
 			_was_open = true
 			_last_pong_ms = Time.get_ticks_msec()
 			_reset_reconnect_state()  # ✅ Reset backoff on success
-			_drain_queue()
+			if has_login_credentials() and not _is_authenticated:
+				_try_auto_login()
+			else:
+				_drain_queue()
 			connected.emit()
 			print("[NET] Connected to server")
 	elif st == WebSocketPeer.STATE_CLOSED:
 		if _was_open:
 			_was_open = false
+			_is_authenticated = false
+			_login_in_flight = false
 			disconnected.emit(0, "Connection lost")
 			print("[NET] Connection closed, scheduling reconnect")
 			_schedule_reconnect()  # ✅ Reconnect auto
@@ -270,6 +301,10 @@ func _handle_packet(pkt: String) -> void:
 		var data := env.get("data", {}) as Dictionary
 		var err := env.get("error", {}) as Dictionary
 
+		if type == "login":
+			_login_in_flight = false
+			_is_authenticated = ok
+
 		_pending_results[rid] = {"rid": rid, "type": type, "ok": ok, "data": data, "error": err}
 		_pending_requests.erase(rid)
 
@@ -283,6 +318,12 @@ func request(
 	data: Dictionary = {},
 	priority: int = RequestPriority.NORMAL
 ) -> String:
+	if type == "login":
+		set_login_credentials(String(data.get("username", "")), String(data.get("pin", "")))
+		_login_in_flight = true
+	elif type == "logout":
+		clear_login_credentials()
+
 	return _add_to_queue(type, data, priority, 0, DEFAULT_TIMEOUT_SEC)
 
 func request_async(
@@ -338,6 +379,8 @@ func get_queue_stats() -> Dictionary:
 		"queue_size": _request_queue.size(),
 		"pending_requests": _pending_requests.size(),
 		"is_open": is_open(),
+		"is_authenticated": _is_authenticated,
+		"has_credentials": has_login_credentials(),
 		"server_clock_offset_ms": server_clock_offset_ms,
 		"reconnect_attempts": _reconnect_attempts,
 		"reconnect_next_delay_sec": _reconnect_delay_sec,

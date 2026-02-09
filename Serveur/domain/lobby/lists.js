@@ -18,17 +18,22 @@ export function createLobbyLists(ctx) {
   } = ctx;
 
   function gamesList() {
-    return [...games.entries()].map(([id, game]) => {
-      const meta = gameMeta.get(id);
-      const spectators = gameSpectators.get(id);
-      return {
-        game_id: id,
-        players: game.players,
-        result: !!meta?.result,
-        disconnected: meta?.disconnected ? [...meta.disconnected] : [],
-        spectators: spectators ? spectators.size : 0,
-      };
-    });
+    return [...games.entries()]
+      .filter(([id]) => {
+        const meta = gameMeta.get(id);
+        return !meta?.result; // game list = parties spectatables uniquement
+      })
+      .map(([id, game]) => {
+        const meta = gameMeta.get(id);
+        const spectators = gameSpectators.get(id);
+        return {
+          game_id: id,
+          players: game.players,
+          result: !!meta?.result,
+          disconnected: meta?.disconnected ? [...meta.disconnected] : [],
+          spectators: spectators ? spectators.size : 0,
+        };
+      });
   }
 
   function playersList() {
