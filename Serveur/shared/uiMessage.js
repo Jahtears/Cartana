@@ -37,3 +37,4 @@ export function toUiMessage(input = {}, defaults = {}) {
   if (Object.keys(meta).length > 0) out.meta = meta;
   return out;
 }
+

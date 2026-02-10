@@ -21,7 +21,7 @@ export function createPresence(ctx) {
     clearInvitesForUser,
 
     // transport
-    sendEventToUser,
+    sendEvtUser,
 
     // saves
     saveGameState,
@@ -97,7 +97,7 @@ export function createPresence(ctx) {
 
     for (const p of game.players) {
       if (p !== username) {
-        sendEventToUser(p, "opponent_disconnected", { game_id, username });
+        sendEvtUser(p, "opponent_disconnected", { game_id, username });
       }
     }
   }
@@ -146,7 +146,7 @@ export function createPresence(ctx) {
     } else {
       for (const p of game.players) {
         if (p !== username) {
-          sendEventToUser(p, "opponent_rejoined", { game_id, username });
+          sendEvtUser(p, "opponent_rejoined", { game_id, username });
         }
       }
     }

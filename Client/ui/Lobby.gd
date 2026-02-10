@@ -1,6 +1,8 @@
 # Lobby.gd v1.0
 extends Control
 
+const Protocol = preload("res://Client/net/Protocol.gd")
+
 var _is_changing_scene := false
 var _statuses: Dictionary = {}            # username -> status
 
@@ -29,17 +31,20 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 				update_games_list(data.get("games", []))
 				update_players_list(data.get("players", []))
 			else:
-				PopupUi.show_info(String(error.get("message", "Erreur get_players")))
+				_show_error_popup(error, "Erreur get_players")
 
 		"join_game", "spectate_game":
 			if not ok:
-				PopupUi.show_info(String(error.get("message", "Action impossible")))
+				_show_error_popup(error, "Action impossible")
 
 		"invite":
 			if ok:
-				PopupUi.show_info("Invitation envoyée.")
+				PopupUi.show_ui_message({
+					"text": "Invitation envoyée.",
+					"code": Protocol.GAME_MESSAGE["INFO"],
+				})
 			else:
-				PopupUi.show_info(String(error.get("error", "Invitation impossible")))
+				_show_error_popup(error, "Invitation impossible")
 
 # --------------------
 # EVT (push serveur)
@@ -70,9 +75,13 @@ func _on_evt(type: String, data: Dictionary) -> void:
 				})
 
 		"invite_response":
-			var msg := String(data.get("message", ""))
-			if msg != "":
-				PopupUi.show_info(msg)
+			var ui := Protocol.normalize_game_message(data, Protocol.GAME_MESSAGE["INFO"])
+			if String(ui.get("text", "")) != "":
+				PopupUi.show_ui_message(ui)
+
+func _show_error_popup(error: Dictionary, fallback_text: String) -> void:
+	var ui := Protocol.normalize_error_message(error, fallback_text)
+	PopupUi.show_ui_message(ui)
 
 # --------------------
 # UI / LOGIC

@@ -1,6 +1,8 @@
 #Login V1.0
 extends Control
 
+const Protocol = preload("res://Client/net/Protocol.gd")
+
 var _login_pending := false
 var _last_username: String = ""
 
@@ -23,7 +25,8 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 		Global.username = u
 		get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
 	else:
-		show_error(String(error.get("message", "Erreur de connexion")))
+		var ui := Protocol.normalize_error_message(error, "Erreur de connexion")
+		show_error(String(ui.get("text", "Erreur de connexion")))
 
 func show_error(message: String) -> void:
 	$Error_dialog.dialog_text = message

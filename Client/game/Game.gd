@@ -172,7 +172,7 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			else:
 				pending_events.append({"type": type, "data": data})
 		"show_game_message":
-			_show_message(data)
+			_show_popup_message(data)
 		"game_end":
 			Global.result = data.duplicate()
 			var merged := data.duplicate(true)
@@ -186,16 +186,25 @@ func _on_evt(type: String, data: Dictionary) -> void:
 					"from": from_user
 				})
 		"invite_response":
-			var invite_msg := String(data.get("message", ""))
-			if invite_msg != "":
-				PopupUi.show_info(invite_msg)
+			var ui := Protocol.normalize_game_message(data, Protocol.GAME_MESSAGE["INFO"])
+			if String(ui.get("text", "")) != "":
+				PopupUi.show_ui_message(ui)
 		"turn_update":
 			# data: { current, turnNumber, endsAt, durationMs, paused?, remainingMs?, endedBy? }
 			_set_turn_timer(data)
 		"opponent_disconnected":
 			var who := String(data.get("username", ""))
 			_opponent_disconnected = true
-			_show_message({"reason": "%s s'est déconnecté." % who, "color": Color(1.0, 0.8, 0.2)})
+			if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
+				PopupUi.show_ui_message({
+					"text": "%s s'est déconnecté." % who,
+					"code": Protocol.GAME_MESSAGE["WARN"],
+				})
+			else:
+				_show_popup_message({
+					"text": "%s s'est déconnecté." % who,
+					"code": Protocol.GAME_MESSAGE["WARN"],
+				})
 			_schedule_disconnect_choice(who)
 		"opponent_rejoined":
 			var who := String(data.get("username", ""))
@@ -203,7 +212,15 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			_disconnect_prompt_seq += 1
 			if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
 				PopupUi.hide()
-			_show_message({"reason": "%s a rejoint la partie." % who, "color": Color(0.6, 1.0, 0.6)})
+				PopupUi.show_ui_message({
+					"text": "%s a rejoint la partie." % who,
+					"code": Protocol.GAME_MESSAGE["INFO"],
+				})
+			else:
+				_show_popup_message({
+					"text": "%s a rejoint la partie." % who,
+					"code": Protocol.GAME_MESSAGE["INFO"],
+				})
 
 # ---------------------------------------------------------
 #  RES (réponses à des requêtes)
@@ -229,15 +246,13 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 			card._reset_move_pending()
 
 	if ok:
-		_show_message({
-			"reason": "Valider",
-			"color": Protocol.MESSAGE_COLORS[Protocol.GAME_MESSAGE["MOVE_OK"]]
+		_show_popup_message({
+			"text": "Valider",
+			"code": Protocol.GAME_MESSAGE["MOVE_OK"],
 		})
 	else:
-		_show_message({
-			"reason": String(error.get("message", "")),
-			"color": Protocol.MESSAGE_COLORS[Protocol.GAME_MESSAGE["MOVE_DENIED"]]
-		})
+		var ui := Protocol.normalize_error_message(error, "Deplacement refuse.")
+		_show_popup_message(ui)
 
 		var details := error.get("details", {}) as Dictionary
 		if details.has("card_id") and details.has("from_slot_id"):
@@ -518,21 +533,22 @@ func show_game_message(text: String, color: Color) -> void:
 	label.visible = true
 	$VBoxContainer/Timer.start()
 
-func _show_message(data: Dictionary) -> void:
+func _normalize_game_popup_payload(data: Dictionary) -> Dictionary:
+	return Protocol.normalize_game_message(data)
+
+func _show_popup_message(data: Dictionary) -> void:
 	if data.is_empty():
 		return
-	var msg := String(data.get("reason", ""))
-	if msg == "":
+	var payload := _normalize_game_popup_payload(data)
+	var text := String(payload.get("text", ""))
+	if text == "":
 		return
 
-	var c: Color = Color.WHITE
-	var color_val = data.get("color", "")
+	var color_val = payload.get("color", Color.WHITE)
+	var color := Color.WHITE
 	if color_val is Color:
-		c = color_val
-	elif color_val is String and String(color_val) != "":
-		c = Color.from_string(String(color_val), Color.WHITE)
-
-	show_game_message(msg, c)
+		color = color_val
+	show_game_message(text, color)
 func _on_timer_timeout() -> void:
 	$VBoxContainer/CenterContainer/GameMessage.visible = false
 

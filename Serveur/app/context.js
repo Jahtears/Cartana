@@ -6,6 +6,8 @@ import { createLobbyLists } from "../domain/lobby/lists.js";
 import { createGameNotifier, emitSlotState, emitFullState } from "../domain/session/index.js";
 import { createPresence } from "../domain/session/presence.js";
 import { createStateManager } from "./stateManager.js";
+import { GAME_MESSAGE } from "../shared/constants.js";
+import { toUiMessage } from "../shared/uiMessage.js";
 
 export function createServerContext(deps) {
   const {
@@ -36,8 +38,13 @@ export function createServerContext(deps) {
   // ========================
   // TRANSPORT
   // ========================
-  const { sendResponse, sendEvent, sendEventToUser, sendLobbyEvent } = createTransport({ 
-    wsByUser: state.wsByUser 
+  const {
+    sendRes,
+    sendEvtSocket,
+    sendEvtUser,
+    sendEvtLobby,
+  } = createTransport({
+    wsByUser: state.wsByUser
   });
 
   // ========================
@@ -57,7 +64,7 @@ export function createServerContext(deps) {
     gameSpectators: state.gameSpectators,
     pendingInviteTo: state.pendingInviteTo,
     gameMeta: state.gameMeta,
-    sendEventToUser,
+    sendEvtUser,
   });
 
   // ========================
@@ -75,7 +82,7 @@ export function createServerContext(deps) {
     gameMeta: state.gameMeta,
     gameSpectators: state.gameSpectators,
     wsByUser: state.wsByUser,
-    sendLobbyEvent,
+    sendEvtLobby,
     getUserStatus,
   });
 
@@ -87,8 +94,8 @@ export function createServerContext(deps) {
     gameMeta: state.gameMeta,
     gameSpectators: state.gameSpectators,
     wsByUser: state.wsByUser,
-    sendEvent,
-    sendEventToUser,
+    sendEvtSocket,
+    sendEvtUser,
   });
 
   // ========================
@@ -149,7 +156,7 @@ export function createServerContext(deps) {
         const uniqueRecipients = new Set(recipients.filter(Boolean).map((u) => String(u)));
 
         for (const username of uniqueRecipients) {
-          sendEventToUser(username, type, data);
+          sendEvtUser(username, type, data);
         }
       }
     }
@@ -164,7 +171,7 @@ export function createServerContext(deps) {
     for (const player of game.players ?? []) {
       const username = typeof player === "string" ? player : String(player?.username ?? "");
       if (!username || username === actor) continue;
-      sendEventToUser(username, evtType, data);
+      sendEvtUser(username, evtType, data);
     }
   }
 
@@ -184,16 +191,18 @@ export function createServerContext(deps) {
     const next = String(expired.next ?? "").trim();
 
     if (prev) {
-      sendEventToUser(prev, "show_game_message", {
-        text: "Temps ecoule.",
-        code: "WARN",
-      });
+      sendEvtUser(
+        prev,
+        "show_game_message",
+        toUiMessage({ text: "Temps ecoule.", code: GAME_MESSAGE.WARN }, { code: GAME_MESSAGE.WARN })
+      );
     }
     if (next) {
-      sendEventToUser(next, "show_game_message", {
-        text: "A vous de jouer.",
-        code: "TURN_START",
-      });
+      sendEvtUser(
+        next,
+        "show_game_message",
+        toUiMessage({ text: "A vous de jouer.", code: GAME_MESSAGE.TURN_START }, { code: GAME_MESSAGE.INFO })
+      );
     }
 
     saveGameState(game_id, game);
@@ -213,7 +222,7 @@ export function createServerContext(deps) {
     wsByUser: state.wsByUser,
     detachSpectator,
     clearInvitesForUser,
-    sendEventToUser,
+    sendEvtUser,
     saveGameState,
     loadGameState,
     refreshLobby,
@@ -230,10 +239,10 @@ export function createServerContext(deps) {
     state,
 
     // Transport (helpers d'envoi)
-    sendResponse,
-    sendEvent,
-    sendEventToUser,
-    sendLobbyEvent,
+    sendRes,
+    sendEvtSocket,
+    sendEvtUser,
+    sendEvtLobby,
 
     // Roles (gestion des statuts/activités)
     Activity,

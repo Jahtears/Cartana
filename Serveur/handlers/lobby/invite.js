@@ -2,17 +2,19 @@
 import { ensureGameMeta } from "../../domain/game/meta.js";
 import { requireParam, rejectIfBusyOrRes } from "../../net/guards.js";
 import { resError } from "../../net/transport.js";
+import { GAME_MESSAGE } from "../../shared/constants.js";
+import { toUiMessage } from "../../shared/uiMessage.js";
 
 export function handleInvite(ctx, ws, req, data, actor) {
   const {
     state,
-    sendResponse,
-    sendEventToUser,
+    sendRes,
+    sendEvtUser,
     refreshLobby,
   } = ctx;
   const { pendingInviteTo } = state;
 
-  const to = requireParam(sendResponse, ws, req, data, "to");
+  const to = requireParam(sendRes, ws, req, data, "to");
   if (!to) return true;
 
   if (rejectIfBusyOrRes(ctx, ws, req, actor, "Tu es déjà en partie")) return true;
@@ -20,30 +22,30 @@ export function handleInvite(ctx, ws, req, data, actor) {
 
   // destinataire a déjà une invite reçue
   if (pendingInviteTo.has(to)) {
-      return resError(sendResponse, ws, req, "BUSY", "Le joueur a déjà une invitation en attente");
+      return resError(sendRes, ws, req, "BUSY", "Le joueur a déjà une invitation en attente");
   }
   // destinataire invite déjà quelqu'un
   for (const inv of pendingInviteTo.values()) {
     if (inv.from === to) {
-      return resError(sendResponse, ws, req, "BUSY", "Le joueur a déjà une invitation en cours");
+      return resError(sendRes, ws, req, "BUSY", "Le joueur a déjà une invitation en cours");
     }
   }
 
   // acteur a déjà une invite reçue
   if (pendingInviteTo.has(actor)) {
-    return resError(sendResponse, ws, req, "BUSY", "Tu as déjà une invitation en attente");
+    return resError(sendRes, ws, req, "BUSY", "Tu as déjà une invitation en attente");
   }
   // acteur invite déjà quelqu'un
   for (const inv of pendingInviteTo.values()) {
     if (inv.from === actor) {
-      return resError(sendResponse, ws, req, "BUSY", "Tu as déjà une invitation en cours");
+      return resError(sendRes, ws, req, "BUSY", "Tu as déjà une invitation en cours");
     }
   }
 
   pendingInviteTo.set(to, { from: actor, to, createdAt: Date.now() });
 
-  sendEventToUser(to, "invite_request", { from: actor });
-  sendResponse(ws, req, true, { sent: true });
+  sendEvtUser(to, "invite_request", { from: actor });
+  sendRes(ws, req, true, { sent: true });
 
   if (typeof refreshLobby === "function") refreshLobby();
 
@@ -53,8 +55,8 @@ export function handleInvite(ctx, ws, req, data, actor) {
 export function handleInviteResponse(ctx, ws, req, data, actor) {
   const {
     state,
-    sendResponse,
-    sendEventToUser,
+    sendRes,
+    sendEvtUser,
     refreshLobby,
 
     generateGameID,
@@ -65,19 +67,26 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
   } = ctx;
   const { pendingInviteTo, games, gameMeta } = state;
 
-  const to = requireParam(sendResponse, ws, req, data, "to");
+  const to = requireParam(sendRes, ws, req, data, "to");
   if (!to) return true;
   const accepted = !!data.accepted;
  
   const pending = pendingInviteTo.get(actor);
   if (!pending || pending.from !== to) {
-    return resError(sendResponse, ws, req, "NO_INVITE", "Aucune invitation correspondante");
+    return resError(sendRes, ws, req, "NO_INVITE", "Aucune invitation correspondante");
   }
   pendingInviteTo.delete(actor);
 
   if (!accepted) {
-    sendEventToUser(to, "invite_response", { message: `${actor} a refusé ton invitation` });
-    sendResponse(ws, req, true, { accepted: false });
+    sendEvtUser(
+      to,
+      "invite_response",
+      toUiMessage({
+        text: `${actor} a refusé ton invitation`,
+        code: GAME_MESSAGE.INFO,
+      })
+    );
+    sendRes(ws, req, true, { accepted: false });
 
     if (typeof refreshLobby === "function") refreshLobby();
 
@@ -102,6 +111,6 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
     emitStartGameToUser(to, game_id, { spectator: false });
   }
 
-  sendResponse(ws, req, true, { accepted: true, game_id, players: game.players });
+  sendRes(ws, req, true, { accepted: true, game_id, players: game.players });
   return true;
 }

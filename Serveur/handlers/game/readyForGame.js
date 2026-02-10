@@ -10,12 +10,12 @@ import { saveGameState } from "../../domain/session/Saves.js";
 export function handleReadyForGame(ctx, ws, req, data, actor) {
   const {
     state,
-    sendResponse,
-  
-    // transport
-    sendEvent,
+    sendRes,
 
-    // NEW API (Game.js) - plus besoin de initializeGameSlots
+    // transport
+    sendEvtSocket,
+
+    // NEW API (Game.js)
     emitFullState,
 
     // init turn
@@ -43,14 +43,14 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
 
     // Rejoin / resync si déjà initialisé
     if (meta.initialSent) {
-      emitFullState(game, actor, wsByUser, sendEvent, { view: "player", gameMeta, game_id });
-      sendResponse(ws, req, true, { ok: true, rejoined: true });
+      emitFullState(game, actor, wsByUser, sendEvtSocket, { view: "player", gameMeta, game_id });
+      sendRes(ws, req, true, { ok: true, rejoined: true });
       return true;
     }
 
     // Attendre les 2 joueurs
     if (readyPlayers.get(game_id).size < game.players.length) {
-      sendResponse(ws, req, true, { ok: true, waiting: true });
+      sendRes(ws, req, true, { ok: true, waiting: true });
       return true;
     }
     
@@ -61,8 +61,8 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
     if (starter) {
       withGameUpdate(game_id, (fx) => {
       // Contrat UI "show_game_message":
-      // - text: libelle affiche
-      // - code: identifiant semantique (couleur cote client)
+      // - text: libellé affiché
+      // - code: identifiant sémantique (couleur côté client)
       // - color: fallback legacy
       fx.message(
         "show_game_message",
@@ -85,17 +85,17 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
     } else {
       // fallback robuste (ancien comportement)
       for (const p of game.players) {
-        emitFullState(game, p, wsByUser, sendEvent, { view: "player", gameMeta, game_id });
+        emitFullState(game, p, wsByUser, sendEvtSocket, { view: "player", gameMeta, game_id });
       }
       const specs = gameSpectators.get(game_id);
       if (specs && specs.size) {
         for (const s of specs) {
-          emitFullState(game, s, wsByUser, sendEvent, { view: "spectator", gameMeta, game_id });
+          emitFullState(game, s, wsByUser, sendEvtSocket, { view: "spectator", gameMeta, game_id });
         }
       }
     }
     
-    sendResponse(ws, req, true, { ok: true });
+    sendRes(ws, req, true, { ok: true });
     saveGameState(game_id, game);
     return true;
   }
@@ -113,7 +113,7 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
 
   if (!requestedGameId) {
     // spectateur sans mapping et sans game_id => demande invalide
-    resBadRequest(sendResponse, ws, req, "game_id manquant");
+    resBadRequest(sendRes, ws, req, "game_id manquant");
     return true;
   }
 
@@ -123,17 +123,17 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
   const specs = gameSpectators.get(requestedGameId);
   const isSpec = !!(specs && specs.has(actor));
   if (!isSpec) {
-    resForbidden(sendResponse, ws, req, "Tu n'es pas spectateur de cette partie");
+    resForbidden(sendRes, ws, req, "Tu n'es pas spectateur de cette partie");
     return true;
   }
 
   const meta = ensureGameMeta(gameMeta, requestedGameId, { initialSent: !!game?.turn });
   if (!meta.initialSent) {
-    sendResponse(ws, req, true, { ok: true, waiting: true });
+    sendRes(ws, req, true, { ok: true, waiting: true });
     return true;
   }
 
-  emitFullState(game, actor, wsByUser, sendEvent, { view: "spectator", gameMeta, game_id: requestedGameId });
-  sendResponse(ws, req, true, { ok: true, spectator: true });
+  emitFullState(game, actor, wsByUser, sendEvtSocket, { view: "spectator", gameMeta, game_id: requestedGameId });
+  sendRes(ws, req, true, { ok: true, spectator: true });
   return true;
 }

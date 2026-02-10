@@ -154,7 +154,7 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
    EMIT PRIMITIVES
 ========================= */
 
-export function emitSlotState(game, recipients, wsByUser, sendEvent, { slot_id, view = "player" }) {
+export function emitSlotState(game, recipients, wsByUser, sendEvtSocket, { slot_id, view = "player" }) {
   if (!wsByUser || typeof wsByUser.get !== "function") return;
 
   for (const username of recipients) {
@@ -162,11 +162,11 @@ export function emitSlotState(game, recipients, wsByUser, sendEvent, { slot_id, 
     if (!ws) continue;
 
     const payload = buildSlotStateForUser(game, username, slot_id, view);
-    sendEvent(ws, "slot_state", payload);
+    sendEvtSocket(ws, "slot_state", payload);
   }
 }
 
-export function emitFullState(game, username, wsByUser, sendEvent, { view = "player", gameMeta = null, game_id = "" } = {}) {
+export function emitFullState(game, username, wsByUser, sendEvtSocket, { view = "player", gameMeta = null, game_id = "" } = {}) {
   if (!wsByUser || typeof wsByUser.get !== "function") return;
 
   const ws = wsByUser.get(username);
@@ -182,7 +182,7 @@ export function emitFullState(game, username, wsByUser, sendEvent, { view = "pla
 
   const snapshot = buildStateSnapshotForUser(game, username, view, { result, forceDisableDrag });
 
-  sendEvent(ws, "state_snapshot", snapshot);
+  sendEvtSocket(ws, "state_snapshot", snapshot);
 }
 
 /**
@@ -196,8 +196,8 @@ export function createGameNotifier({
   gameMeta,
   gameSpectators,
   wsByUser,
-  sendEvent,
-  sendEventToUser,
+  sendEvtSocket,
+  sendEvtUser,
 }) {
   /**
    * Envoie start_game à un user (joueur ou spectateur).
@@ -210,7 +210,7 @@ export function createGameNotifier({
     // ✅ meta existe dès le start_game (stabilise ready_for_game / end / dedupe)
     ensureGameMeta(gameMeta, game_id, { initialSent: !!game.turn });
 
-    sendEventToUser(username, "start_game", {
+    sendEvtUser(username, "start_game", {
       game_id,
       players: game.players,
       spectator: !!spectator,
@@ -262,14 +262,14 @@ export function createGameNotifier({
 
     // joueurs
     for (const p of game.players) {
-      emitFullState(game, p, wsByUser, sendEvent, { view: "player", gameMeta, game_id });
+      emitFullState(game, p, wsByUser, sendEvtSocket, { view: "player", gameMeta, game_id });
     }
 
     // spectateurs
     const specs = gameSpectators.get(game_id);
     if (specs && specs.size) {
       for (const s of specs) {
-        emitFullState(game, s, wsByUser, sendEvent, { view: "spectator", gameMeta, game_id });
+        emitFullState(game, s, wsByUser, sendEvtSocket, { view: "spectator", gameMeta, game_id });
       }
     }
 
@@ -295,13 +295,13 @@ export function createGameNotifier({
     const excludeSet = new Set((exclude || []).filter(Boolean));
 
     for (const p of game.players) {
-      if (!excludeSet.has(p)) sendEventToUser(p, "game_end", payload);
+      if (!excludeSet.has(p)) sendEvtUser(p, "game_end", payload);
     }
 
     const specs = gameSpectators.get(game_id);
     if (specs && specs.size) {
       for (const s of specs) {
-        if (!excludeSet.has(s)) sendEventToUser(s, "game_end", payload);
+        if (!excludeSet.has(s)) sendEvtUser(s, "game_end", payload);
       }
     }
 

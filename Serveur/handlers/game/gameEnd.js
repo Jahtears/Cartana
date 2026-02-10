@@ -98,7 +98,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
   const {
     setUserActivity,
     Activity,
-    sendResponse,
+    sendRes,
     refreshLobby,
   } = ctx;
   const game_id = getGameIdFromDataOrMapping(ctx, ws, req, data, actor, {
@@ -113,7 +113,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
   if (!game) return true;
 
   if (!game || !game.players.includes(actor)) {
-    return resForbidden(sendResponse, ws, req, "Tu n'es pas dans cette partie")
+    return resForbidden(sendRes, ws, req, "Tu n'es pas dans cette partie")
   }
 
   // abandonneur sort (l’adversaire / specs restent attachés jusqu’à ack)
@@ -126,7 +126,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
 
   if (typeof refreshLobby === "function") refreshLobby();
 
-  sendResponse(ws, req, true, { left: true, game_id });
+  sendRes(ws, req, true, { left: true, game_id });
   return true;
 }
 
@@ -135,7 +135,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
     state,
     setUserActivity,
     Activity,
-    sendResponse,
+    sendRes,
     refreshLobby,
   } = ctx;
   const { games, gameMeta, gameSpectators, userToGame, userToSpectate } = state;
@@ -150,7 +150,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
   // idempotent: sans game_id -> OK
   if (!game_id) {
     if (typeof refreshLobby === "function") refreshLobby();
-    sendResponse(ws, req, true, { ack: true, game_id: "", alreadyGone: true });
+    sendRes(ws, req, true, { ack: true, game_id: "", alreadyGone: true });
     return true;
   }
 
@@ -173,7 +173,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
       gameMeta.delete(game_id);
     }
     if (typeof refreshLobby === "function") refreshLobby();
-    sendResponse(ws, req, true, { ack: true, game_id, alreadyGone: true });
+    sendRes(ws, req, true, { ack: true, game_id, alreadyGone: true });
     return true;
   }
 
@@ -182,7 +182,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
   // si pas concerné: OK mais pas de cleanup
   if (!wasPlayer && !wasSpec) {
     if (typeof refreshLobby === "function") refreshLobby();
-    sendResponse(ws, req, true, { ack: true, game_id, ignored: true });
+    sendRes(ws, req, true, { ack: true, game_id, ignored: true });
     return true;
   }
 
@@ -203,6 +203,6 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
   cleanupIfOrphaned(ctx, game_id, { reason: "ack" });
 
   if (typeof refreshLobby === "function") refreshLobby();
-  sendResponse(ws, req, true, { ack: true, game_id });
+  sendRes(ws, req, true, { ack: true, game_id });
   return true;
 }

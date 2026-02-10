@@ -11,10 +11,10 @@ function withTrace(baseCtx, req) {
   return ctx;
 }
 
-function requireAuth(ws, req, { state, sendResponse }) {
+function requireAuth(ws, req, { state, sendRes }) {
   const user = state.getUsername(ws);
   if (!user) {
-    sendResponse(ws, req, false, { code: "AUTH_REQUIRED", message: "Non authentifié" });
+    sendRes(ws, req, false, { code: "AUTH_REQUIRED", message: "Non authentifié" });
     return null;
   }
   return user;
@@ -25,7 +25,7 @@ export function createRouter({
   state,
 
   // transport
-  sendResponse,
+  sendRes,
   wsManager,
 
   // base context
@@ -82,13 +82,13 @@ export function createRouter({
         return;
       } catch (err) {
         console.error("[ROUTE_ERROR] login", err);
-        sendResponse(ws, req, false, { code: "SERVER_ERROR", message: "Erreur serveur" });
+        sendRes(ws, req, false, { code: "SERVER_ERROR", message: "Erreur serveur" });
         return;
       }
     }
 
     // ---------- Tout le reste nécessite auth ----------
-    const actor = requireAuth(ws, req, { state, sendResponse });
+    const actor = requireAuth(ws, req, { state, sendRes });
     if (!actor) return;
 
     const ctx = withTrace(baseCtx, req);
@@ -97,7 +97,7 @@ export function createRouter({
     const routes = {
       get_players: async () => {
         ctx.trace?.("get_players");
-        sendResponse(ws, req, true, {
+        sendRes(ws, req, true, {
           players: ctx.playersList?.() ?? [],
           statuses: ctx.playersStatuses?.() ?? {},
           games: ctx.gamesList?.() ?? [],
@@ -117,7 +117,7 @@ export function createRouter({
 
     const fn = routes[req.type];
     if (!fn) {
-      sendResponse(ws, req, false, { code: "NOT_IMPLEMENTED", message: `Type non géré: ${req.type}` });
+      sendRes(ws, req, false, { code: "NOT_IMPLEMENTED", message: `Type non géré: ${req.type}` });
       return;
     }
 
@@ -129,7 +129,7 @@ export function createRouter({
     } catch (err) {
       console.error("[ROUTE_ERROR]", req.type, err);
       ctx.trace?.("ERROR", String(err?.message ?? err));
-      sendResponse(ws, req, false, { code: "SERVER_ERROR", message: "Erreur serveur" });
+      sendRes(ws, req, false, { code: "SERVER_ERROR", message: "Erreur serveur" });
     }
   }
 

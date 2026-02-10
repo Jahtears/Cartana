@@ -13,7 +13,7 @@ export function createLobbyLists(ctx) {
     gameMeta,
     gameSpectators,
     wsByUser,
-    sendLobbyEvent,
+    sendEvtLobby,
     getUserStatus,
   } = ctx;
 
@@ -51,14 +51,14 @@ export function createLobbyLists(ctx) {
   }
 
   function broadcastPlayersList() {
-    sendLobbyEvent("players_list", {
+    sendEvtLobby("players_list", {
       players: playersList(),
       statuses: playersStatuses(),
     });
   }
 
   function broadcastGamesList() {
-    sendLobbyEvent("games_list", { games: gamesList() });
+    sendEvtLobby("games_list", { games: gamesList() });
   }
 
   const refreshLobby = createLobbyRefresher({ broadcastPlayersList, broadcastGamesList });

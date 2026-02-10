@@ -89,7 +89,7 @@ const wsManager = createWSManager({ wss, trace: console.log });
 // 5️⃣ Créer le router (avec contexte + handlers)
 const router = createRouter({
   state: baseCtx.state,
-  sendResponse: baseCtx.sendResponse,
+  sendRes: baseCtx.sendRes,
   wsManager,
   baseCtx,
   loginCtx,
@@ -178,8 +178,10 @@ process.on('SIGINT', () => {
 
 // ============= DÉMARRAGE =============
 const PORT = process.env.WSS_PORT || 3000;
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Server listening on http://localhost:${PORT}`);
-  console.log(`📊 Metrics available at http://localhost:${PORT}/metrics`);
-  console.log(`❤️ Health check at http://localhost:${PORT}/health`);
+const HOST = "0.0.0.0";
+
+httpServer.listen(PORT, HOST, () => {
+  console.log(`🚀 Server listening on http://${HOST}:${PORT}`);
+  console.log(`📊 Metrics available at http://${HOST}:${PORT}/metrics`);
+  console.log(`❤️ Health check at http://${HOST}:${PORT}/health`);
 });

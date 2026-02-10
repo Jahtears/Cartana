@@ -49,7 +49,7 @@ var _login_in_flight: bool = false
 func _ready() -> void:
 	pass
 
-func connect_to_server(url: String = "ws://localhost:3000") -> void:
+func connect_to_server(url: String = "ws://192.168.1.40:3000") -> void:
 	_url = url
 	_reset_reconnect_state()
 	var err := _ws.connect_to_url(url)
@@ -58,6 +58,7 @@ func connect_to_server(url: String = "ws://localhost:3000") -> void:
 		_schedule_reconnect()
 		return
 	print("[NET] Connecting to %s" % url)
+
 
 func is_open() -> bool:
 	return _ws.get_ready_state() == WebSocketPeer.STATE_OPEN

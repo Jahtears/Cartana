@@ -14,7 +14,7 @@ export function createRoles(ctx) {
     gameSpectators,
     pendingInviteTo,
     gameMeta,
-    sendEventToUser,
+    sendEvtUser,
   } = ctx;
 
   function _removeFromSpectatorsSet(username, gidOverride = null) {
@@ -136,7 +136,7 @@ export function createRoles(ctx) {
       const inv = pendingInviteTo.get(username);
       pendingInviteTo.delete(username);
       if (inv?.from) {
-        sendEventToUser(inv.from, "invite_cancelled", { to: username, reason: "offline" });
+        sendEvtUser(inv.from, "invite_cancelled", { to: username, reason: "offline" });
       }
     }
 
@@ -144,7 +144,7 @@ export function createRoles(ctx) {
     for (const [to, inv] of pendingInviteTo.entries()) {
       if (inv.from === username) {
         pendingInviteTo.delete(to);
-        sendEventToUser(to, "invite_cancelled", { from: username, reason: "offline" });
+        sendEvtUser(to, "invite_cancelled", { from: username, reason: "offline" });
         break;
       }
     }

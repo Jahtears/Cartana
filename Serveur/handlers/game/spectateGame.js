@@ -5,7 +5,7 @@ import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from "../../net
  
  export function handleSpectateGame(ctx, ws, req, data, actor) {
    const {
-     sendResponse,
+     sendRes,
      emitStartGameToUser,
      state,
      refreshLobby,
@@ -14,7 +14,7 @@ import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from "../../net
    } = ctx;
  
 
-  const game_id = requireParam(sendResponse, ws, req, data, "game_id");
+  const game_id = requireParam(sendRes, ws, req, data, "game_id");
   if (!game_id) return true;
 
   const game = getExistingGameOrRes(ctx, ws, req, game_id);
@@ -33,6 +33,6 @@ import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from "../../net
  
    if (typeof refreshLobby === "function") refreshLobby();
  
-   sendResponse(ws, req, true, { ok: true, game_id });
+   sendRes(ws, req, true, { ok: true, game_id });
    return true;
  }

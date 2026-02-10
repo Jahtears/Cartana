@@ -6,7 +6,7 @@ export async function handleLogin(ctx, ws, req, data) {
     state,
     verifyOrCreateUser,
     getUserStatus,
-    sendResponse,
+    sendRes,
     refreshLobby,
     handleReconnect,
   } = ctx;
@@ -17,19 +17,19 @@ export async function handleLogin(ctx, ws, req, data) {
   const pin = String(safeData.pin ?? "").trim();
 
   if (!username || !pin) {
-    resBadRequest(sendResponse, ws, req, "username/pin manquant");
+    resBadRequest(sendRes, ws, req, "username/pin manquant");
     return true;
   }
 
   if (state.getWS(username)) {
-    sendResponse(ws, req, false, { code: "ALREADY_CONNECTED", message: "Utilisateur déjà connecté" });
+    sendRes(ws, req, false, { code: "ALREADY_CONNECTED", message: "Utilisateur déjà connecté" });
     return true;
   }
 
   try {
     const ok = await verifyOrCreateUser(username, pin);
     if (!ok) {
-      sendResponse(ws, req, false, { code: "AUTH_BAD_PIN", message: "PIN incorrect" });
+      sendRes(ws, req, false, { code: "AUTH_BAD_PIN", message: "PIN incorrect" });
       return true;
     }
 
@@ -40,13 +40,13 @@ export async function handleLogin(ctx, ws, req, data) {
       handleReconnect(username);
     }
 
-    sendResponse(ws, req, true, { username, status: getUserStatus(username) });
+    sendRes(ws, req, true, { username, status: getUserStatus(username) });
     if (typeof refreshLobby === "function") refreshLobby();
     return true;
     
   } catch (err) {
     console.error("Erreur login:", err);
-    resServerError(sendResponse, ws, req, "Erreur serveur");
+    resServerError(sendRes, ws, req, "Erreur serveur");
     return true;
   }
 }

@@ -64,16 +64,16 @@ export function createBroadcaster({
   game,
   specs,
   wsByUser,
-  sendEvent,
-  sendEventToUser,
+  sendEvtSocket,
+  sendEvtUser,
   emitSlotState,
   gameMeta
 }) {
   const meta = ensureGameMeta(gameMeta, game_id, { initialSent: !!game?.turn });
 
   const broadcastPartie = (evt, payload) => {
-    for (const p of game.players) sendEventToUser(p, evt, payload);
-    if (specs && specs.size) for (const s of specs) sendEventToUser(s, evt, payload);
+    for (const p of game.players) sendEvtUser(p, evt, payload);
+    if (specs && specs.size) for (const s of specs) sendEvtUser(s, evt, payload);
   };
 
   const pushSlotAll = (slot_id) => {
@@ -88,10 +88,10 @@ export function createBroadcaster({
     if (meta.slot_sig[key] === sig) return;
     meta.slot_sig[key] = sig;
 
-    emitSlotState(game, game.players, wsByUser, sendEvent, { slot_id, view: "player" });
+    emitSlotState(game, game.players, wsByUser, sendEvtSocket, { slot_id, view: "player" });
 
     if (specs && specs.size) {
-      emitSlotState(game, [...specs], wsByUser, sendEvent, { slot_id, view: "spectator" });
+      emitSlotState(game, [...specs], wsByUser, sendEvtSocket, { slot_id, view: "spectator" });
     }
   };
 
@@ -125,7 +125,7 @@ export function createBroadcaster({
   };
 
   const sendToUser = (username, evt, payload) => {
-    sendEventToUser(username, evt, payload);
+    sendEvtUser(username, evt, payload);
   };
 
   return {

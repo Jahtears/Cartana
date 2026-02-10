@@ -3,7 +3,7 @@
 export function handleLogout(ctx, ws, req, data, actor) {
   const {
     state,
-    sendResponse,
+    sendRes,
     clearInvitesForUser,
     setUserActivity,
     Activity,
@@ -30,7 +30,7 @@ export function handleLogout(ctx, ws, req, data, actor) {
   }
 
   // Send response confirming logout
-  sendResponse(ws, req, true, { logged_out: true });
+  sendRes(ws, req, true, { logged_out: true });
 
   return true;
 }

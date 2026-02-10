@@ -7,7 +7,7 @@ import { ensureGameMeta } from "../../domain/game/meta.js";
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
   const {
-    sendResponse,
+    sendRes,
     mapSlotFromClientToServer,
     mapSlotForClient,
     findCardById,
@@ -32,7 +32,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   if (rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, "Spectateur: déplacement interdit")) return true;
   if (rejectIfEndedOrRes(ctx, ws, req, game_id, game)) return true;
   if (meta.pause?.active) {
-    sendResponse(ws, req, false, { code: "GAME_PAUSED", message: "Partie en pause: adversaire déconnecté" });
+    sendRes(ws, req, false, { code: "GAME_PAUSED", message: "Partie en pause: adversaire déconnecté" });
     return true;
   }
 
@@ -40,7 +40,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   if (typeof expireTurnIfNeeded === "function") {
     const didExpire = expireTurnIfNeeded(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
-      sendResponse(ws, req, false, { code: "TURN_TIMEOUT", message: "Temps écoulé" });
+      sendRes(ws, req, false, { code: "TURN_TIMEOUT", message: "Temps écoulé" });
       return true;
     }
   }
@@ -54,7 +54,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const to_slot_id = mapSlotFromClientToServer(raw_to, actor, game);
 
   if (!from_slot_id || !to_slot_id) {
-    resBadRequest(sendResponse, ws, req, "slot_id invalide", {
+    resBadRequest(sendRes, ws, req, "slot_id invalide", {
       from_slot_id: raw_from,
       to_slot_id: raw_to,
     });
@@ -88,7 +88,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   // ✅ HANDLE RESULT
   if (!orchResult.valid) {
     const details = { card_id, from_slot_id: client_from, to_slot_id: client_to };
-    return resNotFound(sendResponse, ws, req, orchResult.reason, details);
+    return resNotFound(sendRes, ws, req, orchResult.reason, details);
   }
 
   // ✅ GAME END: emit end then broadcast
@@ -102,6 +102,6 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   }
 
   // ✅ RESPOND
-  sendResponse(ws, req, true, orchResult.response);
+  sendRes(ws, req, true, orchResult.response);
   return true;
 }
