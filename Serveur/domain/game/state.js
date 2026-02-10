@@ -48,12 +48,12 @@ export function shuffle(deck) {
 ========================= */
 
 /**
- * Distribution initiale des cartes par slot
- * - HAND : 5 cartes du deckA dans le slot unique 1:HAND:1 / 2:HAND:1
- * - DECK : 26 cartes du deckB dans le slot unique 1:DECK:1 / 2:DECK:1
- * - BENCH : 4 slots vides (1:BENCH:1-1:BENCH:4 / 2:BENCH:1-2:BENCH:4)
- * - PILE : Toutes les cartes restantes du deckA dans 0:PILE:1
- * - TABLE : 1 slot vide initial 0:TABLE:1
+ * Initial card distribution by slot:
+ * - HAND: 5 cards from deckA into 1:HAND:1 / 2:HAND:1
+ * - DECK: 26 cards from deckB into 1:DECK:1 / 2:DECK:1
+ * - BENCH: 4 empty slots per player
+ * - PILE: all remaining deckA cards into 0:PILE:1
+ * - TABLE: one empty slot 0:TABLE:1
  */
 const INITIAL_DISTRIBUTION = {
   HAND: { player: null, source: "deckA", count: (cfg) => cfg.handSize },
@@ -78,7 +78,6 @@ function distributeInitialSlots(deckA, deckB, config = {}) {
     if (!cfg) continue;
 
     if (rule.player === null) {
-      // Per-player slots (HAND, DECK, BENCH)
       for (let playerIndex = 1; playerIndex <= 2; playerIndex++) {
         for (let i = 1; i <= cfg.count; i++) {
           const slotId = SlotId.create(playerIndex, cfg.type, i);
@@ -97,7 +96,6 @@ function distributeInitialSlots(deckA, deckB, config = {}) {
         }
       }
     } else {
-      // Shared slots (PILE, TABLE) - player = 0
       for (let i = 1; i <= cfg.count; i++) {
         const slotId = SlotId.create(rule.player, cfg.type, i);
 
@@ -136,7 +134,7 @@ function initCardsById(game, cards = null) {
 }
 
 export function createGame(player1, player2) {
-  // 1) Génération des decks
+  // 1) Generate decks
   const deckA = generateCards("rouge");
   const deckB = generateCards("bleu");
 
@@ -144,14 +142,14 @@ export function createGame(player1, player2) {
   shuffle(deckA);
   shuffle(deckB);
 
-  // 3) Structure de base du game
+  // 3) Build base game object
   const game = {
     players: [player1, player2],
-    slots: {},
-    cardsById: {},
+    slots: createEmptySlots(),
+    cardsById: Object.create(null),
   };
 
-  // 4) Distribution déclarative
+  // 4) Apply declarative distribution
   const { slots, allCards } = distributeInitialSlots(deckA, deckB, {
     handSize: 5,
     personalDeckSize: 26,
@@ -159,7 +157,7 @@ export function createGame(player1, player2) {
 
   game.slots = slots;
 
-  // 5) Indexation des cartes
+  // 5) Index cards
   initCardsById(game, allCards);
 
   console.log("[GAME] CREATE", { player1, player2 });

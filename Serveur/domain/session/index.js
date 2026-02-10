@@ -3,38 +3,28 @@ import {
   mapSlotForClient,
   isOwnerForSlot,
   buildCardData,
-  slotIdToNewString,
 } from "../game/slots.js";
-import { getTableSlots, isTableSlot, getSlotStack, SLOT_TYPES, SlotId } from "../game/SlotManager.js";
+import { getTableSlots, SLOT_TYPES } from "../game/SlotManager.js";
+import {
+  getSlotContent,
+  isTableSlotType,
+  parseSlotIdString,
+  slotIdToString,
+} from "../game/SlotHelper.js";
 import { findCardById } from "../game/state.js";
 
 /* =========================
    HELPERS FOR SLOT STATE
 ========================= */
 
-function getSlotType(slot_id) {
-  if (slot_id instanceof SlotId) return slot_id.type;
-  if (typeof slot_id === "string") {
-    // New format: "0:TYPE:index" (shared=0, players=1/2)
-    const match = slot_id.match(/^(\d+):([A-Z]+):(\d+)$/);
-    if (match) {
-      const t = match[2];
-      if (SLOT_TYPES[t]) return SLOT_TYPES[t];
-    }
-  }
-  return null;
-}
-
 function isTableSlotLike(slot_id) {
-  if (isTableSlot(slot_id)) return true;
-  if (typeof slot_id === "string") return /^\d+:TABLE:\d+$/.test(slot_id);
-  return false;
+  return isTableSlotType(slot_id);
 }
 
 function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag = false } = {}) {
   const disableDrag = view === "spectator" || !!forceDisableDrag;
 
-  const clientSlot = slotIdToNewString(
+  const clientSlot = slotIdToString(
     view === "spectator" ? slot_id : mapSlotForClient(slot_id, username, game)
   );
 
@@ -44,20 +34,12 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
 
   const cards = [];
 
-  let stack = [];
-  if (slot_id instanceof SlotId) {
-    stack = getSlotStack(game, slot_id);
-  } else if (game?.slots instanceof Map) {
-    const v = game.slots.get(slot_id);
-    stack = Array.isArray(v) ? v : (v ? [v] : []);
-  } else {
-    const v = game?.slots?.[slot_id];
-    stack = Array.isArray(v) ? v : (v ? [v] : []);
-  }
+  const slotValue = getSlotContent(game, slot_id);
+  const stack = Array.isArray(slotValue) ? slotValue : (slotValue ? [slotValue] : []);
 
   if (!stack.length) return { slot_id: clientSlot, cards };
 
-  const slotType = getSlotType(slot_id);
+  const slotType = parseSlotIdString(slotIdToString(slot_id))?.type ?? null;
 
   let ids = [];
   if (slotType === SLOT_TYPES.HAND) {
@@ -81,13 +63,7 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
     const payload = buildCardData(card, clientSlot, isOwner, disableDrag);
 
     // ✅ ADAPTATION: Gestion du drag selon le type de slot
-    if (slotType === SLOT_TYPES.HAND) {
-      // Main: toutes les cartes draggable par owner
-      payload.draggable = payload.draggable;
-    } else if (slotType === SLOT_TYPES.DECK) {
-      // Deck: seule la top (dernier index dans ids, qui ne contient que le top)
-      payload.draggable = payload.draggable;
-    } else if (slotType === SLOT_TYPES.BENCH) {
+    if (slotType === SLOT_TYPES.BENCH) {
       // Bench: seule la bot (index 0 du stack original) draggable
       const isTop = ids[i] === stack[stack.length - 1];
       payload.draggable = payload.draggable && isTop;
@@ -106,25 +82,23 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
   const tableSlotIds = getTableSlots(game);
 
   const table = tableSlotIds.map((slotId) =>
-    slotIdToNewString(view === "spectator" ? slotId : mapSlotForClient(slotId, username, game))
+    slotIdToString(view === "spectator" ? slotId : mapSlotForClient(slotId, username, game))
   );
 
   const slots = {};
 
-  // Ordre stable (non-T puis T)
-  const allSlots = game?.slots instanceof Map
-    ? Array.from(game.slots.keys())
-    : Object.keys(game?.slots || {});
+  // Ordre stable (non-table puis table)
+  const allSlots = game?.slots instanceof Map ? Array.from(game.slots.keys()) : [];
 
-  const nonT = allSlots.filter(s => !isTableSlotLike(s));
-  const T = tableSlotIds;
+  const nonTable = allSlots.filter((s) => !isTableSlotLike(s));
+  const orderedTable = tableSlotIds;
 
-  for (const slot_id of nonT) {
+  for (const slot_id of nonTable) {
     const { slot_id: clientSlot, cards } = buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag });
     slots[clientSlot] = cards;
   }
 
-  for (const slot_id of T) {
+  for (const slot_id of orderedTable) {
     const { slot_id: clientSlot, cards } = buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag });
     slots[clientSlot] = cards;
   }
@@ -173,11 +147,10 @@ export function emitFullState(game, username, wsByUser, sendEvtSocket, { view = 
   if (!ws) return;
 
   let result = null;
-  let forceDisableDrag = false;
+  let forceDisableDrag = !!game?.turn?.paused;
   if (gameMeta && game_id) {
     const meta = gameMeta.get(game_id) || {};
     result = meta.result ?? null;
-    forceDisableDrag = !!meta?.pause?.active;
   }
 
   const snapshot = buildStateSnapshotForUser(game, username, view, { result, forceDisableDrag });

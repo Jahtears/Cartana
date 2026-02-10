@@ -1,10 +1,10 @@
 // domain/game/moveOrchestrator.js - Centralized move orchestration
 // Coordinates: validate → apply → check win → track updates → prepare response
 
-import { isTableSlot, makeSharedSlotId } from "./SlotManager.js";
+import { SlotId, isTableSlot, SLOT_TYPES } from "./SlotManager.js";
 
 /**
- * Orchestra a complete move: validate → apply → refill → track updates → check win
+ * Orchestrate a complete move: validate -> apply -> refill -> track updates -> check win.
  * 
  * @param {Object} params - Parameters
  * @param {string} params.game_id - Game ID for state tracking
@@ -29,12 +29,12 @@ import { isTableSlot, makeSharedSlotId } from "./SlotManager.js";
  */
 export function orchestrateMove(params) {
   const {
-    game_id,
+    game_id: gameId,
     game,
     actor,
-    card_id,
-    from_slot_id,
-    to_slot_id,
+    card_id: cardId,
+    from_slot_id: fromSlotId,
+    to_slot_id: toSlotId,
     validateMove,
     applyMove,
     findCardById,
@@ -48,13 +48,13 @@ export function orchestrateMove(params) {
     ctx,
   } = params;
 
-  // Shared slot PILE (player = 0)
-  const pileSlotId = makeSharedSlotId("P", 1);
+  //    (player index 0)(slot type pile )(slot index 1)
+  const pileSlotId = SlotId.create(0, SLOT_TYPES.PILE, 1);
 
   // ========================
   // 1) FIND CARD
   // ========================
-  const card = findCardById(game, card_id);
+  const card = findCardById(game, cardId);
   if (!card) {
     return {
       valid: false,
@@ -66,7 +66,7 @@ export function orchestrateMove(params) {
   // ========================
   // 2) VALIDATE MOVE
   // ========================
-  const validation = validateMove(game, actor, card, from_slot_id, to_slot_id);
+  const validation = validateMove(game, actor, card, fromSlotId, toSlotId);
   if (!validation.valid) {
     return {
       valid: false,
@@ -78,7 +78,7 @@ export function orchestrateMove(params) {
   // ========================
   // 3) APPLY MOVE
   // ========================
-  const moveResult = applyMove(game, card, from_slot_id, to_slot_id, actor);
+  const moveResult = applyMove(game, card, fromSlotId, toSlotId, actor);
   if (!moveResult) {
     return {
       valid: false,
@@ -90,7 +90,7 @@ export function orchestrateMove(params) {
   // ========================
   // 4) DETERMINE IF BENCH PLAY (ends turn)
   // ========================
-  const endsTurn = isBenchSlot(to_slot_id);
+  const endsTurn = isBenchSlot(toSlotId);
 
   // ========================
   // 5) REFILL HAND IF NEEDED (only if not ending turn)
@@ -107,14 +107,14 @@ export function orchestrateMove(params) {
   // ========================
   const tableSlots = getTableSlots(game);
 
-  withGameUpdate(game_id, (fx) => {
+  withGameUpdate(gameId, (fx) => {
     if (moveResult.newTableSlot) {
       fx.syncTable(tableSlots);
       fx.touch(moveResult.newTableSlot);
     }
-    fx.touch(from_slot_id);
-    if (to_slot_id !== moveResult.newTableSlot) fx.touch(to_slot_id);
-    for (const refill of selfRefill) fx.touch(refill.slot_id);
+    fx.touch(fromSlotId);
+    if (toSlotId !== moveResult.newTableSlot) fx.touch(toSlotId);
+    for (const refill of selfRefill) fx.touch(refill.slotId);
     if (selfRefill.length) fx.touch(pileSlotId);
     fx.turn();
   }, ctx?.trace);
@@ -126,9 +126,9 @@ export function orchestrateMove(params) {
     return {
       valid: true,
       response: {
-        card_id,
-        from_slot_id,
-        to_slot_id,
+        card_id: cardId,
+        from_slot_id: fromSlotId,
+        to_slot_id: toSlotId,
         winner,
       },
       winner,
@@ -142,9 +142,9 @@ export function orchestrateMove(params) {
     return {
       valid: true,
       response: {
-        card_id,
-        from_slot_id,
-        to_slot_id,
+        card_id: cardId,
+        from_slot_id: fromSlotId,
+        to_slot_id: toSlotId,
       },
     };
   }
@@ -155,34 +155,32 @@ export function orchestrateMove(params) {
   const { given, recycled } = endTurnAfterBenchPlay(game, actor);
 
   // Track end-of-turn updates
-  const fromExists = game?.slots instanceof Map
-    ? game.slots.has(from_slot_id)
-    : Object.prototype.hasOwnProperty.call(game.slots || {}, from_slot_id);
+  const fromExists = game?.slots instanceof Map && game.slots.has(fromSlotId);
 
-  withGameUpdate(game_id, (fx) => {
+  withGameUpdate(gameId, (fx) => {
     if (recycled?.recycledSlots?.length) {
       const freshTableSlots = getTableSlots(game);
       fx.syncTable(freshTableSlots);
     }
 
-    if (!isTableSlot(from_slot_id) || fromExists) fx.touch(from_slot_id);
-    fx.touch(to_slot_id);
-    for (const refill of given) fx.touch(refill.slot_id);
+    if (!isTableSlot(fromSlotId) || fromExists) fx.touch(fromSlotId);
+    fx.touch(toSlotId);
+    for (const refill of given) fx.touch(refill.slotId);
     fx.touch(pileSlotId);
     fx.turn();
   }, ctx?.trace);
 
   // Broadcast if pile was recycled
   if (recycled?.recycledSlots?.length && typeof emitSnapshotsToAudience === "function") {
-    emitSnapshotsToAudience(game_id, { reason: "recycle" });
+    emitSnapshotsToAudience(gameId, { reason: "recycle" });
   }
 
   return {
     valid: true,
     response: {
-      card_id,
-      from_slot_id,
-      to_slot_id,
+      card_id: cardId,
+      from_slot_id: fromSlotId,
+      to_slot_id: toSlotId,
     },
   };
 }

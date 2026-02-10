@@ -19,7 +19,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     hasWonByEmptyDeckSlot,
     getTableSlots,
     emitSnapshotsToAudience,
-    expireTurnIfNeeded,
+    processTurnTimeout,
     withGameUpdate,
   } = ctx;
 
@@ -27,18 +27,18 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const pg = getPlayerGameOrRes(ctx, ws, req, actor);
   if (!pg) return true;
   const { game_id, game } = pg;
-  const meta = ensureGameMeta(ctx.state.gameMeta, game_id, { initialSent: !!game?.turn });
+  ensureGameMeta(ctx.state.gameMeta, game_id, { initialSent: !!game?.turn });
 
   if (rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, "Spectateur: déplacement interdit")) return true;
   if (rejectIfEndedOrRes(ctx, ws, req, game_id, game)) return true;
-  if (meta.pause?.active) {
+  if (game?.turn?.paused) {
     sendRes(ws, req, false, { code: "GAME_PAUSED", message: "Partie en pause: adversaire déconnecté" });
     return true;
   }
 
   // ✅ TURN EXPIRY CHECK
-  if (typeof expireTurnIfNeeded === "function") {
-    const didExpire = expireTurnIfNeeded(game_id);
+  if (typeof processTurnTimeout === "function") {
+    const didExpire = processTurnTimeout(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
       sendRes(ws, req, false, { code: "TURN_TIMEOUT", message: "Temps écoulé" });
       return true;

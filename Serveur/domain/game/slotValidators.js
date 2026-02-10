@@ -2,6 +2,22 @@
 
 import { SlotId, SLOT_TYPES, getSlotStack } from "./SlotManager.js";
 
+const TURN_VALUE_RANK = {
+  A: 13,
+  R: 12,
+  D: 11,
+  V: 10,
+  "10": 9,
+  "9": 8,
+  "8": 7,
+  "7": 6,
+  "6": 5,
+  "5": 4,
+  "4": 3,
+  "3": 2,
+  "2": 1,
+};
+
 /**
  * Retrieve card from game's card index by ID
  */
@@ -45,12 +61,43 @@ function _slotAnyHasAce(game, slotId) {
   return false;
 }
 
+function _valueRank(v) {
+  return TURN_VALUE_RANK[String(v)] ?? 0;
+}
+
+/**
+ * Compare two cards by turn value rank.
+ */
+function compareCardsByTurnValue(c1, c2) {
+  const r1 = c1 ? _valueRank(c1.value) : 0;
+  const r2 = c2 ? _valueRank(c2.value) : 0;
+  if (r1 > r2) return 1;
+  if (r1 < r2) return -1;
+  return 0;
+}
+
+/**
+ * Find an Ace in a hand slot, iterating from top to bottom.
+ */
+function findAceCardInHand(game, handSlotId, handSize = 5) {
+  const ids = getSlotStack(game, handSlotId);
+  const start = Math.max(0, ids.length - handSize);
+  for (let i = ids.length - 1; i >= start; i--) {
+    const cardId = ids[i];
+    const card = _getCardById(game, cardId);
+    if (card && _isAceValue(card.value)) {
+      return { slotId: handSlotId, cardId };
+    }
+  }
+  return null;
+}
+
 /**
  * Validate placement on Table slot
  * Rules: empty=[A,R], count=1=[2,R], count=2=[3,R], ... count=9=[10,R], count=10=[D]
  */
-export function validateTableSlot(game, card, from_slot_id, to_slot_id) {
-  const slot = getSlotStack(game, to_slot_id);
+export function validateTableSlot(game, card, fromSlotId, toSlotId) {
+  const slot = getSlotStack(game, toSlotId);
   const count = slot.length;
 
   const allowedByCount = [
@@ -74,7 +121,7 @@ export function validateTableSlot(game, card, from_slot_id, to_slot_id) {
     const acceptedStr = allowed ? allowed.join(" ou ") : "aucune";
     console.log("[RULES] MOVE_DENIED_SLOT Table", {
       card_id: card.id,
-      to_slot_id,
+      to_slot_id: toSlotId,
       count,
       tried: card.value,
       accepted: allowed ?? [],
@@ -92,28 +139,28 @@ export function validateTableSlot(game, card, from_slot_id, to_slot_id) {
 /**
  * Validate placement on Deck slot (not allowed)
  */
-export function validateDeckSlot(game, card, from_slot_id, to_slot_id) {
+export function validateDeckSlot(game, card, fromSlotId, toSlotId) {
   return { valid: false, reason: "Impossible de jouer sur un deck" };
 }
 
 /**
  * Validate placement on Hand slot (not allowed)
  */
-export function validateHandSlot(game, card, from_slot_id, to_slot_id) {
+export function validateHandSlot(game, card, fromSlotId, toSlotId) {
   return { valid: false, reason: "Impossible de jouer sur la main" };
 }
 
 /**
  * Validate placement on Bench slot (always allowed)
  */
-export function validateBenchSlot(game, card, from_slot_id, to_slot_id) {
+export function validateBenchSlot(game, card, fromSlotId, toSlotId) {
   return { valid: true };
 }
 
 /**
  * Validate placement on Draw Pile slot (not allowed)
  */
-export function validateDrawPileSlot(game, card, from_slot_id, to_slot_id) {
+export function validateDrawPileSlot(game, card, fromSlotId, toSlotId) {
   return { valid: false, reason: "Impossible de jouer sur la pioche" };
 }
 
@@ -147,4 +194,11 @@ export function getSlotValidator(slotType) {
 /**
  * Export helpers for use in other rules
  */
-export { _getCardById, _isAceValue, _slotTopHasAce, _slotAnyHasAce };
+export {
+  _getCardById,
+  _isAceValue,
+  _slotTopHasAce,
+  _slotAnyHasAce,
+  compareCardsByTurnValue,
+  findAceCardInHand,
+};

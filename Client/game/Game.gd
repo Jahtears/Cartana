@@ -1,14 +1,19 @@
-# Game.gd V1.2
+# Game.gd V2.0 -  système d'événements et slots
+
 extends Control 
 
+# ============= SCENES =============
 var slot_scene: PackedScene = preload("res://Client/Scenes/Slot.tscn")
 var card_scene: PackedScene = preload("res://Client/Scenes/Carte.tscn")
+
+# ============= PROTOCOLS & HELPERS =============
 const Protocol = preload("res://Client/net/Protocol.gd")
 const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
 const TableSyncHelper = preload("res://Client/game/helpers/table_sync.gd")
 const CardSyncHelper = preload("res://Client/game/helpers/card_sync.gd")
 const TimebarUtil = preload("res://Client/game/helpers/timebar.gd")
 
+# ============= LAYOUT CONSTANTS =============
 const MAIN_COUNT := 1
 const BANC_COUNT := 4
 const MIN_SLOT_SPACING := 64.0
@@ -21,27 +26,33 @@ const TABLE_Y_RATIO := 0.5
 const PIOCHE_RIGHT_MARGIN := 80.0
 const START_POS := Vector2.ZERO
 
+# ============= TIMEBAR COLORS =============
 static var TIMEBAR_GREEN: Color = Color.from_hsv(0.333, 0.85, 0.95, 1.0)
 static var TIMEBAR_YELLOW: Color = Color.from_hsv(0.166, 0.85, 0.95, 1.0)
 static var TIMEBAR_ORANGE: Color = Color.from_hsv(0.083, 0.85, 0.95, 1.0)
-static var TIMEBAR_RED: Color   = Color.from_hsv(0.000, 0.85, 0.95, 1.0)
+static var TIMEBAR_RED: Color = Color.from_hsv(0.000, 0.85, 0.95, 1.0)
+const TIMEBAR_SPEC: Color = Color(0.85, 0.85, 0.85)
 
-const TIMEBAR_SPEC := Color(0.85, 0.85, 0.85)
-
+# ============= STATE =============
 var slots_ready: bool = false
-var slots_by_id: Dictionary = {}                    # slot_id -> Node
-var pending_events: Array[Dictionary] = []          # events arrivés avant slots_ready
-var cards: Dictionary = {}                          # card_id -> Node
+var slots_by_id: Dictionary = {}
+var pending_events: Array[Dictionary] = []
+var cards: Dictionary = {}
+var allowed_table_slots: Dictionary = {}
+
+# ============= UI STATE =============
 var _is_changing_scene := false
 var _game_end_prompted := false
 var _leave_sent := false
 var _disconnect_prompt_seq := 0
 var _opponent_disconnected := false
 var opponent_name: String = ""
-var allowed_table_slots: Dictionary = {}            # IDs table autorisés (format 0:TABLE:index)
+
+# ============= LAYOUT STATE =============
 var _slot_spacing: float = 100.0
 var _table_spacing: int = 100
 
+# ============= NODES =============
 @onready var time_bar: ProgressBar = $TimeBar
 @onready var player1_root: Node2D = $Player1
 @onready var player2_root: Node2D = $Player2
@@ -54,7 +65,10 @@ var _table_spacing: int = 100
 @onready var pioche_root: Node2D = $Pioche
 @onready var table_root: Node2D = $Table
 
+# ============= CARD CONTEXT =============
 var _card_ctx: Dictionary = {}
+
+# ============= TIMEBAR STATE =============
 var _timebar_state: Dictionary = {
 	"turn_current": "",
 	"turn_ends_at_ms": 0,
@@ -65,6 +79,7 @@ var _timebar_state: Dictionary = {
 	"timebar_fill_sb": null,
 	"timebar_last_color": Color(-1, -1, -1, -1),
 }
+
 var _timebar_colors: Dictionary = {
 	"green": TIMEBAR_GREEN,
 	"yellow": TIMEBAR_YELLOW,
@@ -73,12 +88,15 @@ var _timebar_colors: Dictionary = {
 	"spec": TIMEBAR_SPEC,
 }
 
+# ============= LIFECYCLE =============
+
 func _ready() -> void:
 	_connect_layout_signals()
 	_relayout_board()
 	_setup_player($Player1, 1)
 	_setup_player($Player2, 2)
 	_setup_Pioche($Pioche)
+	
 	_card_ctx = {
 		"cards": cards,
 		"card_scene": card_scene,
@@ -95,9 +113,7 @@ func _ready() -> void:
 	if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
 		PopupUi.hide()
 
-	# ready dès que la scène Game est chargée
-	# - joueur: {} suffit
-	# - spectateur: {"game_id": ...}
+	# Ready pour la scène
 	if String(Global.current_game_id) != "":
 		if bool(Global.is_spectator):
 			NetworkManager.request("ready_for_game", {"game_id": String(Global.current_game_id)})
@@ -107,124 +123,142 @@ func _ready() -> void:
 	await get_tree().process_frame
 	slots_ready = true
 	TimebarUtil.update_timebar(_timebar_state, time_bar, Callable(NetworkManager, "server_now_ms"), _timebar_colors)
-	# Rejoue les events reçus avant que les slots soient prêts
+	
+	# Replay events avant que les slots soient prêts
 	for ev in pending_events:
 		_on_evt(String(ev.get("type", "")), ev.get("data", {}) as Dictionary)
 	pending_events.clear()
 
-# ---------------------------------------------------------
-#  EVT (push serveur)
-# ---------------------------------------------------------
+# ============= EVENTS (PUSH SERVEUR) =============
+
 func _on_evt(type: String, data: Dictionary) -> void:
 	print("[EVT]", type, data)
 
 	match type:
 		"start_game":
-			# 1) Maj globals
-			Global.current_game_id = String(data.get("game_id", ""))
-			Global.players_in_game = data.get("players", [])
-			Global.is_spectator = bool(data.get("spectator", false))
-
-			# ended reset (important)
-			Global.result.clear()
-			
-			# 2) Maj opponent_name
-			opponent_name = ""
-			for p in Global.players_in_game:
-				var ps := String(p)
-				if ps != Global.username:
-					opponent_name = ps
-
-			# 3) Reset état local si on était déjà en Game
-			_reset_board_state()
-			slots_ready = true
-			pending_events.clear()
-			_is_changing_scene = false
-			_game_end_prompted = false
-			_leave_sent = false
-			_opponent_disconnected = false
-			_disconnect_prompt_seq += 1
-			if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
-				PopupUi.hide()
-
-			# 4) Ready même sans reload de scène
-			if Global.current_game_id != "":
-				if Global.is_spectator:
-					NetworkManager.request("ready_for_game", {"game_id": Global.current_game_id})
-				else:
-					NetworkManager.request("ready_for_game", {})
-
+			_handle_start_game(data)
 		"table_sync":
-			if slots_ready:
-				TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, data.get("slots", []), _table_spacing, START_POS)
-			else:
-				pending_events.append({"type": type, "data": data})
-
+			_handle_table_sync(data)
 		"slot_state":
-			if slots_ready:
-				_on_slot_state(data)
-			else:
-				pending_events.append({"type": type, "data": data})
-
+			_handle_slot_state(data)
 		"state_snapshot":
-			if slots_ready:
-				_apply_state_snapshot(data)
-			else:
-				pending_events.append({"type": type, "data": data})
+			_handle_state_snapshot(data)
 		"show_game_message":
 			_show_popup_message(data)
 		"game_end":
-			Global.result = data.duplicate()
-			var merged := data.duplicate(true)
-			merged["game_id"] = String(merged.get("game_id", String(Global.current_game_id)))
-			_on_game_end(merged)
+			_handle_game_end(data)
 		"invite_request":
-			var from_user := String(data.get("from", ""))
-			if from_user != "":
-				PopupUi.show_invite_request(from_user, {
-					"flow": "invite_request",
-					"from": from_user
-				})
+			_handle_invite_request(data)
 		"invite_response":
-			var ui := Protocol.normalize_game_message(data, Protocol.GAME_MESSAGE["INFO"])
-			if String(ui.get("text", "")) != "":
-				PopupUi.show_ui_message(ui)
+			_handle_invite_response(data)
 		"turn_update":
-			# data: { current, turnNumber, endsAt, durationMs, paused?, remainingMs?, endedBy? }
 			_set_turn_timer(data)
 		"opponent_disconnected":
-			var who := String(data.get("username", ""))
-			_opponent_disconnected = true
-			if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
-				PopupUi.show_ui_message({
-					"text": "%s s'est déconnecté." % who,
-					"code": Protocol.GAME_MESSAGE["WARN"],
-				})
-			else:
-				_show_popup_message({
-					"text": "%s s'est déconnecté." % who,
-					"code": Protocol.GAME_MESSAGE["WARN"],
-				})
-			_schedule_disconnect_choice(who)
+			_handle_opponent_disconnected(data)
 		"opponent_rejoined":
-			var who := String(data.get("username", ""))
-			_opponent_disconnected = false
-			_disconnect_prompt_seq += 1
-			if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
-				PopupUi.hide()
-				PopupUi.show_ui_message({
-					"text": "%s a rejoint la partie." % who,
-					"code": Protocol.GAME_MESSAGE["INFO"],
-				})
-			else:
-				_show_popup_message({
-					"text": "%s a rejoint la partie." % who,
-					"code": Protocol.GAME_MESSAGE["INFO"],
-				})
+			_handle_opponent_rejoined(data)
 
-# ---------------------------------------------------------
-#  RES (réponses à des requêtes)
-# ---------------------------------------------------------
+# ============= HANDLERS =============
+
+func _handle_start_game(data: Dictionary) -> void:
+	Global.current_game_id = String(data.get("game_id", ""))
+	Global.players_in_game = data.get("players", [])
+	Global.is_spectator = bool(data.get("spectator", false))
+
+	Global.result.clear()
+	
+	opponent_name = ""
+	for p in Global.players_in_game:
+		var ps := String(p)
+		if ps != Global.username:
+			opponent_name = ps
+
+	_reset_board_state()
+	slots_ready = true
+	pending_events.clear()
+	_is_changing_scene = false
+	_game_end_prompted = false
+	_leave_sent = false
+	_opponent_disconnected = false
+	_disconnect_prompt_seq += 1
+	if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
+		PopupUi.hide()
+
+	if Global.current_game_id != "":
+		if Global.is_spectator:
+			NetworkManager.request("ready_for_game", {"game_id": Global.current_game_id})
+		else:
+			NetworkManager.request("ready_for_game", {})
+
+func _handle_table_sync(data: Dictionary) -> void:
+	if slots_ready:
+		TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, data.get("slots", []), _table_spacing, START_POS)
+	else:
+		pending_events.append({"type": "table_sync", "data": data})
+
+func _handle_slot_state(data: Dictionary) -> void:
+	if slots_ready:
+		_on_slot_state(data)
+	else:
+		pending_events.append({"type": "slot_state", "data": data})
+
+func _handle_state_snapshot(data: Dictionary) -> void:
+	if slots_ready:
+		_apply_state_snapshot(data)
+	else:
+		pending_events.append({"type": "state_snapshot", "data": data})
+
+func _handle_game_end(data: Dictionary) -> void:
+	Global.result = data.duplicate()
+	var merged := data.duplicate(true)
+	merged["game_id"] = String(merged.get("game_id", String(Global.current_game_id)))
+	_on_game_end(merged)
+
+func _handle_invite_request(data: Dictionary) -> void:
+	var from_user := String(data.get("from", ""))
+	if from_user != "":
+		PopupUi.show_invite_request(from_user, {
+			"flow": "invite_request",
+			"from": from_user
+		})
+
+func _handle_invite_response(data: Dictionary) -> void:
+	var ui := Protocol.normalize_game_message(data, Protocol.GAME_MESSAGE["INFO"])
+	if String(ui.get("text", "")) != "":
+		PopupUi.show_ui_message(ui)
+
+func _handle_opponent_disconnected(data: Dictionary) -> void:
+	var who := String(data.get("username", ""))
+	_opponent_disconnected = true
+	if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
+		PopupUi.show_ui_message({
+			"text": "%s s'est déconnecté." % who,
+			"code": Protocol.GAME_MESSAGE["WARN"],
+		})
+	else:
+		_show_popup_message({
+			"text": "%s s'est déconnecté." % who,
+			"code": Protocol.GAME_MESSAGE["WARN"],
+		})
+	_schedule_disconnect_choice(who)
+
+func _handle_opponent_rejoined(data: Dictionary) -> void:
+	var who := String(data.get("username", ""))
+	_opponent_disconnected = false
+	_disconnect_prompt_seq += 1
+	if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
+		PopupUi.hide()
+		PopupUi.show_ui_message({
+			"text": "%s a rejoint la partie." % who,
+			"code": Protocol.GAME_MESSAGE["INFO"],
+		})
+	else:
+		_show_popup_message({
+			"text": "%s a rejoint la partie." % who,
+			"code": Protocol.GAME_MESSAGE["INFO"],
+		})
+
+# ============= RESPONSES =============
 
 func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error: Dictionary) -> void:
 	if type == "login":
@@ -238,7 +272,7 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 	if type != "move_request":
 		return
 
-	# ✅ NOUVEAU: Reset move pending flag
+	# Reset move pending flag
 	var card_id = _data.get("card_id", "")
 	if card_id != "":
 		var card = cards.get(card_id)
@@ -261,9 +295,8 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 				"from_slot_id": String(details.get("from_slot_id", ""))
 			})
 
-# ---------------------------------------------------------
-#  SNAPSHOT (full resync)
-# ---------------------------------------------------------
+# ============= SNAPSHOT =============
+
 func _apply_state_snapshot(data: Dictionary) -> void:
 	for s in slots_by_id.values():
 		if s and s.has_method("clear_slot"):
@@ -280,18 +313,22 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 			slot = _find_slot_by_id(slot_id)
 
 		var arr: Array = slots_dict.get(k, [])
-		for payload in arr:
+		
+		# ✅ CORRECTION #3: Ajouter index d'ordre du serveur à chaque carte
+		for i in range(arr.size()):
+			var payload = arr[i]
 			if payload is Dictionary:
+				payload["_array_order"] = i  # Index du serveur
 				CardSyncHelper.apply_card_update(_card_ctx, payload)
 
-	# ✅ TURN timer depuis snapshot (hors boucle)
+	# ✅ CORRECTION: Timebar depuis snapshot (hors boucle)
 	var turn_val = data.get("turn", null)
 	if turn_val is Dictionary:
 		_set_turn_timer(turn_val as Dictionary)
 	else:
 		_set_turn_timer({})
 
-	# ✅ result via snapshot
+	# ✅ CORRECTION: result via snapshot
 	var result_val = data.get("result", null)
 	if result_val is Dictionary and (result_val as Dictionary).size() > 0:
 		var e := result_val as Dictionary
@@ -300,9 +337,9 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 			merged[kk] = e[kk]
 		_on_game_end(merged)
 
-# ---------------------------------------------------------
-#  GAME END (unifié + ack_game_end)
-# ---------------------------------------------------------
+
+# ============= GAME END =============
+
 func _on_game_end(data: Dictionary) -> void:
 	if _game_end_prompted:
 		return
@@ -347,9 +384,8 @@ func _ack_end_and_go_lobby() -> void:
 
 	await _go_to_lobby_safe()
 
-# ---------------------------------------------------------
-#  SLOT_STATE (diff granulaire)
-# ---------------------------------------------------------
+# ============= SLOT STATE =============
+
 func _on_slot_state(data: Dictionary) -> void:
 	var slot_id := SlotIdHelper.normalize_slot_id(String(data.get("slot_id", "")))
 	if slot_id == "":
@@ -366,13 +402,17 @@ func _on_slot_state(data: Dictionary) -> void:
 		slot.clear_slot()
 
 	var arr: Array = data.get("cards", [])
-	for payload in arr:
+	
+	# ✅ CORRECTION #3: Ajouter index à chaque carte
+	for i in range(arr.size()):
+		var payload = arr[i]
 		if payload is Dictionary:
+			payload["_array_order"] = i  # Index du serveur
 			CardSyncHelper.apply_card_update(_card_ctx, payload)
 
-# ---------------------------------------------------------
-#  INVALID MOVE (snap-back)
-# ---------------------------------------------------------
+
+# ============= INVALID MOVE =============
+
 func _on_invalid_move(data: Dictionary) -> void:
 	print("INVALID MOVE:", data)
 	var card_id: String = String(data.get("card_id", ""))
@@ -386,9 +426,8 @@ func _on_invalid_move(data: Dictionary) -> void:
 		slot.snap_card(card, true)
 		card.set_meta("last_slot_id", from_slot_id)
 
-# ---------------------------------------------------------
-#  RESET LOCAL
-# ---------------------------------------------------------
+# ============= RESET =============
+
 func _reset_board_state() -> void:
 	for s in slots_by_id.values():
 		if s and s.has_method("clear_slot"):
@@ -406,9 +445,8 @@ func _reset_board_state() -> void:
 	slots_ready = true
 	allowed_table_slots.clear()
 
-# ---------------------------------------------------------
-#  SETUP SLOTS (fixes)
-# ---------------------------------------------------------
+# ============= SETUP SLOTS =============
+
 func _setup_player(player: Node, id: int) -> void:
 	var deck = player.get_node("Deck")
 	var main = player.get_node("Main")
@@ -454,11 +492,12 @@ func _create_slot(parent: Node, slot_name: String, pos: Vector2) -> void:
 	parent.add_child(slot)
 	slots_by_id[slot_name] = slot
 
-# ---------------------------------------------------------
-#  CARD UPDATE (payload)
-# ---------------------------------------------------------
+# ============= FIND SLOT =============
+
 func _find_slot_by_id(slot_id: String) -> Node:
 	return slots_by_id.get(slot_id, null)
+
+# ============= LAYOUT =============
 
 func _connect_layout_signals() -> void:
 	var vp := get_viewport()
@@ -523,9 +562,8 @@ func _update_row_positions(player_id: int, slot_type: String, count: int) -> voi
 		if slot != null:
 			slot.position = START_POS + Vector2(i * _slot_spacing, 0)
 
-# ---------------------------------------------------------
-#  UI MESSAGE
-# ---------------------------------------------------------
+# ============= UI MESSAGES =============
+
 func show_game_message(text: String, color: Color) -> void:
 	var label := $VBoxContainer/CenterContainer/GameMessage
 	label.bbcode_enabled = true
@@ -549,14 +587,13 @@ func _show_popup_message(data: Dictionary) -> void:
 	if color_val is Color:
 		color = color_val
 	show_game_message(text, color)
+
 func _on_timer_timeout() -> void:
 	$VBoxContainer/CenterContainer/GameMessage.visible = false
 
-# ---------------------------------------------------------
-#  TimerBar
-# ---------------------------------------------------------
+# ============= TIMEBAR =============
+
 func _process(_delta: float) -> void:
-	# Affichage uniquement: la source de vérité est le serveur (endsAt + durationMs)
 	if time_bar.visible:
 		TimebarUtil.update_timebar(_timebar_state, time_bar, Callable(NetworkManager, "server_now_ms"), _timebar_colors)
 
@@ -565,9 +602,8 @@ func _set_turn_timer(turn: Dictionary) -> void:
 	TimebarUtil.update_timebar_mode(_timebar_state, bool(Global.is_spectator), String(Global.username))
 	TimebarUtil.update_timebar(_timebar_state, time_bar, Callable(NetworkManager, "server_now_ms"), _timebar_colors)
 
-# ---------------------------------------------------------
-#  Quitter (bouton Game)
-# ---------------------------------------------------------
+# ============= QUITTER =============
+
 func _on_quitter_pressed() -> void:
 	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and PopupUi.has_method("show_confirm"):
 		PopupUi.show_confirm(

@@ -1,5 +1,4 @@
-// SlotManager.js v4.4 - ULTRA OPTIMISÉ
-// player === 0 pour shared, player === 1 ou 2 pour joueurs
+// SlotManager.js - Canonical slot storage/operations
 
 /* =========================
    SLOT ID CLASS
@@ -9,7 +8,7 @@ const slotIdCache = new Map();
 
 class SlotId {
   constructor(player, type, index) {
-    this.player = player;  // 0 = shared, 1 = P1, 2 = P2
+    this.player = player;
     this.type = type;
     this.index = index;
   }
@@ -38,8 +37,8 @@ const SLOT_TYPES = {
   TABLE: "TABLE",
   PILE: "PILE",
 };
+const SLOT_TYPE_SET = new Set(Object.values(SLOT_TYPES));
 
-// 0 = shared, 1+ = player slots
 const SLOT_CONFIG = {
   PILE:  { player: 0, type: SLOT_TYPES.PILE,  count: 1 },
   TABLE: { player: 0, type: SLOT_TYPES.TABLE, count: 1 },
@@ -53,15 +52,10 @@ const SLOT_CONFIG = {
 ========================= */
 
 function makePlayerSlotId(playerIndex, slotType, slotNumber) {
-  const map = { D: "DECK", M: "HAND", B: "BENCH" };
-  const type = map[slotType] || slotType;
-  return SlotId.create(playerIndex, type, slotNumber);
-}
-
-function makeSharedSlotId(slotType, slotNumber) {
-  const map = { T: "TABLE", P: "PILE" };
-  const type = map[slotType] || slotType;
-  return SlotId.create(0, type, slotNumber);
+  if (!SLOT_TYPE_SET.has(slotType)) {
+    throw new TypeError(`Invalid slot type for player slot: ${slotType}`);
+  }
+  return SlotId.create(playerIndex, slotType, slotNumber);
 }
 
 function parseSlotId(slotId) {
@@ -83,14 +77,14 @@ function createEmptySlots() {
 
   for (const cfg of Object.values(SLOT_CONFIG)) {
     if (cfg.player === null) {
-      // Per-player slots (DECK, HAND, BENCH)
+
       for (let p = 1; p <= 2; p++) {
         for (let i = 1; i <= cfg.count; i++) {
           slots.set(SlotId.create(p, cfg.type, i), []);
         }
       }
     } else {
-      // Shared slots (player = 0)
+      
       for (let i = 1; i <= cfg.count; i++) {
         slots.set(SlotId.create(cfg.player, cfg.type, i), []);
       }
@@ -135,10 +129,6 @@ function drawTop(game, slotId) {
   return stack.length ? stack.pop() : null;
 }
 
-function hasCardInSlot(game, slotId, cardId) {
-  return getSlotStack(game, slotId).includes(cardId);
-}
-
 function removeCardFromSlot(game, slotId, cardId) {
   const stack = getSlotStack(game, slotId);
   const idx = stack.indexOf(cardId);
@@ -155,10 +145,6 @@ function isSlotEmpty(game, slotId) {
   return getSlotCount(game, slotId) === 0;
 }
 
-function peekTop(game, slotId) {
-  const stack = getSlotStack(game, slotId);
-  return stack.length ? stack[stack.length - 1] : null;
-}
 
 /* =========================
    TABLE API
@@ -189,6 +175,21 @@ function getOrCreateTableSlot(game) {
   return emptySlot || addTableSlot(game);
 }
 
+function getOrCreateTableSlotWithFlag(game) {
+  const before = getTableSlots(game).length;
+  const slotId = getOrCreateTableSlot(game);
+  const after = getTableSlots(game).length;
+  return { slotId, created: after > before };
+}
+
+function ensureOneEmptyTableSlot(game) {
+  const tableSlots = getTableSlots(game);
+  const hasEmpty = tableSlots.some((slotId) => isSlotEmpty(game, slotId));
+  if (hasEmpty) return false;
+  addTableSlot(game);
+  return true;
+}
+
 function cleanupEmptyTableSlots(game) {
   const slots = getTableSlots(game);
   const empty = slots.filter(id => isSlotEmpty(game, id));
@@ -200,10 +201,6 @@ function cleanupEmptyTableSlots(game) {
   const toDelete = empty.slice(1);
   toDelete.forEach(id => game.slots.delete(id));
   return toDelete;
-}
-
-function getActiveTableSlotIds(game) {
-  return getTableSlots(game).map(id => id.toString());
 }
 
 /* =========================
@@ -218,35 +215,8 @@ function isPileSlot(slotId) {
   return slotId instanceof SlotId && slotId.type === SLOT_TYPES.PILE;
 }
 
-function isHandSlot(slotId) {
-  return slotId instanceof SlotId && slotId.type === SLOT_TYPES.HAND;
-}
-
 function isBenchSlot(slotId) {
   return slotId instanceof SlotId && slotId.type === SLOT_TYPES.BENCH;
-}
-
-function isDeckSlot(slotId) {
-  return slotId instanceof SlotId && slotId.type === SLOT_TYPES.DECK;
-}
-
-function isSharedSlot(slotId) {
-  return slotId instanceof SlotId && slotId.player === 0;
-}
-
-function isPlayerSlot(slotId, playerIndex) {
-  return slotId instanceof SlotId && slotId.player === playerIndex;
-}
-
-function getPlayerSlots(playerIndex, slotType) {
-  const cfg = Object.values(SLOT_CONFIG).find(x => x.type === slotType && x.player === null);
-  if (!cfg) return [];
-  
-  const result = [];
-  for (let i = 1; i <= cfg.count; i++) {
-    result.push(SlotId.create(playerIndex, slotType, i));
-  }
-  return result;
 }
 
 function getHandSize(game, playerIndex) {
@@ -257,6 +227,21 @@ function getHandSize(game, playerIndex) {
    EXPORTS
 ========================= */
 
+function hasWonByEmptyDeckSlot(game, player) {
+  if (!player || !game) return false;
+
+  const playerArrayIndex = game.players.indexOf(player); // 0 or 1
+  if (playerArrayIndex === -1) return false;
+
+  const playerIndex = playerArrayIndex + 1; // 1 or 2 for SlotManager
+
+  // Canonical deck slot: "<player>:DECK:1"
+  const deckSlot = makePlayerSlotId(playerIndex, SLOT_TYPES.DECK, 1);
+
+  // Win when deck is empty.
+  return getSlotCount(game, deckSlot) === 0;
+}
+
 export {
   // Classes & Constants
   SlotId,
@@ -265,7 +250,6 @@ export {
 
   // Builders
   makePlayerSlotId,
-  makeSharedSlotId,
   parseSlotId,
 
   // Init
@@ -276,27 +260,22 @@ export {
   putTop,
   putBottom,
   drawTop,
-  hasCardInSlot,
   removeCardFromSlot,
   getSlotCount,
   isSlotEmpty,
-  peekTop,
 
   // Table API
   getTableSlots,
   addTableSlot,
   getOrCreateTableSlot,
+  getOrCreateTableSlotWithFlag,
+  ensureOneEmptyTableSlot,
   cleanupEmptyTableSlots,
-  getActiveTableSlotIds,
 
   // Queries
   isTableSlot,
   isPileSlot,
-  isHandSlot,
   isBenchSlot,
-  isDeckSlot,
-  isSharedSlot,
-  isPlayerSlot,
-  getPlayerSlots,
   getHandSize,
+  hasWonByEmptyDeckSlot,
 };

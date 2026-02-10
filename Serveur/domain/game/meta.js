@@ -1,7 +1,7 @@
 // meta.js
 
-export function ensureGameMeta(gameMeta, game_id, { initialSent } = {}) {
-  let meta = gameMeta.get(game_id);
+export function ensureGameMeta(gameMeta, gameId, { initialSent } = {}) {
+  let meta = gameMeta.get(gameId);
 
   if (!meta || typeof meta !== "object") meta = {};
 
@@ -16,15 +16,8 @@ export function ensureGameMeta(gameMeta, game_id, { initialSent } = {}) {
   if (typeof meta.turn_sig !== "string") meta.turn_sig = "";
 
   if (!("result" in meta)) meta.result = null;
-  if (!meta.pause || typeof meta.pause !== "object") {
-    meta.pause = { active: false, startedAt: 0, remainingMs: 0 };
-  } else {
-    if (typeof meta.pause.active !== "boolean") meta.pause.active = false;
-    if (typeof meta.pause.startedAt !== "number" || !Number.isFinite(meta.pause.startedAt)) meta.pause.startedAt = 0;
-    if (typeof meta.pause.remainingMs !== "number" || !Number.isFinite(meta.pause.remainingMs)) meta.pause.remainingMs = 0;
-  }
 
-  gameMeta.set(game_id, meta);
+  gameMeta.set(gameId, meta);
   return meta;
 }
 

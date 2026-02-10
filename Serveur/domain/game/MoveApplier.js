@@ -1,10 +1,9 @@
 // MoveApplier.js v3.2 - Slots = stacks (NO game.stacks)
-// Utilise uniquement les primitives SlotManager
+// Uses SlotManager primitives only
 
-import { addTurnBonusTime } from "./turn.js";
+import { TURN_MS, addBonusToTurnClock } from "./turnClock.js";
 import {
   parseSlotId,
-  getSlotStack,
   putTop,
   putBottom,
   removeCardFromSlot,
@@ -19,27 +18,27 @@ import {
 ========================= */
 
 /**
- * Applique un déplacement validé
- * @returns {{from, to, newTableSlot, deckBecameEmpty}} ou null si refusé
+ * Apply a validated move.
+ * @returns {{from, to, newTableSlot}|null}
  */
-function applyMove(game, card, from_slot_id, to_slot_id, actor) {
+function applyMove(game, card, fromSlotId, toSlotId, actor) {
   console.log("[APPLY] MOVE_START", {
     card_id: card.id,
     value: card.value,
     color: card.color,
-    from: from_slot_id,
-    to: to_slot_id,
+    from: fromSlotId,
+    to: toSlotId,
     actor,
   });
 
-  // Validation minimale des ids de slots (évite de créer des slots fantômes)
-  const fromParsed = parseSlotId(from_slot_id);
-  const toParsed = parseSlotId(to_slot_id);
+  // Minimal slot-id validation to prevent ghost slots.
+  const fromParsed = parseSlotId(fromSlotId);
+  const toParsed = parseSlotId(toSlotId);
 
   if (!fromParsed || !toParsed) {
     console.warn("[APPLY] MOVE_DENIED_INVALID_SLOT", {
-      from_slot_id,
-      to_slot_id,
+      from_slot_id: fromSlotId,
+      to_slot_id: toSlotId,
       actor,
       fromParsed: !!fromParsed,
       toParsed: !!toParsed,
@@ -47,15 +46,15 @@ function applyMove(game, card, from_slot_id, to_slot_id, actor) {
     return null;
   }
 
-  // Protection ownership : source non shared (player !== 0) => doit appartenir à actor
-  if (!fromParsed.isShared) {
-    const actorArrayIndex = game.players.indexOf(actor);  // 0 ou 1
-    const actorPlayerIndex = actorArrayIndex + 1;         // 1 ou 2
+  // Ownership guard: player slots must belong to actor.
+  if (fromParsed.playerIndex !== 0) {
+    const actorArrayIndex = game.players.indexOf(actor); // 0 or 1
+    const actorPlayerIndex = actorArrayIndex + 1; // 1 or 2
     
     if (fromParsed.playerIndex !== actorPlayerIndex) {
       console.warn("[APPLY] MOVE_DENIED_NOT_OWNER", {
         actor,
-        from_slot_id,
+        from_slot_id: fromSlotId,
         fromPlayerIndex: fromParsed.playerIndex,
         actorPlayerIndex,
         actorArrayIndex,
@@ -64,12 +63,12 @@ function applyMove(game, card, from_slot_id, to_slot_id, actor) {
     }
   }
 
-  // Retire la carte du slot source
-  const removed = removeCardFromSlot(game, from_slot_id, card.id);
+  // Remove card from source slot.
+  const removed = removeCardFromSlot(game, fromSlotId, card.id);
   if (!removed) {
     console.warn("[APPLY] MOVE_SOURCE_MISSING_CARD", {
       actor,
-      from_slot_id,
+      from_slot_id: fromSlotId,
       card_id: card.id,
     });
     return null;
@@ -77,16 +76,16 @@ function applyMove(game, card, from_slot_id, to_slot_id, actor) {
 
   let newTableSlot = null;
 
-  // Convention: bot = index 0, top = dernier index
-  // - Table/Bench => au TOP (posé dessus / visible)
-  // - Autres => au BOT (par défaut, même si souvent interdit par les règles)
+  // Convention: bottom = index 0, top = last index.
+  // - Table/Bench => push on top
+  // - Other slots => push at bottom
   if (toParsed.type === SLOT_TYPES.TABLE || toParsed.type === SLOT_TYPES.BENCH) {
-    putTop(game, to_slot_id, card.id);
+    putTop(game, toSlotId, card.id);
   } else {
-    putBottom(game, to_slot_id, card.id);
+    putBottom(game, toSlotId, card.id);
   }
 
-  // Assure un slot table vide si besoin
+  // Ensure there is an empty table slot available.
   if (toParsed.type === SLOT_TYPES.TABLE) {
     const tableSlots = getTableSlots(game);
     const last = tableSlots[tableSlots.length - 1] ?? null;
@@ -95,28 +94,21 @@ function applyMove(game, card, from_slot_id, to_slot_id, actor) {
     }
   }
 
-  // Deck vide ?
-  let deckBecameEmpty = false;
-  if (fromParsed.type === SLOT_TYPES.DECK) {
-    deckBecameEmpty = getSlotStack(game, from_slot_id).length === 0;
-  }
-
-  // Bonus +10s si pose sur table (pas un déplacement T→T)
+  // +1s bonus on non TABLE->TABLE moves to TABLE (cap at TURN_MS).
   if (toParsed.type === SLOT_TYPES.TABLE && fromParsed.type !== SLOT_TYPES.TABLE) {
-    if (!game.turn || game.turn.current === actor) {
-      addTurnBonusTime(game, 10_000);
+    if (game.turn && game.turn.current === actor) {
+      addBonusToTurnClock(game.turn, 1000, Date.now(), TURN_MS);
     }
   }
 
   console.log("[APPLY] MOVE_DONE", {
     card_id: card.id,
-    from: from_slot_id,
-    to: to_slot_id,
+    from: fromSlotId,
+    to: toSlotId,
     newTableSlot,
-    deckBecameEmpty,
   });
 
-  return { from: from_slot_id, to: to_slot_id, newTableSlot, deckBecameEmpty };
+  return { from: fromSlotId, to: toSlotId, newTableSlot };
 }
 
 export { applyMove };

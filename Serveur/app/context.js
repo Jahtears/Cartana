@@ -21,7 +21,7 @@ export function createServerContext(deps) {
     initTurnForGame,
     isBenchSlot,
     endTurnAfterBenchPlay,
-    timeoutTurnIfExpired,
+    tryExpireTurn,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
     saveGameState,
@@ -175,20 +175,20 @@ export function createServerContext(deps) {
     }
   }
 
-  function expireTurnIfNeeded(game_id, now = Date.now()) {
-    if (typeof timeoutTurnIfExpired !== "function") return false;
+  function processTurnTimeout(gameId, now = Date.now()) {
+    if (typeof tryExpireTurn !== "function") return false;
 
-    const game = state.getGame(game_id);
+    const game = state.getGame(gameId);
     if (!game?.turn) return false;
 
-    const meta = state.gameMeta.get(game_id);
-    if (meta?.pause?.active || meta?.result) return false;
+    const meta = state.gameMeta.get(gameId);
+    if (game.turn.paused || meta?.result) return false;
 
-    const expired = timeoutTurnIfExpired(game, now);
-    if (!expired) return false;
+    const timeoutResult = tryExpireTurn(game, now);
+    if (!timeoutResult) return false;
 
-    const prev = String(expired.prev ?? "").trim();
-    const next = String(expired.next ?? "").trim();
+    const prev = String(timeoutResult.prev ?? "").trim();
+    const next = String(timeoutResult.next ?? "").trim();
 
     if (prev) {
       sendEvtUser(
@@ -205,9 +205,9 @@ export function createServerContext(deps) {
       );
     }
 
-    saveGameState(game_id, game);
-    emitSnapshotsToAudience(game_id, { reason: "turn_timeout" });
-    return expired;
+    saveGameState(gameId, game);
+    emitSnapshotsToAudience(gameId, { reason: "turn_timeout" });
+    return timeoutResult;
   }
 
   // ========================
@@ -281,7 +281,7 @@ export function createServerContext(deps) {
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
     withGameUpdate,
-    expireTurnIfNeeded,
+    processTurnTimeout,
 
     // Persist (sauvegarde)
     saveGameState,

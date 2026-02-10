@@ -1,84 +1,51 @@
-// SlotHelper.js - Helpers pour SlotId (format 0:TYPE:index)
+// SlotHelper.js - SlotId helpers (canonical format: player:TYPE:index)
 
 import { SLOT_TYPES, SlotId } from "./SlotManager.js";
 
-function _parseStringSlotId(str) {
-  if (!str) return null;
-  const s = String(str);
-  const m = s.match(/^(\d+):([A-Z]+):(\d+)$/);
+function parseSlotIdString(str) {
+  if (!str || typeof str !== "string") return null;
+  const m = str.match(/^(\d+):([A-Z]+):(\d+)$/);
   if (!m) return null;
-  const player = parseInt(m[1], 10);
+  const playerIndex = parseInt(m[1], 10);
   const type = m[2];
-  const index = parseInt(m[3], 10);
-  if (!Number.isFinite(player) || !Number.isFinite(index)) return null;
-  return { player, type, index };
+  const number = parseInt(m[3], 10);
+  if (!Number.isFinite(playerIndex) || !Number.isFinite(number)) return null;
+  if (!SLOT_TYPES[type]) return null;
+  return { playerIndex, type, number };
 }
 
 /**
- * Accès sécurisé au contenu d'un slot (fonctionne avec Map ou objet)
+ * Safe access to slot content (canonical Map storage)
  */
 function getSlotContent(game, slotId) {
-  if (!game?.slots) return [];
-  
-  // Si c'est une Map
-  if (game.slots instanceof Map) {
-    return game.slots.get(slotId) || [];
-  }
-  // Si c'est un objet (rétro-compatibilité)
-  return game.slots[slotId] || [];
-}
-
-/**
- * Vérification du type de slot
- */
-function isNeutralSlot(slotId) {
-  if (slotId instanceof SlotId) {
-    // Shared = player === 0
-    return slotId.player === 0;
-  }
-  const parsed = _parseStringSlotId(slotId);
-  if (parsed) return parsed.player === 0;
-  return false;
+  if (!(game?.slots instanceof Map)) return [];
+  return game.slots.get(slotId) || [];
 }
 
 function isTableSlotType(slotId) {
   if (slotId instanceof SlotId) return slotId.type === SLOT_TYPES.TABLE;
-  const parsed = _parseStringSlotId(slotId);
+  const parsed = parseSlotIdString(slotIdToString(slotId));
   if (parsed) return parsed.type === SLOT_TYPES.TABLE;
-  return false;
-}
-
-function isPileSlotType(slotId) {
-  if (slotId instanceof SlotId) return slotId.type === SLOT_TYPES.PILE;
-  const parsed = _parseStringSlotId(slotId);
-  if (parsed) return parsed.type === SLOT_TYPES.PILE;
-  return false;
-}
-
-function isHandSlotType(slotId) {
-  if (slotId instanceof SlotId) return slotId.type === SLOT_TYPES.HAND;
-  const parsed = _parseStringSlotId(slotId);
-  if (parsed) return parsed.type === SLOT_TYPES.HAND;
   return false;
 }
 
 function isBenchSlotType(slotId) {
   if (slotId instanceof SlotId) return slotId.type === SLOT_TYPES.BENCH;
-  const parsed = _parseStringSlotId(slotId);
+  const parsed = parseSlotIdString(slotIdToString(slotId));
   if (parsed) return parsed.type === SLOT_TYPES.BENCH;
   return false;
 }
 
 function isDeckSlotType(slotId) {
   if (slotId instanceof SlotId) return slotId.type === SLOT_TYPES.DECK;
-  const parsed = _parseStringSlotId(slotId);
+  const parsed = parseSlotIdString(slotIdToString(slotId));
   if (parsed) return parsed.type === SLOT_TYPES.DECK;
   return false;
 }
 
 /**
- * Extraction du player index à partir d'une SlotId ou string
- * @returns {number|null} - 0 pour shared, 1 ou 2 pour players, null si invalide
+ * Extract player index from SlotId or string
+ * @returns {number|null}
  */
 function getPlayerFromSlotId(slotId) {
   if (slotId instanceof SlotId) {
@@ -87,33 +54,38 @@ function getPlayerFromSlotId(slotId) {
     return null;
   }
 
-  const parsed = _parseStringSlotId(slotId);
+  const parsed = parseSlotIdString(slotIdToString(slotId));
   if (parsed) {
-    if (parsed.player === 0) return 0;
-    if (parsed.player === 1 || parsed.player === 2) return parsed.player;
+    if (parsed.playerIndex === 0) return 0;
+    if (parsed.playerIndex === 1 || parsed.playerIndex === 2) return parsed.playerIndex;
     return null;
   }
   return null;
 }
 
 /**
- * Conversion SlotId→string et vice versa
+ * Normalize slot id to canonical "player:TYPE:index"
  */
 function slotIdToString(slotId) {
   if (slotId instanceof SlotId) {
     return slotId.toString();
   }
-  return String(slotId);
+
+  if (typeof slotId === "string") {
+    const parsed = parseSlotIdString(slotId);
+    if (!parsed) return "";
+    return `${parsed.playerIndex}:${parsed.type}:${parsed.number}`;
+  }
+
+  return "";
 }
 
 export {
+  parseSlotIdString,
+  slotIdToString,
   getSlotContent,
-  isNeutralSlot,
   isTableSlotType,
-  isPileSlotType,
-  isHandSlotType,
   isBenchSlotType,
   isDeckSlotType,
   getPlayerFromSlotId,
-  slotIdToString,
 };

@@ -1,35 +1,18 @@
 // net/broadcast.js v1.1
 import { ensureGameMeta } from "../domain/game/meta.js";
-import { SlotId } from "../domain/game/SlotManager.js";
-import { slotIdToNewString } from "../domain/game/slots.js";
+import { getSlotContent, isTableSlotType, slotIdToString } from "../domain/game/SlotHelper.js";
 import { toUiMessage } from "../shared/uiMessage.js";
 
 function slotKey(slot_id) {
-  if (slot_id instanceof SlotId) return slot_id.toString();
-  return String(slot_id ?? "");
+  return slotIdToString(slot_id);
 }
 
 function isTableKey(key) {
-  if (!key) return false;
-  // SlotId format: "0:TABLE:1"
-  if (key.includes(":TABLE:")) return true;
-  return false;
-}
-
-function getStackForSig(game, slot_id) {
-  if (!game?.slots) return [];
-
-  if (game.slots instanceof Map) {
-    const v = game.slots.get(slot_id);
-    return Array.isArray(v) ? v : (v ? [v] : []);
-  }
-
-  const v = game.slots[slot_id];
-  return Array.isArray(v) ? v : (v ? [v] : []);
+  return isTableSlotType(key);
 }
 
 function computeSlotSig(game, slot_id) {
-  const v = getStackForSig(game, slot_id);
+  const v = getSlotContent(game, slot_id);
   if (!v || v.length === 0) return "";
   if (Array.isArray(v)) return v.join("|");
   return String(v);
@@ -77,10 +60,7 @@ export function createBroadcaster({
   };
 
   const pushSlotAll = (slot_id) => {
-    const hasSlot = game?.slots instanceof Map
-      ? game.slots.has(slot_id)
-      : Object.prototype.hasOwnProperty.call(game.slots || {}, slot_id);
-
+    const hasSlot = game?.slots instanceof Map && game.slots.has(slot_id);
     if (!hasSlot) return;
 
     const key = slotKey(slot_id);
@@ -181,7 +161,7 @@ export function createFlush(bc, trace) {
 
     // 1) table_sync
     if (tableSlots) {
-      const tablePayload = tableSlots.map(slotIdToNewString);
+      const tablePayload = tableSlots.map(slotIdToString);
       bc.broadcastPartie("table_sync", { slots: tablePayload });
       bc.onTableSync(tableSlots);
       tableSlots = null;

@@ -7,7 +7,7 @@ Faire expirer le tour **côté serveur** dès que le temps est écoulé, sans at
 ## Scope
 
 - Expiration automatique de tour sur boucle serveur.
-- Timeout métier (`timeoutTurnIfExpired`) avec auto-play As + switch de tour.
+- Timeout métier (`tryExpireTurn`) avec auto-play As + switch de tour.
 - Cap du timer (`durationMs`) à `TURN_MS` (15s).
 - Messages UI ciblés lors du timeout:
   - `prev`: `Temps ecoule.`

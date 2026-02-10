@@ -1,5 +1,6 @@
 // services/session/presence.js v1.1
 import { ensureGameMeta } from "../game/meta.js";
+import { pauseTurnClock, resumeTurnClock } from "../game/turnClock.js";
 
 /**
  * Presence/session : déconnexion / reconnexion + wrapper close WS.
@@ -36,39 +37,14 @@ export function createPresence(ctx) {
     emitSnapshotsToAudience,
   } = ctx;
 
-  function pauseTurnForDisconnect(game, meta) {
-    if (!game?.turn || !meta) return false;
-    if (meta.pause?.active) return false;
-
-    const now = Date.now();
-    const endsAt = Number(game.turn.endsAt ?? now);
-    const remainingMs = Math.max(0, endsAt - now);
-
-    meta.pause = {
-      active: true,
-      startedAt: now,
-      remainingMs,
-    };
-    game.turn.paused = true;
-    game.turn.remainingMs = remainingMs;
-    return true;
+  function pauseTurnForDisconnect(game) {
+    if (!game?.turn) return false;
+    return pauseTurnClock(game.turn, Date.now());
   }
 
-  function resumeTurnAfterReconnect(game, meta) {
-    if (!game?.turn || !meta?.pause?.active) return false;
-
-    const now = Date.now();
-    const remainingMs = Math.max(0, Number(meta.pause.remainingMs ?? game.turn.remainingMs ?? 0));
-
-    game.turn.endsAt = now + remainingMs;
-    game.turn.paused = false;
-    game.turn.remainingMs = 0;
-    meta.pause = {
-      active: false,
-      startedAt: 0,
-      remainingMs: 0,
-    };
-    return true;
+  function resumeTurnAfterReconnect(game) {
+    if (!game?.turn) return false;
+    return resumeTurnClock(game.turn, Date.now());
   }
 
   function handleDisconnect(username) {
@@ -88,7 +64,7 @@ export function createPresence(ctx) {
     const meta = ensureGameMeta(gameMeta, game_id, { initialSent: false });
     meta.disconnected.add(username);
     meta.lastSeen[username] = Date.now();
-    const paused = pauseTurnForDisconnect(game, meta);
+    const paused = pauseTurnForDisconnect(game);
 
     saveGameState(game_id, game);
     if (paused && typeof emitSnapshotsToAudience === "function") {
@@ -130,7 +106,7 @@ export function createPresence(ctx) {
     meta.lastSeen[username] = Date.now();
     let resumed = false;
     if (meta.disconnected.size === 0) {
-      resumed = resumeTurnAfterReconnect(game, meta);
+      resumed = resumeTurnAfterReconnect(game);
     }
 
     // Retour direct en game pour le joueur reconnecté.
