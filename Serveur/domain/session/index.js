@@ -2,24 +2,27 @@ import { ensureGameMeta, ensureGameResult } from "../game/meta.js";
 import {
   mapSlotForClient,
   isOwnerForSlot,
-  buildCardData,
-} from "../game/slots.js";
-import { getTableSlots, SLOT_TYPES } from "../game/SlotManager.js";
+} from "../game/helpers/slotHelpers.js";
+import { buildCardData } from "../game/builders/gameBuilder.js";
+import { getTableSlots } from "../game/helpers/tableHelper.js";
 import {
   getSlotContent,
-  isTableSlotType,
-  parseSlotIdString,
+  isTableSlot,
+  parseSlotId,
   slotIdToString,
-} from "../game/SlotHelper.js";
-import { findCardById } from "../game/state.js";
+} from "../game/helpers/slotHelpers.js";
+import {
+  applySlotDragPolicy,
+  getVisibleCardIdsForSlot,
+  toSlotStack,
+} from "../game/helpers/slotViewHelpers.js";
+import { getCardById } from "../game/helpers/cardHelpers.js";
+import { buildTurnPayload } from "../game/helpers/turnPayloadHelpers.js";
 
 /* =========================
    HELPERS FOR SLOT STATE
 ========================= */
 
-function isTableSlotLike(slot_id) {
-  return isTableSlotType(slot_id);
-}
 
 function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag = false } = {}) {
   const disableDrag = view === "spectator" || !!forceDisableDrag;
@@ -35,42 +38,19 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
   const cards = [];
 
   const slotValue = getSlotContent(game, slot_id);
-  const stack = Array.isArray(slotValue) ? slotValue : (slotValue ? [slotValue] : []);
+  const stack = toSlotStack(slotValue);
 
   if (!stack.length) return { slot_id: clientSlot, cards };
 
-  const slotType = parseSlotIdString(slotIdToString(slot_id))?.type ?? null;
-
-  let ids = [];
-  if (slotType === SLOT_TYPES.HAND) {
-    // Main: tout le stack (toutes les cartes visibles côté owner)
-    ids = [...stack];
-  } else if (slotType === SLOT_TYPES.PILE || slotType === SLOT_TYPES.DECK) {
-    // Pile & Deck: top uniquement (évite les leaks)
-    ids = stack.length ? [stack[stack.length - 1]] : [];
-  } else if (slotType === SLOT_TYPES.TABLE) {
-    // Table: top uniquement
-    ids = stack.length ? [stack[stack.length - 1]] : [];
-  } else {
-    // Bench: tout le stack (toutes affichées)
-    ids = [...stack];
-  }
+  const slotType = parseSlotId(slotIdToString(slot_id))?.type ?? null;
+  const ids = getVisibleCardIdsForSlot(slotType, stack);
 
   for (let i = 0; i < ids.length; i++) {
-    const card = findCardById(game, ids[i]);
+    const card = getCardById(game, ids[i]);
     if (!card) continue;
 
     const payload = buildCardData(card, clientSlot, isOwner, disableDrag);
-
-    // ✅ ADAPTATION: Gestion du drag selon le type de slot
-    if (slotType === SLOT_TYPES.BENCH) {
-      // Bench: seule la bot (index 0 du stack original) draggable
-      const isTop = ids[i] === stack[stack.length - 1];
-      payload.draggable = payload.draggable && isTop;
-    } else if (slotType === SLOT_TYPES.TABLE || slotType === SLOT_TYPES.PILE) {
-      // Table et Pile: jamais draggable
-      payload.draggable = false;
-    }
+    payload.draggable = applySlotDragPolicy(slotType, stack, ids[i], payload.draggable);
 
     cards.push(payload);
   }
@@ -90,7 +70,7 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
   // Ordre stable (non-table puis table)
   const allSlots = game?.slots instanceof Map ? Array.from(game.slots.keys()) : [];
 
-  const nonTable = allSlots.filter((s) => !isTableSlotLike(s));
+  const nonTable = allSlots.filter((s) => !isTableSlot(s));
   const orderedTable = tableSlotIds;
 
   for (const slot_id of nonTable) {
@@ -103,17 +83,7 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
     slots[clientSlot] = cards;
   }
 
-  const turn = game.turn
-    ? {
-        current: game.turn.current,
-        turnNumber: game.turn.number,
-        endsAt: game.turn.endsAt ?? null,
-        durationMs: game.turn.durationMs ?? null,
-        paused: !!game.turn.paused,
-        remainingMs: Number(game.turn.remainingMs ?? 0),
-        serverNow: Date.now(),
-      }
-    : null;
+  const turn = buildTurnPayload(game.turn, { includeEmpty: false });
 
   return {
     view, // "player" | "spectator"

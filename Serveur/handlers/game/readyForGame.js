@@ -1,6 +1,7 @@
 // handlers/readyForGame.js v2.0 - Adapté pour architecture slots unifiée
 
 import { ensureGameMeta } from "../../domain/game/meta.js";
+import { TURN_FLOW_MESSAGES } from "../../domain/game/helpers/turnFlowHelpers.js";
 import { GAME_MESSAGE, MESSAGE_COLORS } from "../../shared/constants.js";
 import { toUiMessage } from "../../shared/uiMessage.js";
 import { getExistingGameOrRes, getGameIdFromDataOrMapping } from "../../net/guards.js";
@@ -11,6 +12,7 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
   const {
     state,
     sendRes,
+    sendEvtUser,
 
     // transport
     sendEvtSocket,
@@ -21,7 +23,6 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
     // init turn
     initTurnForGame,
     emitSnapshotsToAudience,
-    withGameUpdate,
   } = ctx;
   const { gameMeta, readyPlayers, gameSpectators, userToGame, wsByUser } = state;
 
@@ -59,24 +60,22 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
     meta.initialSent = true;
 
     if (starter) {
-      withGameUpdate(game_id, (fx) => {
       // Contrat UI "show_game_message":
       // - text: libellé affiché
       // - code: identifiant sémantique (couleur côté client)
       // - color: fallback legacy
-      fx.message(
+      sendEvtUser(
+        starter,
         "show_game_message",
         toUiMessage(
           {
-            text: reason || "A vous de commencer",
+            text: reason || TURN_FLOW_MESSAGES.START,
             code: GAME_MESSAGE.TURN_START,
             color: MESSAGE_COLORS[GAME_MESSAGE.TURN_START],
           },
           { code: GAME_MESSAGE.INFO }
-        ),
-        { to: starter }
+        )
       );
-      }, ctx.trace);
     }
 
     // ✅ snapshot complet à l'audience (joueurs + spectateurs) via notifier

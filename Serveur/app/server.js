@@ -4,12 +4,13 @@ import { WebSocketServer } from "ws";
 import http from "http";
 
 // ============= IMPORTS MÉTIER =============
-import { createGame, findCardById } from '../domain/game/state.js';
-import { mapSlotFromClientToServer, mapSlotForClient } from '../domain/game/slots.js';
-import { getTableSlots } from '../domain/game/SlotManager.js';
+import { createGame } from "../domain/game/builders/gameBuilder.js";
+import { getCardById } from "../domain/game/helpers/cardHelpers.js";
+import { mapSlotFromClientToServer, mapSlotForClient } from "../domain/game/helpers/slotHelpers.js";
+import { getTableSlots } from "../domain/game/helpers/tableHelper.js";
 import { applyMove } from '../domain/game/MoveApplier.js';
 import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot } from '../domain/game/Regles.js';
-import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from '../domain/game/turn.js';
+import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../domain/game/helpers/turnFlowHelpers.js";
 import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
 import { verifyOrCreateUser } from '../domain/auth/usersStore.js';
 import { emitSlotState, emitFullState } from '../domain/session/index.js';
@@ -41,7 +42,7 @@ const { baseCtx, loginCtx, onSocketClose } = createServerContext({
   emitSlotState,
   emitFullState,
   getTableSlots,
-  findCardById,
+  getCardById,
   mapSlotFromClientToServer,
   mapSlotForClient,
   validateMove,

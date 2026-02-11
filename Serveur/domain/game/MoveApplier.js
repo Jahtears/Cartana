@@ -1,17 +1,18 @@
 // MoveApplier.js v3.2 - Slots = stacks (NO game.stacks)
-// Uses SlotManager primitives only
+// Uses stack helpers + table API
 
 import { TURN_MS, addBonusToTurnClock } from "./turnClock.js";
 import {
-  parseSlotId,
+  ensureEmptyTableSlot,
+} from "./helpers/tableHelper.js";
+import {
   putTop,
   putBottom,
   removeCardFromSlot,
-  getTableSlots,
-  isSlotEmpty,
-  addTableSlot,
-  SLOT_TYPES,
-} from "./SlotManager.js"; 
+} from "./helpers/slotStackHelpers.js";
+import { SLOT_TYPES } from "./constants/slots.js";
+import { parseSlotId } from "./helpers/slotHelpers.js";
+import { debugLog, debugWarn } from "./helpers/debugHelpers.js";
 
 /* =========================
    APPLY MOVE (PUBLIC)
@@ -19,10 +20,10 @@ import {
 
 /**
  * Apply a validated move.
- * @returns {{from, to, newTableSlot}|null}
+ * @returns {{from, to, createdTableSlotId}|null}
  */
 function applyMove(game, card, fromSlotId, toSlotId, actor) {
-  console.log("[APPLY] MOVE_START", {
+  debugLog("[APPLY] MOVE_START", {
     card_id: card.id,
     value: card.value,
     color: card.color,
@@ -36,7 +37,7 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
   const toParsed = parseSlotId(toSlotId);
 
   if (!fromParsed || !toParsed) {
-    console.warn("[APPLY] MOVE_DENIED_INVALID_SLOT", {
+    debugWarn("[APPLY] MOVE_DENIED_INVALID_SLOT", {
       from_slot_id: fromSlotId,
       to_slot_id: toSlotId,
       actor,
@@ -52,7 +53,7 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
     const actorPlayerIndex = actorArrayIndex + 1; // 1 or 2
     
     if (fromParsed.playerIndex !== actorPlayerIndex) {
-      console.warn("[APPLY] MOVE_DENIED_NOT_OWNER", {
+      debugWarn("[APPLY] MOVE_DENIED_NOT_OWNER", {
         actor,
         from_slot_id: fromSlotId,
         fromPlayerIndex: fromParsed.playerIndex,
@@ -66,7 +67,7 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
   // Remove card from source slot.
   const removed = removeCardFromSlot(game, fromSlotId, card.id);
   if (!removed) {
-    console.warn("[APPLY] MOVE_SOURCE_MISSING_CARD", {
+    debugWarn("[APPLY] MOVE_SOURCE_MISSING_CARD", {
       actor,
       from_slot_id: fromSlotId,
       card_id: card.id,
@@ -74,7 +75,7 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
     return null;
   }
 
-  let newTableSlot = null;
+  let createdTableSlotId = null;
 
   // Convention: bottom = index 0, top = last index.
   // - Table/Bench => push on top
@@ -87,28 +88,25 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
 
   // Ensure there is an empty table slot available.
   if (toParsed.type === SLOT_TYPES.TABLE) {
-    const tableSlots = getTableSlots(game);
-    const last = tableSlots[tableSlots.length - 1] ?? null;
-    if (!last || !isSlotEmpty(game, last)) {
-      newTableSlot = addTableSlot(game);
-    }
+    const ensured = ensureEmptyTableSlot(game);
+    createdTableSlotId = ensured.created ? ensured.slotId : null;
   }
 
-  // +1s bonus on non TABLE->TABLE moves to TABLE (cap at TURN_MS).
+  // +10s bonus on non TABLE->TABLE moves to TABLE (cap at TURN_MS).
   if (toParsed.type === SLOT_TYPES.TABLE && fromParsed.type !== SLOT_TYPES.TABLE) {
     if (game.turn && game.turn.current === actor) {
-      addBonusToTurnClock(game.turn, 1000, Date.now(), TURN_MS);
+      addBonusToTurnClock(game.turn, 10000, Date.now(), TURN_MS);
     }
   }
 
-  console.log("[APPLY] MOVE_DONE", {
+  debugLog("[APPLY] MOVE_DONE", {
     card_id: card.id,
     from: fromSlotId,
     to: toSlotId,
-    newTableSlot,
+    createdTableSlotId,
   });
 
-  return { from: fromSlotId, to: toSlotId, newTableSlot };
+  return { from: fromSlotId, to: toSlotId, createdTableSlotId };
 }
 
 export { applyMove };

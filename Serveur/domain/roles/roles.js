@@ -121,10 +121,6 @@ export function createRoles(ctx) {
     setUserActivity(username, Activity.LOBBY, null);
   }
   
-  function isBusy(username) {
-    return userToGame.has(username);
-  }
-
   function isSpectator(game_id, username) {
     return userToSpectate.get(username) === game_id;
   }
@@ -157,7 +153,6 @@ export function createRoles(ctx) {
     attachSpectator,
     detachSpectator,
     clearInvitesForUser,
-    isBusy,
     isSpectator,
 
   };

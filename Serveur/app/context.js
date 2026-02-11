@@ -1,10 +1,12 @@
 // server/context.js v3.1 - Utilise StateManager + Notifier pour émission
 
 import { createTransport } from "../net/transport.js";
+import { createBroadcaster, createFlush } from "../net/broadcast.js";
 import { createRoles } from "../domain/roles/roles.js";
 import { createLobbyLists } from "../domain/lobby/lists.js";
 import { createGameNotifier, emitSlotState, emitFullState } from "../domain/session/index.js";
 import { createPresence } from "../domain/session/presence.js";
+import { TURN_FLOW_MESSAGES } from "../domain/game/helpers/turnFlowHelpers.js";
 import { createStateManager } from "./stateManager.js";
 import { GAME_MESSAGE } from "../shared/constants.js";
 import { toUiMessage } from "../shared/uiMessage.js";
@@ -13,7 +15,7 @@ export function createServerContext(deps) {
   const {
     createGame,
     getTableSlots,
-    findCardById,
+    getCardById,
     mapSlotFromClientToServer,
     mapSlotForClient,
     validateMove,
@@ -110,59 +112,47 @@ export function createServerContext(deps) {
     const game = state.getGame(game_id);
     if (!game) return;
 
-    // Créer un builder avec les méthodes attendues
+    const specs = state.gameSpectators.get(game_id);
+    const bc = createBroadcaster({
+      game_id,
+      game,
+      specs,
+      wsByUser: state.wsByUser,
+      sendEvtSocket,
+      sendEvtUser,
+      emitSlotState,
+      gameMeta: state.gameMeta,
+    });
+    const fl = createFlush(bc, trace);
+
+    // Builder incrémental: table_sync -> slot_state -> turn_update -> messages.
     const fx = {
       game,
       touches: new Set(),
-      messages: [],
 
       touch(slot_id) {
+        if (!slot_id) return;
         this.touches.add(slot_id);
+        fl.touch(slot_id);
       },
 
       syncTable(tableSlots) {
         game.tableSlots = tableSlots;
+        fl.syncTable(tableSlots);
       },
 
       turn() {
-        // Passer au tour suivant
-        if (game.turn && typeof game.turn.next === 'function') {
-          game.turn.next();
-        }
+        fl.turn();
       },
 
       message(type, data, opts) {
-        this.messages.push({ type, data, opts });
+        fl.message(type, data, opts);
       },
     };
 
-    // Exécuter le callback avec le builder
+    // Exécuter les mutations métier, puis flush incrémental.
     callback(fx);
-
-    // Emettre les messages applicatifs accumulés (show_game_message, etc.)
-    if (fx.messages.length) {
-      const specs = state.gameSpectators.get(game_id);
-      const audience = [
-        ...(Array.isArray(game.players) ? game.players : []),
-        ...(specs ? Array.from(specs) : []),
-      ];
-
-      for (const msg of fx.messages) {
-        const type = String(msg?.type ?? "").trim();
-        if (!type) continue;
-        const data = msg?.data && typeof msg.data === "object" ? msg.data : {};
-        const to = msg?.opts?.to ?? null;
-        const recipients = Array.isArray(to) ? to : (to ? [to] : audience);
-        const uniqueRecipients = new Set(recipients.filter(Boolean).map((u) => String(u)));
-
-        for (const username of uniqueRecipients) {
-          sendEvtUser(username, type, data);
-        }
-      }
-    }
-
-    // Broadcaster les mises à jour d'état (snapshot)
-    emitSnapshotsToAudience(game_id, { reason: "with_game_update" });
+    fl.flush();
   }
 
   function notifyOpponent(game_id, game, evtType, data) {
@@ -194,14 +184,14 @@ export function createServerContext(deps) {
       sendEvtUser(
         prev,
         "show_game_message",
-        toUiMessage({ text: "Temps ecoule.", code: GAME_MESSAGE.WARN }, { code: GAME_MESSAGE.WARN })
+        toUiMessage({ text: TURN_FLOW_MESSAGES.TIMEOUT, code: GAME_MESSAGE.WARN }, { code: GAME_MESSAGE.WARN })
       );
     }
     if (next) {
       sendEvtUser(
         next,
         "show_game_message",
-        toUiMessage({ text: "A vous de jouer.", code: GAME_MESSAGE.TURN_START }, { code: GAME_MESSAGE.INFO })
+        toUiMessage({ text: TURN_FLOW_MESSAGES.TURN_START, code: GAME_MESSAGE.TURN_START }, { code: GAME_MESSAGE.INFO })
       );
     }
 
@@ -270,7 +260,7 @@ export function createServerContext(deps) {
     emitSlotState,
     emitFullState,
     getTableSlots,
-    findCardById,
+    getCardById,
     mapSlotFromClientToServer,
     mapSlotForClient,
     validateMove,

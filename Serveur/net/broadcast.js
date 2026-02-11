@@ -1,15 +1,18 @@
 // net/broadcast.js v1.1
 import { ensureGameMeta } from "../domain/game/meta.js";
-import { getSlotContent, isTableSlotType, slotIdToString } from "../domain/game/SlotHelper.js";
+import { SLOT_TYPES } from "../domain/game/constants/slots.js";
+import { getSlotContent, parseSlotId, slotIdToString } from "../domain/game/helpers/slotHelpers.js";
+import { buildTurnPayload } from "../domain/game/helpers/turnPayloadHelpers.js";
 import { toUiMessage } from "../shared/uiMessage.js";
 
 function slotKey(slot_id) {
   return slotIdToString(slot_id);
 }
 
-function isTableKey(key) {
-  return isTableSlotType(key);
+function isTableKey(slotKeyValue) {
+  return parseSlotId(slotKeyValue)?.type === SLOT_TYPES.TABLE;
 }
+
 
 function computeSlotSig(game, slot_id) {
   const v = getSlotContent(game, slot_id);
@@ -81,23 +84,8 @@ export function createBroadcaster({
     if (meta.turn_sig === sig) return;
     meta.turn_sig = sig;
 
-    const t = game.turn ?? null;
-
-    broadcastPartie("turn_update", t ? {
-      current: t.current,
-      turnNumber: t.number,
-      endsAt: t.endsAt ?? null,
-      durationMs: t.durationMs ?? null,
-      paused: !!t.paused,
-      remainingMs: Number(t.remainingMs ?? 0),
-      serverNow: Date.now()
-    } : {
-      endsAt: 0,
-      durationMs: 0,
-      paused: false,
-      remainingMs: 0,
-      serverNow: Date.now()
-    });
+    const payload = buildTurnPayload(game.turn, { includeEmpty: true });
+    broadcastPartie("turn_update", payload);
   };
 
   const onTableSync = (tableSlots) => {
