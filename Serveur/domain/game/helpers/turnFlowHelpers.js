@@ -1,42 +1,46 @@
-// turn.js - Turn system
+// helpers/turnFlowHelpers.js - Turn start/end/timeout flow helpers
 
+import { SLOT_TYPES, SlotId } from "../constants/slots.js";
 import {
-  getSlotStack,
-  makePlayerSlotId,
-  getOrCreateTableSlotWithFlag,
-  cleanupEmptyTableSlots,
-  ensureOneEmptyTableSlot,
-  removeCardFromSlot,
-  putTop,
-  SLOT_TYPES,
-} from "./SlotManager.js";
-import {
-  refillEmptyHandSlotsFromPile,
-  recycleFullTableSlotsToPile,
-} from "./pileManager.js";
+  DEFAULT_HAND_SIZE,
+  INITIAL_TURN_NUMBER,
+} from "../constants/turnFlow.js";
 import {
   TURN_MS,
   isTurnExpired,
   startTurnClock,
-} from "./turnClock.js";
+} from "../turnClock.js";
 import {
   compareCardsByTurnValue,
   findAceCardInHand,
-} from "./slotValidators.js";
+} from "./cardHelpers.js";
+import {
+  cleanupExtraEmptyTableSlots,
+  ensureEmptyTableSlot,
+} from "./tableHelper.js";
+import {
+  getSlotStack,
+  putTop,
+  removeCardFromSlot,
+} from "./slotStackHelpers.js";
+import {
+  recycleFullTableSlotsToPile,
+  refillEmptyHandSlotsFromPile,
+} from "./pileFlowHelpers.js";
+import { debugLog } from "./debugHelpers.js";
 
-/**
- * Determine who starts:
- * - compare each player's deck top card (index -1)
- * - if tied, compare index -2
- * - if still tied, fallback to player[0]
- */
-export function initTurnForGame(game) {
+const TURN_FLOW_MESSAGES = {
+  START: "A vous de commencer",
+  TIMEOUT: "Temps ecoule.",
+  TURN_START: "A vous de jouer.",
+};
+
+function initTurnForGame(game) {
   const p1 = game.players[0];
   const p2 = game.players[1];
 
-  // SlotManager expects playerIndex 1 or 2.
-  const d1Ids = getSlotStack(game, makePlayerSlotId(1, SLOT_TYPES.DECK, 1));
-  const d2Ids = getSlotStack(game, makePlayerSlotId(2, SLOT_TYPES.DECK, 1));
+  const d1Ids = getSlotStack(game, SlotId.create(1, SLOT_TYPES.DECK, 1));
+  const d2Ids = getSlotStack(game, SlotId.create(2, SLOT_TYPES.DECK, 1));
 
   const top1Id = d1Ids.length ? d1Ids[d1Ids.length - 1] : null;
   const top2Id = d2Ids.length ? d2Ids[d2Ids.length - 1] : null;
@@ -56,53 +60,41 @@ export function initTurnForGame(game) {
     cmp = compareCardsByTurnValue(top1b, top2b);
   }
 
-  const starter = (cmp >= 0) ? p1 : p2;
-  game.turn = { current: starter, number: 1 };
+  const starter = cmp >= 0 ? p1 : p2;
+  game.turn = { current: starter, number: INITIAL_TURN_NUMBER };
   startTurnClock(game.turn, Date.now(), TURN_MS);
 
-  console.log("[TURN] INIT", {
+  debugLog("[TURN] INIT", {
     starter,
     p1_top: top1 ? top1.value : null,
     p2_top: top2 ? top2.value : null,
   });
 
-  return { starter, reason: "A vous de commencer" };
+  return { starter, reason: TURN_FLOW_MESSAGES.START };
 }
 
-/**
- * End actor turn after BENCH play:
- * refill opponent hand if empty, then switch turn.
- */
-export function endTurnAfterBenchPlay(game, actor) {
+function endTurnAfterBenchPlay(game, actor) {
   const recycled = recycleFullTableSlotsToPile(game);
   const next = actor === game.players[0] ? game.players[1] : game.players[0];
 
   if (recycled?.recycledSlots?.length) {
-    getOrCreateTableSlotWithFlag(game);
-    cleanupEmptyTableSlots(game);
+    ensureEmptyTableSlot(game);
+    cleanupExtraEmptyTableSlots(game);
   }
 
-  const given = refillEmptyHandSlotsFromPile(game, next, 5);
+  const given = refillEmptyHandSlotsFromPile(game, next, DEFAULT_HAND_SIZE);
 
-  game.turn = game.turn || { current: next, number: 1 };
+  game.turn = game.turn || { current: next, number: INITIAL_TURN_NUMBER };
   game.turn.current = next;
-  game.turn.number = (game.turn.number ?? 1) + 1;
+  game.turn.number = (game.turn.number ?? INITIAL_TURN_NUMBER) + 1;
   startTurnClock(game.turn, Date.now(), TURN_MS);
 
-  console.log("[TURN] SWITCH", { endedBy: actor, next, turnNumber: game.turn.number });
+  debugLog("[TURN] SWITCH", { endedBy: actor, next, turnNumber: game.turn.number });
 
   return { next, given, recycled };
 }
 
-/**
- * Try to expire current turn when timer elapsed.
- * - auto-play an Ace from hand to table if available
- * - run canonical end-of-turn pipeline
- * - reset timer from provided timestamp
- *
- * @returns {false|Object}
- */
-export function tryExpireTurn(game, now = Date.now()) {
+function tryExpireTurn(game, now = Date.now()) {
   const t = game?.turn;
   if (!t) return false;
   if (!isTurnExpired(t, now)) return false;
@@ -118,10 +110,10 @@ export function tryExpireTurn(game, now = Date.now()) {
   const prevPlayerArrayIndex = game.players.indexOf(prev);
   const handSlot = prevPlayerArrayIndex === -1
     ? null
-    : makePlayerSlotId(prevPlayerArrayIndex + 1, SLOT_TYPES.HAND, 1);
-  const ace = handSlot ? findAceCardInHand(game, handSlot, 5) : null;
+    : SlotId.create(prevPlayerArrayIndex + 1, SLOT_TYPES.HAND, 1);
+  const ace = handSlot ? findAceCardInHand(game, handSlot, DEFAULT_HAND_SIZE) : null;
   if (ace) {
-    const { slotId: tableSlot, created } = getOrCreateTableSlotWithFlag(game);
+    const { slotId: tableSlot, created } = ensureEmptyTableSlot(game);
     const removed = removeCardFromSlot(game, ace.slotId, ace.cardId);
     if (removed) {
       putTop(game, tableSlot, ace.cardId);
@@ -129,15 +121,14 @@ export function tryExpireTurn(game, now = Date.now()) {
       aceFrom = ace.slotId;
       aceTo = tableSlot;
       tableSyncNeeded = !!created;
-      if (ensureOneEmptyTableSlot(game)) tableSyncNeeded = true;
+      if (ensureEmptyTableSlot(game).created) tableSyncNeeded = true;
 
-      console.log("[TURN] TIMEOUT_AUTO_ACE", { prev, from: aceFrom, to: aceTo });
+      debugLog("[TURN] TIMEOUT_AUTO_ACE", { prev, from: aceFrom, to: aceTo });
     }
   }
 
   const { next, given, recycled } = endTurnAfterBenchPlay(game, prev);
 
-  // Keep external ticker timestamp as reference.
   startTurnClock(game.turn, now, TURN_MS);
 
   const result = {
@@ -155,7 +146,7 @@ export function tryExpireTurn(game, now = Date.now()) {
     turnNumber: game.turn.number,
   };
 
-  console.log("[TURN] TIMEOUT_EXPIRED", {
+  debugLog("[TURN] TIMEOUT_EXPIRED", {
     prev: result.prev,
     next: result.next,
     playedAce: result.playedAce,
@@ -164,3 +155,10 @@ export function tryExpireTurn(game, now = Date.now()) {
 
   return result;
 }
+
+export {
+  endTurnAfterBenchPlay,
+  initTurnForGame,
+  TURN_FLOW_MESSAGES,
+  tryExpireTurn,
+};

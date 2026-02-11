@@ -1,103 +1,23 @@
 // domain/game/slotValidators.js - Slot-specific validators extracted from Regles.js
 
-import { SlotId, SLOT_TYPES, getSlotStack } from "./SlotManager.js";
-
-const TURN_VALUE_RANK = {
-  A: 13,
-  R: 12,
-  D: 11,
-  V: 10,
-  "10": 9,
-  "9": 8,
-  "8": 7,
-  "7": 6,
-  "6": 5,
-  "5": 4,
-  "4": 3,
-  "3": 2,
-  "2": 1,
-};
-
-/**
- * Retrieve card from game's card index by ID
- */
-function _getCardById(game, id) {
-  if (!game || !id) return null;
-  return (game.cardsById && typeof game.cardsById === "object")
-    ? (game.cardsById[id] ?? null)
-    : (game.cardIndex?.get?.(id) ?? null);
-}
-
-/**
- * Check if value is an Ace (A or 1)
- */
-function _isAceValue(v) {
-  const s = String(v ?? "");
-  return s === "A" || s === "1";
-}
-
-/**
- * Check if the top card of a slot is an Ace
- */
-function _slotTopHasAce(game, slotId) {
-  const stack = getSlotStack(game, slotId);
-  const topId = stack.length ? stack[stack.length - 1] : null;
-
-  if (!topId) return false;
-
-  const c = _getCardById(game, topId);
-  return !!(c && _isAceValue(c.value));
-}
-
-/**
- * Check if any card in a slot is an Ace
- */
-function _slotAnyHasAce(game, slotId) {
-  const ids = getSlotStack(game, slotId);
-  for (const id of ids) {
-    const c = _getCardById(game, id);
-    if (c && _isAceValue(c.value)) return true;
-  }
-  return false;
-}
-
-function _valueRank(v) {
-  return TURN_VALUE_RANK[String(v)] ?? 0;
-}
-
-/**
- * Compare two cards by turn value rank.
- */
-function compareCardsByTurnValue(c1, c2) {
-  const r1 = c1 ? _valueRank(c1.value) : 0;
-  const r2 = c2 ? _valueRank(c2.value) : 0;
-  if (r1 > r2) return 1;
-  if (r1 < r2) return -1;
-  return 0;
-}
-
-/**
- * Find an Ace in a hand slot, iterating from top to bottom.
- */
-function findAceCardInHand(game, handSlotId, handSize = 5) {
-  const ids = getSlotStack(game, handSlotId);
-  const start = Math.max(0, ids.length - handSize);
-  for (let i = ids.length - 1; i >= start; i--) {
-    const cardId = ids[i];
-    const card = _getCardById(game, cardId);
-    if (card && _isAceValue(card.value)) {
-      return { slotId: handSlotId, cardId };
-    }
-  }
-  return null;
-}
+import { SLOT_TYPES } from "./constants/slots.js";
+import {
+  getSlotContent,
+  isSlotIdPresent,
+  parseSlotId,
+} from "./helpers/slotHelpers.js";
+import { debugLog } from "./helpers/debugHelpers.js";
 
 /**
  * Validate placement on Table slot
  * Rules: empty=[A,R], count=1=[2,R], count=2=[3,R], ... count=9=[10,R], count=10=[D]
  */
 export function validateTableSlot(game, card, fromSlotId, toSlotId) {
-  const slot = getSlotStack(game, toSlotId);
+  if (!isSlotIdPresent(game, toSlotId)) {
+    return { valid: false, reason: "Slot Table introuvable" };
+  }
+
+  const slot = getSlotContent(game, toSlotId);
   const count = slot.length;
 
   const allowedByCount = [
@@ -119,7 +39,7 @@ export function validateTableSlot(game, card, fromSlotId, toSlotId) {
 
   if (!allowed || !allowed.includes(card.value)) {
     const acceptedStr = allowed ? allowed.join(" ou ") : "aucune";
-    console.log("[RULES] MOVE_DENIED_SLOT Table", {
+    debugLog("[RULES] MOVE_DENIED_SLOT Table", {
       card_id: card.id,
       to_slot_id: toSlotId,
       count,
@@ -165,7 +85,8 @@ export function validateDrawPileSlot(game, card, fromSlotId, toSlotId) {
 }
 
 function normalizeSlotType(slotType) {
-  if (slotType instanceof SlotId) return slotType.type;
+  const parsed = parseSlotId(slotType);
+  if (parsed) return parsed.type;
 
   if (typeof slotType === "string") {
     return slotType;
@@ -190,15 +111,3 @@ export function getSlotValidator(slotType) {
   };
   return validators[normalized] ?? null;
 }
-
-/**
- * Export helpers for use in other rules
- */
-export {
-  _getCardById,
-  _isAceValue,
-  _slotTopHasAce,
-  _slotAnyHasAce,
-  compareCardsByTurnValue,
-  findAceCardInHand,
-};

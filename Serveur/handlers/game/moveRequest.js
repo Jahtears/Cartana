@@ -1,7 +1,7 @@
 // handlers/moveRequest.js v2.0 - Thin handler using MoveOrchestrator
 import { emitGameEndThenSnapshot } from "../../net/broadcast.js";
 import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../../net/guards.js";
-import { resBadRequest, resNotFound } from "../../net/transport.js";
+import { resBadRequest, resBadState, resError, resNotFound } from "../../net/transport.js";
 import { orchestrateMove } from "../../domain/game/moveOrchestrator.js";
 import { ensureGameMeta } from "../../domain/game/meta.js";
 
@@ -10,7 +10,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     sendRes,
     mapSlotFromClientToServer,
     mapSlotForClient,
-    findCardById,
+    getCardById,
     validateMove,
     applyMove,
     isBenchSlot,
@@ -18,7 +18,6 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
     getTableSlots,
-    emitSnapshotsToAudience,
     processTurnTimeout,
     withGameUpdate,
   } = ctx;
@@ -32,16 +31,14 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   if (rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, "Spectateur: déplacement interdit")) return true;
   if (rejectIfEndedOrRes(ctx, ws, req, game_id, game)) return true;
   if (game?.turn?.paused) {
-    sendRes(ws, req, false, { code: "GAME_PAUSED", message: "Partie en pause: adversaire déconnecté" });
-    return true;
+    return resError(sendRes, ws, req, "GAME_PAUSED", "Partie en pause: adversaire deconnecte", { game_id });
   }
 
   // ✅ TURN EXPIRY CHECK
   if (typeof processTurnTimeout === "function") {
     const didExpire = processTurnTimeout(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
-      sendRes(ws, req, false, { code: "TURN_TIMEOUT", message: "Temps écoulé" });
-      return true;
+      return resError(sendRes, ws, req, "TURN_TIMEOUT", "Temps ecoule.", { game_id });
     }
   }
 
@@ -74,21 +71,34 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     to_slot_id,
     validateMove,
     applyMove,
-    findCardById,
+    getCardById,
     isBenchSlot,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
     getTableSlots,
     endTurnAfterBenchPlay,
     withGameUpdate,
-    emitSnapshotsToAudience,
     ctx,
   });
 
   // ✅ HANDLE RESULT
   if (!orchResult.valid) {
-    const details = { card_id, from_slot_id: client_from, to_slot_id: client_to };
-    return resNotFound(sendRes, ws, req, orchResult.reason, details);
+    const details = {
+      card_id,
+      from_slot_id: client_from,
+      to_slot_id: client_to,
+      move_code: orchResult.code ?? "UNKNOWN",
+    };
+
+    if (orchResult.code === "NOT_FOUND") {
+      return resNotFound(sendRes, ws, req, orchResult.reason, details);
+    }
+
+    if (orchResult.code === "MOVE_DENIED") {
+      return resBadRequest(sendRes, ws, req, orchResult.reason, details);
+    }
+
+    return resBadState(sendRes, ws, req, orchResult.reason || "MOVE_ERROR", details);
   }
 
   // ✅ GAME END: emit end then broadcast

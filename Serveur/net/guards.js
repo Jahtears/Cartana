@@ -96,9 +96,14 @@ export function getGameIdFromDataOrMapping(
 }
 
 export function rejectIfBusyOrRes(ctx, ws, req, username, message = "Tu es déjà en partie") {
-  const { isBusy } = ctx;
   const sendRes = getResponder(ctx);
-  if (typeof isBusy === "function" && isBusy(username)) {
+  const state = ctx?.state;
+
+  const inGame = typeof state?.getUserGame === "function"
+    ? !!state.getUserGame(username)
+    : !!state?.userToGame?.get?.(username);
+
+  if (inGame) {
     resBadState(sendRes, ws, req, message);
     return true;
   }
@@ -106,10 +111,16 @@ export function rejectIfBusyOrRes(ctx, ws, req, username, message = "Tu es déj�
 }
 
 export function rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, message = "Spectateur: action interdite") {
-    const { isSpectator } = ctx;
-    const sendRes = getResponder(ctx);
+  const sendRes = getResponder(ctx);
+  const state = ctx?.state;
 
-  if (typeof isSpectator === "function" && isSpectator(game_id, actor)) {
+  const spectatingGameId = typeof state?.getUserSpectate === "function"
+    ? state.getUserSpectate(actor)
+    : state?.userToSpectate?.get?.(actor);
+
+  const sameGameAsSpectator = String(spectatingGameId ?? "") === String(game_id ?? "");
+
+  if (sameGameAsSpectator) {
     resForbidden(sendRes, ws, req, message);
     return true;
   }
@@ -126,4 +137,3 @@ export function rejectIfEndedOrRes(ctx, ws, req, game_id, game) {
   }
   return false;
 }
-

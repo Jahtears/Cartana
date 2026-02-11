@@ -1,7 +1,9 @@
 // domain/game/moveOrchestrator.js - Centralized move orchestration
-// Coordinates: validate → apply → check win → track updates → prepare response
+// Coordinates: validate → apply → check win → track updates → prepare response 
 
-import { SlotId, isTableSlot, SLOT_TYPES } from "./SlotManager.js";
+import { SLOT_TYPES, SlotId } from "./constants/slots.js";
+import { DEFAULT_HAND_SIZE } from "./constants/turnFlow.js";
+import { isTableSlot } from "./helpers/slotHelpers.js";
 
 /**
  * Orchestrate a complete move: validate -> apply -> refill -> track updates -> check win.
@@ -15,14 +17,13 @@ import { SlotId, isTableSlot, SLOT_TYPES } from "./SlotManager.js";
  * @param {Object} params.to_slot_id - Target slot (server-side SlotId)
  * @param {Function} params.validateMove - Validation function
  * @param {Function} params.applyMove - Application function
- * @param {Function} params.findCardById - Card lookup
+ * @param {Function} params.getCardById - Card lookup
  * @param {Function} params.isBenchSlot - Bench detection
  * @param {Function} params.refillHandIfEmpty - Hand refill
  * @param {Function} params.hasWonByEmptyDeckSlot - Win check
  * @param {Function} params.getTableSlots - Get table slots
  * @param {Function} params.endTurnAfterBenchPlay - End turn logic
  * @param {Function} params.withGameUpdate - Game state update builder
- * @param {Function} params.emitSnapshotsToAudience - Broadcast snapshots
  * @param {Object} params.ctx - Request context (for trace)
  * 
  * @returns {Object} Result = { valid, reason?, response?, shouldEnd?, winner? }
@@ -37,14 +38,13 @@ export function orchestrateMove(params) {
     to_slot_id: toSlotId,
     validateMove,
     applyMove,
-    findCardById,
+    getCardById,
     isBenchSlot,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
     getTableSlots,
     endTurnAfterBenchPlay,
     withGameUpdate,
-    emitSnapshotsToAudience,
     ctx,
   } = params;
 
@@ -54,7 +54,7 @@ export function orchestrateMove(params) {
   // ========================
   // 1) FIND CARD
   // ========================
-  const card = findCardById(game, cardId);
+  const card = getCardById(game, cardId);
   if (!card) {
     return {
       valid: false,
@@ -95,7 +95,7 @@ export function orchestrateMove(params) {
   // ========================
   // 5) REFILL HAND IF NEEDED (only if not ending turn)
   // ========================
-  const selfRefill = !endsTurn ? refillHandIfEmpty(game, actor, 5) : [];
+  const selfRefill = !endsTurn ? refillHandIfEmpty(game, actor, DEFAULT_HAND_SIZE) : [];
 
   // ========================
   // 6) CHECK WIN CONDITION
@@ -108,15 +108,15 @@ export function orchestrateMove(params) {
   const tableSlots = getTableSlots(game);
 
   withGameUpdate(gameId, (fx) => {
-    if (moveResult.newTableSlot) {
+    if (moveResult.createdTableSlotId) {
       fx.syncTable(tableSlots);
-      fx.touch(moveResult.newTableSlot);
+      fx.touch(moveResult.createdTableSlotId);
     }
     fx.touch(fromSlotId);
-    if (toSlotId !== moveResult.newTableSlot) fx.touch(toSlotId);
+    if (toSlotId !== moveResult.createdTableSlotId) fx.touch(toSlotId);
     for (const refill of selfRefill) fx.touch(refill.slotId);
     if (selfRefill.length) fx.touch(pileSlotId);
-    fx.turn();
+    if (!endsTurn) fx.turn();
   }, ctx?.trace);
 
   // ========================
@@ -169,11 +169,6 @@ export function orchestrateMove(params) {
     fx.touch(pileSlotId);
     fx.turn();
   }, ctx?.trace);
-
-  // Broadcast if pile was recycled
-  if (recycled?.recycledSlots?.length && typeof emitSnapshotsToAudience === "function") {
-    emitSnapshotsToAudience(gameId, { reason: "recycle" });
-  }
 
   return {
     valid: true,

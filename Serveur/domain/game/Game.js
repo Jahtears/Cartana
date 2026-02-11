@@ -1,10 +1,11 @@
 // Game.js (barrel)
-export { createGame, shuffle, findCardById } from "./state.js";
+export { createGame } from "./builders/gameBuilder.js";
+export { shuffle, getCardById } from "./helpers/cardHelpers.js";
 export {
   mapSlotForClient,
   mapSlotFromClientToServer,
   isOwnerForSlot,
-  buildCardData,
-} from "./slots.js";
+} from "./helpers/slotHelpers.js";
+export { buildCardData } from "./builders/gameBuilder.js";
 export { ensureGameMeta, ensureGameResult } from "./meta.js";
-export { getTableSlots } from "./SlotManager.js"; 
+export { getTableSlots } from "./helpers/tableHelper.js";
