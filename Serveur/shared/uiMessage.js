@@ -1,4 +1,4 @@
-import { GAME_MESSAGE } from "./constants.js";
+import { GAME_MESSAGE, UI_EVENT } from "./constants.js";
 
 function firstNonEmpty(...values) {
   for (const value of values) {
@@ -24,7 +24,7 @@ export function toUiMessage(input = {}, defaults = {}) {
   const src = input && typeof input === "object" ? input : {};
   const dft = defaults && typeof defaults === "object" ? defaults : {};
 
-  const text = firstNonEmpty(src.text, src.message, src.reason, dft.text);
+  const text = firstNonEmpty(src.text, dft.text);
   const code = firstNonEmpty(src.code, dft.code, GAME_MESSAGE.INFO);
   const color = firstNonEmpty(src.color, dft.color);
   const meta = {
@@ -38,3 +38,61 @@ export function toUiMessage(input = {}, defaults = {}) {
   return out;
 }
 
+function normalizeTargets(to) {
+  return Array.isArray(to) ? to : [to];
+}
+
+/**
+ * Emit inline gameplay UI message.
+ * - Event: UI_EVENT.GAME_MESSAGE
+ * - Payload: normalized UI message
+ */
+export function emitGameMessage(sendEvtUser, to, input = {}, defaults = {}) {
+  if (typeof sendEvtUser !== "function") return false;
+
+  const payload = toUiMessage(input, defaults);
+  const targets = normalizeTargets(to);
+  let sent = false;
+
+  for (const username of targets) {
+    if (!username) continue;
+    sendEvtUser(username, UI_EVENT.GAME_MESSAGE, payload);
+    sent = true;
+  }
+
+  return sent;
+}
+
+/**
+ * Emit business event with optional popup UI payload.
+ * - Event: eventType (business)
+ * - Payload: { ...envelope, [field]: normalizedUI }
+ */
+export function emitPopupMessage(
+  sendEvtUser,
+  to,
+  eventType,
+  envelope = {},
+  input = {},
+  defaults = {},
+  field = "ui"
+) {
+  if (typeof sendEvtUser !== "function") return false;
+  if (!eventType || typeof eventType !== "string") return false;
+
+  const ui = toUiMessage(input, defaults);
+  const baseEnvelope =
+    envelope && typeof envelope === "object" ? envelope : {};
+  const payload = { ...baseEnvelope, [field]: ui };
+
+  const targets = normalizeTargets(to);
+  let sent = false;
+
+  for (const username of targets) {
+    if (!username) continue;
+    sendEvtUser(username, eventType, payload);
+    sent = true;
+  }
+
+  return sent;
+}

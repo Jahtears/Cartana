@@ -37,11 +37,6 @@ secret = true
 layout_mode = 2
 text = "Connexion"
 
-[node name="Error_dialog" type="AcceptDialog" parent="." unique_id=891669693]
-oversampling_override = 1.0
-size = Vector2i(174, 100)
-dialog_text = "Erreur de connexion"
-
 [node name="Background" type="ColorRect" parent="." unique_id=1949501948]
 z_index = -1
 layout_mode = 1

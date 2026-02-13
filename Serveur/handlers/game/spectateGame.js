@@ -1,6 +1,7 @@
 //handlers\spectateGame.js
 import { ensureGameMeta } from "../../domain/game/meta.js";
 import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from "../../net/guards.js";
+import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
  
  
  export function handleSpectateGame(ctx, ws, req, data, actor) {
@@ -21,7 +22,7 @@ import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from "../../net
   if (!game) return true;
 
   // joueur interdit (un joueur est “busy”), spectateur OK
-  if (rejectIfBusyOrRes(ctx, ws, req, actor, "Tu es déjà joueur dans une partie")) return true;
+  if (rejectIfBusyOrRes(ctx, ws, req, actor, POPUP_MESSAGE.TECH_BAD_STATE)) return true;
  
    ensureGameMeta(state.gameMeta, game_id, { initialSent: !!game?.turn });
  

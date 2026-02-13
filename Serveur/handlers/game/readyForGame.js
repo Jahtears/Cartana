@@ -2,11 +2,12 @@
 
 import { ensureGameMeta } from "../../domain/game/meta.js";
 import { TURN_FLOW_MESSAGES } from "../../domain/game/helpers/turnFlowHelpers.js";
-import { GAME_MESSAGE, MESSAGE_COLORS } from "../../shared/constants.js";
-import { toUiMessage } from "../../shared/uiMessage.js";
+import { GAME_MESSAGE } from "../../shared/constants.js";
+import { emitGameMessage } from "../../shared/uiMessage.js";
 import { getExistingGameOrRes, getGameIdFromDataOrMapping } from "../../net/guards.js";
 import { resBadRequest, resForbidden } from "../../net/transport.js";
 import { saveGameState } from "../../domain/session/Saves.js";
+import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 export function handleReadyForGame(ctx, ws, req, data, actor) {
   const {
@@ -64,17 +65,14 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
       // - text: libellé affiché
       // - code: identifiant sémantique (couleur côté client)
       // - color: fallback legacy
-      sendEvtUser(
+      emitGameMessage(
+        sendEvtUser,
         starter,
-        "show_game_message",
-        toUiMessage(
-          {
-            text: reason || TURN_FLOW_MESSAGES.START,
-            code: GAME_MESSAGE.TURN_START,
-            color: MESSAGE_COLORS[GAME_MESSAGE.TURN_START],
-          },
-          { code: GAME_MESSAGE.INFO }
-        )
+        {
+          text: reason || TURN_FLOW_MESSAGES.START,
+          code: GAME_MESSAGE.TURN_START,
+       },
+        { code: GAME_MESSAGE.INFO }
       );
     }
 
@@ -112,7 +110,7 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
 
   if (!requestedGameId) {
     // spectateur sans mapping et sans game_id => demande invalide
-    resBadRequest(sendRes, ws, req, "game_id manquant");
+    resBadRequest(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_REQUEST);
     return true;
   }
 
@@ -122,7 +120,7 @@ export function handleReadyForGame(ctx, ws, req, data, actor) {
   const specs = gameSpectators.get(requestedGameId);
   const isSpec = !!(specs && specs.has(actor));
   if (!isSpec) {
-    resForbidden(sendRes, ws, req, "Tu n'es pas spectateur de cette partie");
+    resForbidden(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN);
     return true;
   }
 

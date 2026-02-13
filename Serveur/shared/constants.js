@@ -9,11 +9,13 @@ export const GAME_MESSAGE = {
   ERROR: "ERROR",
 };
 
-export const MESSAGE_COLORS = {
-  [GAME_MESSAGE.TURN_START]: "#00FF00",
-  [GAME_MESSAGE.MOVE_OK]: "#00FF00",
-  [GAME_MESSAGE.MOVE_DENIED]: "#FF3B30",
-  [GAME_MESSAGE.INFO]: "#FFFFFF",
-  [GAME_MESSAGE.WARN]: "#FFCC00",
-  [GAME_MESSAGE.ERROR]: "#FF3B30",
+export const UI_EVENT = {
+  GAME_MESSAGE: "show_game_message",
 };
+
+export const GAME_END_REASONS = {
+  ABANDON: "abandon",
+  DECK_EMPTY: "deck_empty",
+};
+
+export const GAME_END_REASON_SET = new Set(Object.values(GAME_END_REASONS));

@@ -2,8 +2,6 @@
 extends RefCounted
 class_name CardSyncHelper
 
-const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
-
 static func get_or_create_card(game_ctx: Dictionary, card_id: String) -> Node2D:
 	var cards = game_ctx.get("cards", null)
 	var card_scene: PackedScene = game_ctx.get("card_scene", null)

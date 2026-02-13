@@ -12,7 +12,7 @@ import { applyMove } from '../domain/game/MoveApplier.js';
 import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot } from '../domain/game/Regles.js';
 import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../domain/game/helpers/turnFlowHelpers.js";
 import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
-import { verifyOrCreateUser } from '../domain/auth/usersStore.js';
+import { verifyOrCreateUser } from '../handlers/auth/usersStore.js';
 import { emitSlotState, emitFullState } from '../domain/session/index.js';
 
 // ============= IMPORTS HANDLERS =============
@@ -22,7 +22,7 @@ import { handleInvite, handleInviteResponse } from '../handlers/lobby/invite.js'
 import { handleReadyForGame } from '../handlers/game/readyForGame.js';
 import { handleJoinGame } from '../handlers/game/joinGame.js';
 import { handleSpectateGame } from '../handlers/game/spectateGame.js';
-import { handleMoveRequest } from '../handlers/game/moveRequest.js';
+import { handleMoveRequest } from '../domain/game/moveRequest.js';
 import { handleLeaveGame, handleAckGameEnd } from '../handlers/game/gameEnd.js';
 
 // ============= IMPORTS APP =============
@@ -33,6 +33,9 @@ import { createWSManager } from '../net/wsManager.js';
 // ============= IMPORTS NETWORK =============
 import { stopHeartbeatManager } from '../net/heartbeat.js';
 import { metrics, createMetricsMiddleware } from '../net/monitoring.js';
+
+const DEBUG_TRACE_ENABLED = process.env.DEBUG_TRACE === "1";
+const GAME_DEBUG_ENABLED = process.env.GAME_DEBUG === "1" || DEBUG_TRACE_ENABLED;
 
 // ============= INITIALISATION =============
 
@@ -185,4 +188,7 @@ httpServer.listen(PORT, HOST, () => {
   console.log(`🚀 Server listening on http://${HOST}:${PORT}`);
   console.log(`📊 Metrics available at http://${HOST}:${PORT}/metrics`);
   console.log(`❤️ Health check at http://${HOST}:${PORT}/health`);
+  if (DEBUG_TRACE_ENABLED || GAME_DEBUG_ENABLED) {
+    console.log(`🧪 Debug flags: DEBUG_TRACE=${DEBUG_TRACE_ENABLED ? "1" : "0"} GAME_DEBUG=${GAME_DEBUG_ENABLED ? "1" : "0"}`);
+  }
 });

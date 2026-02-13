@@ -58,6 +58,15 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
   return { slot_id: clientSlot, cards };
 }
 
+function publicGameEndResult(result) {
+  if (!result || typeof result !== "object") return { winner: null };
+  const winner =
+    typeof result.winner === "string" && result.winner.trim()
+      ? result.winner
+      : null;
+  return { winner };
+}
+
 function buildStateSnapshotForUser(game, username, view, { result = null, forceDisableDrag = false } = {}) {
   const tableSlotIds = getTableSlots(game);
 
@@ -90,7 +99,7 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
     table, // ["0:TABLE:1","0:TABLE:2",...]
     slots, // { "1:HAND:1":[...], "0:PILE:1":[...], ... }
     turn, // { current, turnNumber } | null
-    result, // { winner, reason, by, at } | null
+    result, // { winner } | null
   };
 }
 
@@ -120,7 +129,7 @@ export function emitFullState(game, username, wsByUser, sendEvtSocket, { view = 
   let forceDisableDrag = !!game?.turn?.paused;
   if (gameMeta && game_id) {
     const meta = gameMeta.get(game_id) || {};
-    result = meta.result ?? null;
+    result = meta.result ? publicGameEndResult(meta.result) : null;
   }
 
   const snapshot = buildStateSnapshotForUser(game, username, view, { result, forceDisableDrag });
@@ -232,7 +241,7 @@ export function createGameNotifier({
     const meta = ensureGameMeta(gameMeta, game_id, { initialSent: true });
     const { result, created } = ensureGameResult(meta, patch);
 
-    const payload = { game_id, ...result };
+    const payload = { game_id, ...publicGameEndResult(result) };
     if (!created) return { payload, created: false };
 
     const excludeSet = new Set((exclude || []).filter(Boolean));

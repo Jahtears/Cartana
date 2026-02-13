@@ -1,5 +1,7 @@
 // net/transport.js v3.0 - Transport et réponses
 // Le heartbeat est maintenant centralisé dans heartbeat.js
+import { POPUP_MESSAGE } from "../shared/popupMessages.js";
+import { RESPONSE_CODE } from "../shared/responseCodes.js";
 
 /**
  * Vérifier si un WebSocket est ouvert
@@ -40,7 +42,13 @@ export function createTransport({ wsByUser }) {
   function sendRes(ws, req, ok, payload) {
     const base = { v: 1, kind: "res", type: req.type, rid: req.rid, ok: !!ok };
     if (ok) return safeSend(ws, { ...base, data: payload ?? {} });
-    return safeSend(ws, { ...base, error: payload ?? { code: "UNKNOWN", message: "Erreur" } });
+    return safeSend(ws, {
+      ...base,
+      error: payload ?? {
+        code: RESPONSE_CODE.UNKNOWN,
+        message: POPUP_MESSAGE.TECH_ERROR_GENERIC,
+      },
+    });
   }
 
   /**
@@ -104,30 +112,30 @@ export function resError(sendRes, ws, req, code, message, details) {
    return true;
 }
 
-export function resBadRequest(sendRes, ws, req, message = "BAD_REQUEST", details) {
-  return resError(sendRes, ws, req, "BAD_REQUEST", message, details);
+export function resBadRequest(sendRes, ws, req, message = POPUP_MESSAGE.TECH_BAD_REQUEST, details) {
+  return resError(sendRes, ws, req, RESPONSE_CODE.BAD_REQUEST, message, details);
 }
 
-export function resNotFound(sendRes, ws, req, message = "NOT_FOUND", details) {
-  return resError(sendRes, ws, req, "NOT_FOUND", message, details);
+export function resNotFound(sendRes, ws, req, message = POPUP_MESSAGE.TECH_NOT_FOUND, details) {
+  return resError(sendRes, ws, req, RESPONSE_CODE.NOT_FOUND, message, details);
 }
 
-export function resForbidden(sendRes, ws, req, message = "FORBIDDEN", details) {
-  return resError(sendRes, ws, req, "FORBIDDEN", message, details);
+export function resForbidden(sendRes, ws, req, message = POPUP_MESSAGE.TECH_FORBIDDEN, details) {
+  return resError(sendRes, ws, req, RESPONSE_CODE.FORBIDDEN, message, details);
 }
 
-export function resBadState(sendRes, ws, req, message = "BAD_STATE", details) {
-  return resError(sendRes, ws, req, "BAD_STATE", message, details);
+export function resBadState(sendRes, ws, req, message = POPUP_MESSAGE.TECH_BAD_STATE, details) {
+  return resError(sendRes, ws, req, RESPONSE_CODE.BAD_STATE, message, details);
 }
 
-export function resGameEnd(sendRes, ws, req, message = "Partie terminée", details) {
-  return resError(sendRes, ws, req, "GAME_END", message, details);
+export function resGameEnd(sendRes, ws, req, message = POPUP_MESSAGE.GAME_ENDED, details) {
+  return resError(sendRes, ws, req, RESPONSE_CODE.GAME_END, message, details);
 }
 
-export function resNotImplemented(sendRes, ws, req, message = "Type non géré", details) {
-  return resError(sendRes, ws, req, "NOT_IMPLEMENTED", message, details);
+export function resNotImplemented(sendRes, ws, req, message = POPUP_MESSAGE.TECH_NOT_IMPLEMENTED, details) {
+  return resError(sendRes, ws, req, RESPONSE_CODE.NOT_IMPLEMENTED, message, details);
 }
 
-export function resServerError(sendRes, ws, req, message = "Erreur serveur", details) {
-  return resError(sendRes, ws, req, "SERVER_ERROR", message, details);
+export function resServerError(sendRes, ws, req, message = POPUP_MESSAGE.TECH_INTERNAL_ERROR, details) {
+  return resError(sendRes, ws, req, RESPONSE_CODE.SERVER_ERROR, message, details);
 }

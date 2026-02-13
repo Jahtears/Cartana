@@ -39,8 +39,6 @@ var _is_hovered := false
 var _base_scale := Vector2.ONE
 var _base_modulate := Color.WHITE
 
-const HitboxUtil = preload("res://Client/game/helpers/hitbox.gd")
-
 # ============= LIFECYCLE =============
 
 func _ready() -> void:

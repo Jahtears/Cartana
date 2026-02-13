@@ -2,6 +2,7 @@
 import { ensureGameMeta } from "../../domain/game/meta.js";
 import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from "../../net/guards.js";
 import { resForbidden } from "../../net/transport.js";
+import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 
 export function handleJoinGame(ctx, ws, req, data, actor) {
@@ -14,7 +15,7 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
     Activity,
   } = ctx;
   // ✅ join_game = cibler une ressource, mais interdit si déjà joueur ailleurs
-  if (rejectIfBusyOrRes(ctx, ws, req, actor, "Tu es déjà joueur dans une partie")) return true;
+  if (rejectIfBusyOrRes(ctx, ws, req, actor, POPUP_MESSAGE.TECH_BAD_STATE)) return true;
 
   const game_id = requireParam(sendRes, ws, req, data, "game_id");
   if (!game_id) return true;
@@ -25,7 +26,7 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
 
   // Interdire un join "hors players"
   if (!game.players.includes(actor)) {
-  return resForbidden(sendRes, ws, req, "Tu n'es pas joueur dans cette partie");
+  return resForbidden(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN);
   }
 
   ensureGameMeta(state.gameMeta, game_id, { initialSent: !!game?.turn });

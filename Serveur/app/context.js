@@ -9,7 +9,7 @@ import { createPresence } from "../domain/session/presence.js";
 import { TURN_FLOW_MESSAGES } from "../domain/game/helpers/turnFlowHelpers.js";
 import { createStateManager } from "./stateManager.js";
 import { GAME_MESSAGE } from "../shared/constants.js";
-import { toUiMessage } from "../shared/uiMessage.js";
+import { emitGameMessage } from "../shared/uiMessage.js";
 
 export function createServerContext(deps) {
   const {
@@ -181,17 +181,19 @@ export function createServerContext(deps) {
     const next = String(timeoutResult.next ?? "").trim();
 
     if (prev) {
-      sendEvtUser(
+      emitGameMessage(
+        sendEvtUser,
         prev,
-        "show_game_message",
-        toUiMessage({ text: TURN_FLOW_MESSAGES.TIMEOUT, code: GAME_MESSAGE.WARN }, { code: GAME_MESSAGE.WARN })
+        { text: TURN_FLOW_MESSAGES.TIMEOUT, code: GAME_MESSAGE.WARN },
+        { code: GAME_MESSAGE.WARN }
       );
     }
     if (next) {
-      sendEvtUser(
+      emitGameMessage(
+        sendEvtUser,
         next,
-        "show_game_message",
-        toUiMessage({ text: TURN_FLOW_MESSAGES.TURN_START, code: GAME_MESSAGE.TURN_START }, { code: GAME_MESSAGE.INFO })
+        { text: TURN_FLOW_MESSAGES.TURN_START, code: GAME_MESSAGE.TURN_START },
+        { code: GAME_MESSAGE.INFO }
       );
     }
 

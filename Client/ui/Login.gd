@@ -2,6 +2,7 @@
 extends Control
 
 const Protocol = preload("res://Client/net/Protocol.gd")
+const PopupMessages = preload("res://Client/game/messages/PopupMessages.gd")
 
 var _login_pending := false
 var _last_username: String = ""
@@ -11,6 +12,7 @@ func _ready() -> void:
 		NetworkManager.connect_to_server()
 	if not NetworkManager.response.is_connected(_on_response):
 		NetworkManager.response.connect(_on_response)
+	PopupUi.hide()
 
 func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
 	if type != "login":
@@ -25,12 +27,14 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 		Global.username = u
 		get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
 	else:
-		var ui := Protocol.normalize_error_message(error, "Erreur de connexion")
-		show_error(String(ui.get("text", "Erreur de connexion")))
+		var ui := Protocol.normalize_error_message(error, PopupMessages.MSG_POPUP_AUTH_CONNECTION_ERROR)
+		show_error(String(ui.get("text", Protocol.popup_text(PopupMessages.MSG_POPUP_AUTH_CONNECTION_ERROR))))
 
 func show_error(message: String) -> void:
-	$Error_dialog.dialog_text = message
-	$Error_dialog.popup_centered()
+	PopupUi.show_ui_message({
+		"text": message,
+		"code": Protocol.GAME_MESSAGE["ERROR"],
+	})
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept"):
@@ -44,7 +48,7 @@ func _on_login_button_pressed() -> void:
 	var pin: String = $CenterContainer/VBoxContainer/Pin_input.text.strip_edges()
 
 	if username == "" or pin == "":
-		show_error("Identifiant ou PIN manquant.")
+		show_error(Protocol.popup_text(PopupMessages.MSG_POPUP_AUTH_MISSING_CREDENTIALS))
 		return
 
 	_last_username = username

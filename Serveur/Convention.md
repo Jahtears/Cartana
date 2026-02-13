@@ -81,3 +81,41 @@ Conventions serveur (etat actuel)
 12. Statut legacy
 - Les anciens fichiers `SlotManager.js`, `SlotHelper.js`, `slots.js`, `state.js`, `turn.js`, `pileManager.js` ne sont plus la source canonique.
 - Toute nouvelle logique doit etre ajoutee uniquement dans `constants/`, `helpers/`, `builders/` ou les points d'entree metier ci-dessus.
+
+13. Convention UI messages (routes d'affichage)
+- Principe:
+  - Gameplay court -> `GameMessage` inline (vert/rouge) dans la scene game.
+  - Tous les autres messages -> `WindowPopup` (sans couleur custom).
+
+- Route serveur:
+  - Wrappers UI canoniques (`Serveur/shared/uiMessage.js`):
+    - `emitGameMessage(...)` -> event `show_game_message` (inline gameplay court).
+    - `emitPopupMessage(...)` -> event metier + champ `ui` (popup).
+  - Reasons de fin de partie canoniques (`Serveur/domain/game/constants/gameEnd.js`):
+    - `GAME_END_REASONS.ABANDON` -> `"abandon"`
+    - `GAME_END_REASONS.DECK_EMPTY` -> `"deck_empty"`
+  - `show_game_message` est utilise pour les messages de tour:
+    - start turn (`Serveur/handlers/game/readyForGame.js`)
+    - timeout / next turn (`Serveur/app/context.js`)
+  - `invite_response` en payload metier + champ `ui` optionnel:
+    - `{ accepted, from, to, ui }` (`Serveur/handlers/lobby/invite.js`).
+
+- Route client:
+  - `Client/net/Protocol.gd` (source de vérité UI client):
+    - normalisation: `normalize_game_message(...)`, `normalize_error_message(...)`.
+    - routing gameplay: `is_inline_game_message(...)`, `inline_message_color(...)`.
+    - invite popup: `normalize_invite_response_ui(...)`, `invite_action_request(...)`.
+    - game end: `game_end_popup_text(...)`.
+  - `Client/ui/WindowPopup.gd`:
+    - API popup: `show_ui_message(...)`, `show_confirm(...)`, `show_invite_request(...)`.
+    - API gameplay: `show_gameplay_message(...)` (décide inline vs popup via `Protocol`).
+    - rendu neutre sans couleur message custom (`Client/ui/WindowPopup.gd`).
+    - scene unique: `res://Client/Scenes/WindowPopup.tscn` (autoload `PopupUi`).
+  - `Client/game/Game.gd`:
+    - orchestration uniquement (plus de logique legacy locale `_show_popup_message/_is_inline...`).
+
+- Regle de dev:
+  - Ne pas ajouter de nouveau canal d'affichage.
+  - Toute nouvelle notification doit choisir explicitement:
+    - inline gameplay court
+    - ou popup metier via `PopupUi`.

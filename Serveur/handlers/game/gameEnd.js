@@ -3,6 +3,8 @@
 import { getExistingGameOrRes, getGameIdFromDataOrMapping } from "../../net/guards.js";
 import { resForbidden } from "../../net/transport.js";
 import { ensureGameMeta } from "../../domain/game/meta.js";
+import { GAME_END_REASONS } from "../../domain/game/constants/gameEnd.js";
+import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 const CLEANUP_TTL_MS = 2 * 60 * 1000;
 
@@ -113,7 +115,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
   if (!game) return true;
 
   if (!game || !game.players.includes(actor)) {
-    return resForbidden(sendRes, ws, req, "Tu n'es pas dans cette partie")
+    return resForbidden(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN)
   }
 
   // abandonneur sort (l’adversaire / specs restent attachés jusqu’à ack)
@@ -122,7 +124,12 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
   // ✅ game_end idempotent/once (uniquement à la création du result)
   const winner = game.players.find((p) => p !== actor) ?? null;
 
-  endGame(ctx, game_id, { winner, reason: "abandon", by: actor, at: Date.now() }, { exclude: [actor] });
+  endGame(
+    ctx,
+    game_id,
+    { winner, reason: GAME_END_REASONS.ABANDON, by: actor, at: Date.now() },
+    { exclude: [actor] }
+  );
 
   if (typeof refreshLobby === "function") refreshLobby();
 
@@ -191,7 +198,12 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
   // ✅ si un joueur ACK alors que la partie n'est pas finie => traiter comme abandon
   if (wasPlayer && !meta.result) {
     const winner = game.players.find((p) => p !== actor) ?? null;
-    endGame(ctx, game_id, { winner, reason: "abandon", by: actor, at: Date.now() }, { exclude: [actor] });
+    endGame(
+      ctx,
+      game_id,
+      { winner, reason: GAME_END_REASONS.ABANDON, by: actor, at: Date.now() },
+      { exclude: [actor] }
+    );
   }
 
   meta.acks.add(actor);

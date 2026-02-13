@@ -1,5 +1,7 @@
 // router.js v2.0 
 
+import { POPUP_MESSAGE } from "../shared/popupMessages.js";
+import { RESPONSE_CODE } from "../shared/responseCodes.js";
 const DEV_TRACE = process.env.DEBUG_TRACE === "1";
 
 function withTrace(baseCtx, req) {
@@ -14,7 +16,10 @@ function withTrace(baseCtx, req) {
 function requireAuth(ws, req, { state, sendRes }) {
   const user = state.getUsername(ws);
   if (!user) {
-    sendRes(ws, req, false, { code: "AUTH_REQUIRED", message: "Non authentifié" });
+    sendRes(ws, req, false, {
+      code: RESPONSE_CODE.AUTH_REQUIRED,
+      message: POPUP_MESSAGE.AUTH_REQUIRED,
+    });
     return null;
   }
   return user;
@@ -82,7 +87,10 @@ export function createRouter({
         return;
       } catch (err) {
         console.error("[ROUTE_ERROR] login", err);
-        sendRes(ws, req, false, { code: "SERVER_ERROR", message: "Erreur serveur" });
+        sendRes(ws, req, false, {
+          code: RESPONSE_CODE.SERVER_ERROR,
+          message: POPUP_MESSAGE.TECH_INTERNAL_ERROR,
+        });
         return;
       }
     }
@@ -117,7 +125,10 @@ export function createRouter({
 
     const fn = routes[req.type];
     if (!fn) {
-      sendRes(ws, req, false, { code: "NOT_IMPLEMENTED", message: `Type non géré: ${req.type}` });
+      sendRes(ws, req, false, {
+        code: RESPONSE_CODE.NOT_IMPLEMENTED,
+        message: POPUP_MESSAGE.TECH_NOT_IMPLEMENTED,
+      });
       return;
     }
 
@@ -129,7 +140,10 @@ export function createRouter({
     } catch (err) {
       console.error("[ROUTE_ERROR]", req.type, err);
       ctx.trace?.("ERROR", String(err?.message ?? err));
-      sendRes(ws, req, false, { code: "SERVER_ERROR", message: "Erreur serveur" });
+      sendRes(ws, req, false, {
+        code: RESPONSE_CODE.SERVER_ERROR,
+        message: POPUP_MESSAGE.TECH_INTERNAL_ERROR,
+      });
     }
   }
 

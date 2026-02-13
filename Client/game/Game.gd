@@ -8,6 +8,8 @@ var card_scene: PackedScene = preload("res://Client/Scenes/Carte.tscn")
 
 # ============= PROTOCOLS & HELPERS =============
 const Protocol = preload("res://Client/net/Protocol.gd")
+const PopupMessages = preload("res://Client/game/messages/PopupMessages.gd")
+const InlineMessages = preload("res://Client/game/messages/InlineMessages.gd")
 const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
 const TableSyncHelper = preload("res://Client/game/helpers/table_sync.gd")
 const CardSyncHelper = preload("res://Client/game/helpers/card_sync.gd")
@@ -64,6 +66,8 @@ var _table_spacing: int = 100
 @onready var player2_banc: Node2D = $Player2/Banc
 @onready var pioche_root: Node2D = $Pioche
 @onready var table_root: Node2D = $Table
+@onready var game_message_label: RichTextLabel = $VBoxContainer/CenterContainer/GameMessage
+@onready var game_message_timer: Timer = $VBoxContainer/Timer
 
 # ============= CARD CONTEXT =============
 var _card_ctx: Dictionary = {}
@@ -108,10 +112,9 @@ func _ready() -> void:
 		NetworkManager.evt.connect(_on_evt)
 	if not NetworkManager.response.is_connected(_on_response):
 		NetworkManager.response.connect(_on_response)
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and not PopupUi.action_selected.is_connected(_on_popup_action):
+	if not PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.connect(_on_popup_action)
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
-		PopupUi.hide()
+	PopupUi.hide()
 
 	# Ready pour la scène
 	if String(Global.current_game_id) != "":
@@ -132,8 +135,6 @@ func _ready() -> void:
 # ============= EVENTS (PUSH SERVEUR) =============
 
 func _on_evt(type: String, data: Dictionary) -> void:
-	print("[EVT]", type, data)
-
 	match type:
 		"start_game":
 			_handle_start_game(data)
@@ -144,21 +145,35 @@ func _on_evt(type: String, data: Dictionary) -> void:
 		"state_snapshot":
 			_handle_state_snapshot(data)
 		"show_game_message":
-			_show_popup_message(data)
+			PopupUi.show_gameplay_message(data, game_message_label, game_message_timer)
 		"game_end":
 			_handle_game_end(data)
-		"invite_request":
-			_handle_invite_request(data)
-		"invite_response":
-			_handle_invite_response(data)
 		"turn_update":
 			_set_turn_timer(data)
 		"opponent_disconnected":
 			_handle_opponent_disconnected(data)
 		"opponent_rejoined":
 			_handle_opponent_rejoined(data)
+		"invite_request":
+			_handle_invite_request(data)
+		"invite_response":
+			_handle_invite_response(data)
+
 
 # ============= HANDLERS =============
+
+func _handle_invite_request(data: Dictionary) -> void:
+	var from_user := String(data.get("from", ""))
+	if from_user != "":
+		PopupUi.show_invite_request(from_user, {
+			"flow": String(Protocol.POPUP_FLOW["INVITE_REQUEST"]),
+			"from": from_user
+		})
+
+func _handle_invite_response(data: Dictionary) -> void:
+	var ui := Protocol.normalize_invite_response_ui(data)
+	if String(ui.get("text", "")) != "":
+		PopupUi.show_ui_message(ui)
 
 func _handle_start_game(data: Dictionary) -> void:
 	Global.current_game_id = String(data.get("game_id", ""))
@@ -181,8 +196,7 @@ func _handle_start_game(data: Dictionary) -> void:
 	_leave_sent = false
 	_opponent_disconnected = false
 	_disconnect_prompt_seq += 1
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
-		PopupUi.hide()
+	PopupUi.hide()
 
 	if Global.current_game_id != "":
 		if Global.is_spectator:
@@ -214,49 +228,26 @@ func _handle_game_end(data: Dictionary) -> void:
 	merged["game_id"] = String(merged.get("game_id", String(Global.current_game_id)))
 	_on_game_end(merged)
 
-func _handle_invite_request(data: Dictionary) -> void:
-	var from_user := String(data.get("from", ""))
-	if from_user != "":
-		PopupUi.show_invite_request(from_user, {
-			"flow": "invite_request",
-			"from": from_user
-		})
-
-func _handle_invite_response(data: Dictionary) -> void:
-	var ui := Protocol.normalize_game_message(data, Protocol.GAME_MESSAGE["INFO"])
-	if String(ui.get("text", "")) != "":
-		PopupUi.show_ui_message(ui)
-
 func _handle_opponent_disconnected(data: Dictionary) -> void:
 	var who := String(data.get("username", ""))
 	_opponent_disconnected = true
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
-		PopupUi.show_ui_message({
-			"text": "%s s'est déconnecté." % who,
-			"code": Protocol.GAME_MESSAGE["WARN"],
-		})
-	else:
-		_show_popup_message({
-			"text": "%s s'est déconnecté." % who,
-			"code": Protocol.GAME_MESSAGE["WARN"],
-		})
+	PopupUi.show_ui_message({
+		"text": PopupMessages.MSG_POPUP_OPPONENT_DISCONNECTED,
+		"message_params": { "name": who },
+		"code": Protocol.GAME_MESSAGE["WARN"],
+	})
 	_schedule_disconnect_choice(who)
 
 func _handle_opponent_rejoined(data: Dictionary) -> void:
 	var who := String(data.get("username", ""))
 	_opponent_disconnected = false
 	_disconnect_prompt_seq += 1
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null:
-		PopupUi.hide()
-		PopupUi.show_ui_message({
-			"text": "%s a rejoint la partie." % who,
-			"code": Protocol.GAME_MESSAGE["INFO"],
-		})
-	else:
-		_show_popup_message({
-			"text": "%s a rejoint la partie." % who,
-			"code": Protocol.GAME_MESSAGE["INFO"],
-		})
+	PopupUi.hide()
+	PopupUi.show_ui_message({
+		"text": PopupMessages.MSG_POPUP_OPPONENT_REJOINED,
+		"message_params": { "name": who },
+		"code": Protocol.GAME_MESSAGE["INFO"],
+	})
 
 # ============= RESPONSES =============
 
@@ -280,15 +271,17 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 			card._reset_move_pending()
 
 	if ok:
-		_show_popup_message({
-			"text": "Valider",
+		PopupUi.show_gameplay_message({
+			"text": InlineMessages.MSG_INLINE_MOVE_OK,
 			"code": Protocol.GAME_MESSAGE["MOVE_OK"],
-		})
+		}, game_message_label, game_message_timer)
 	else:
-		var ui := Protocol.normalize_error_message(error, "Deplacement refuse.")
-		_show_popup_message(ui)
-
+		var ui := Protocol.normalize_error_message(error, InlineMessages.MSG_INLINE_MOVE_DENIED)
 		var details := error.get("details", {}) as Dictionary
+		if String(details.get("move_code", "")) == "MOVE_DENIED":
+			ui["code"] = Protocol.GAME_MESSAGE["MOVE_DENIED"]
+		PopupUi.show_gameplay_message(ui, game_message_label, game_message_timer)
+
 		if details.has("card_id") and details.has("from_slot_id"):
 			_on_invalid_move({
 				"card_id": String(details.get("card_id", "")),
@@ -344,33 +337,17 @@ func _on_game_end(data: Dictionary) -> void:
 	if _game_end_prompted:
 		return
 	_game_end_prompted = true
-	Global.ended = data.duplicate()
-	var winner := String(data.get("winner", ""))
-	var reason := String(data.get("reason", ""))
+	var msg := Protocol.game_end_popup_text(data, String(Global.username), bool(Global.is_spectator))
 
-	var msg := "Partie terminée.\n"
-	if winner != "":
-		if Global.is_spectator:
-			msg += "Winner: %s\n" % winner
-		else:
-			msg += ("Vous avez gagné.\n" if winner == Global.username else "Vous avez perdu.\n")
-	if reason != "":
-		msg += "Reason: %s\n" % reason
-	msg += "Retour au lobby."
-
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and PopupUi.has_method("show_confirm"):
-		PopupUi.show_confirm(
-			msg,
-			"Retour lobby", "Rester",
-			{
-				"yes_action_id": "game_end_leave",
-				"no_action_id": "game_end_stay",
-				"game_id": String(Global.current_game_id),
-			}
-		)
-	else:
-		await get_tree().create_timer(0.6).timeout
-		await _ack_end_and_go_lobby()
+	PopupUi.show_confirm(
+		msg,
+		"Retour lobby", "Rester",
+		{
+			"yes_action_id": "game_end_leave",
+			"no_action_id": "game_end_stay",
+			"game_id": String(Global.current_game_id),
+		}
+	)
 
 func _ack_end_and_go_lobby() -> void:
 	var gid := String(Global.current_game_id)
@@ -564,32 +541,8 @@ func _update_row_positions(player_id: int, slot_type: String, count: int) -> voi
 
 # ============= UI MESSAGES =============
 
-func show_game_message(text: String, color: Color) -> void:
-	var label := $VBoxContainer/CenterContainer/GameMessage
-	label.bbcode_enabled = true
-	label.text = "[center][color=%s]%s[/color][/center]" % [color.to_html(), text]
-	label.visible = true
-	$VBoxContainer/Timer.start()
-
-func _normalize_game_popup_payload(data: Dictionary) -> Dictionary:
-	return Protocol.normalize_game_message(data)
-
-func _show_popup_message(data: Dictionary) -> void:
-	if data.is_empty():
-		return
-	var payload := _normalize_game_popup_payload(data)
-	var text := String(payload.get("text", ""))
-	if text == "":
-		return
-
-	var color_val = payload.get("color", Color.WHITE)
-	var color := Color.WHITE
-	if color_val is Color:
-		color = color_val
-	show_game_message(text, color)
-
 func _on_timer_timeout() -> void:
-	$VBoxContainer/CenterContainer/GameMessage.visible = false
+	game_message_label.visible = false
 
 # ============= TIMEBAR =============
 
@@ -605,30 +558,26 @@ func _set_turn_timer(turn: Dictionary) -> void:
 # ============= QUITTER =============
 
 func _on_quitter_pressed() -> void:
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and PopupUi.has_method("show_confirm"):
-		PopupUi.show_confirm(
-			"Quitter la partie et revenir au lobby ?",
-			"Annuler",
-			"Quitter",
-			{
-				"yes_action_id": "quit_cancel",
-				"no_action_id": "quit_confirm",
-			}
-		)
-	else:
-		await _leave_current_and_go_lobby()
+	PopupUi.show_confirm(
+		Protocol.popup_text(PopupMessages.MSG_POPUP_QUIT_CONFIRM),
+		"Annuler",
+		"Quitter",
+		{
+			"yes_action_id": "quit_cancel",
+			"no_action_id": "quit_confirm",
+		}
+	)
 
 func _show_pause_choice(msg: String) -> void:
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and PopupUi.has_method("show_confirm"):
-		PopupUi.show_confirm(
-			msg,
-			"Attendre",
-			"Retour lobby",
-			{
-				"yes_action_id": "pause_wait",
-				"no_action_id": "pause_leave",
-			}
-		)
+	PopupUi.show_confirm(
+		msg,
+		"Attendre",
+		"Retour lobby",
+		{
+			"yes_action_id": "pause_wait",
+			"no_action_id": "pause_leave",
+		}
+	)
 
 func _schedule_disconnect_choice(who: String) -> void:
 	_disconnect_prompt_seq += 1
@@ -639,19 +588,18 @@ func _schedule_disconnect_choice(who: String) -> void:
 			return
 		if not _opponent_disconnected:
 			return
-		_show_pause_choice("%s s'est déconnecté.\nAttendre ou revenir au lobby ?" % who)
+		_show_pause_choice(
+			Protocol.popup_text(
+				PopupMessages.MSG_POPUP_OPPONENT_DISCONNECTED_CHOICE,
+				{ "name": who }
+			)
+		)
 	)
 
-func _on_popup_action(action_id: String, _payload: Dictionary) -> void:
-	var flow := String(_payload.get("flow", ""))
-	if flow == "invite_request":
-		var from_user := String(_payload.get("from", ""))
-		if from_user == "":
-			return
-		if action_id == "confirm_yes":
-			NetworkManager.request("invite_response", {"to": from_user, "accepted": true})
-		elif action_id == "confirm_no":
-			NetworkManager.request("invite_response", {"to": from_user, "accepted": false})
+func _on_popup_action(action_id: String, payload: Dictionary) -> void:
+	var invite_req := Protocol.invite_action_request(action_id, payload)
+	if not invite_req.is_empty():
+		NetworkManager.request("invite_response", invite_req)
 		return
 
 	match action_id:
@@ -701,7 +649,7 @@ func _exit_tree() -> void:
 		NetworkManager.evt.disconnect(_on_evt)
 	if NetworkManager.response.is_connected(_on_response):
 		NetworkManager.response.disconnect(_on_response)
-	if typeof(PopupUi) != TYPE_NIL and PopupUi != null and PopupUi.action_selected.is_connected(_on_popup_action):
+	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)
 
 func _notification(what: int) -> void:
