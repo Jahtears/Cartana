@@ -2,7 +2,22 @@
 extends Control
 
 const Protocol = preload("res://Client/net/Protocol.gd")
-const PopupMessages = preload("res://Client/game/messages/PopupMessages.gd")
+
+const REQ_GET_PLAYERS := "get_players"
+const REQ_JOIN_GAME := "join_game"
+const REQ_INVITE := "invite"
+const REQ_INVITE_RESPONSE := "invite_response"
+const REQ_SPECTATE_GAME := "spectate_game"
+const REQ_LOGOUT := "logout"
+
+const FLOW_SPECTATE_GAME := REQ_SPECTATE_GAME
+const FLOW_LOGOUT := REQ_LOGOUT
+const FLOW_INVITE_REQUEST_FALLBACK := "invite_request"
+const ACTION_CONFIRM_YES_FALLBACK := "confirm_yes"
+
+const BUTTON_YES := "Oui"
+const BUTTON_NO := "Non"
+const GAME_ROW_PREFIX := "Partie "
 
 var _is_changing_scene := false
 var _statuses: Dictionary = {}            # username -> status
@@ -14,37 +29,38 @@ func _ready() -> void:
 		NetworkManager.response.connect(_on_response)
 	if not NetworkManager.evt.is_connected(_on_evt):
 		NetworkManager.evt.connect(_on_evt)
+	if not NetworkManager.disconnected.is_connected(_on_network_disconnected):
+		NetworkManager.disconnected.connect(_on_network_disconnected)
 	if not PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.connect(_on_popup_action)
 	PopupUi.hide()
 
-	NetworkManager.request("get_players", {})
+	NetworkManager.request(REQ_GET_PLAYERS, {})
 
 # --------------------
 # REQ/RES
 # --------------------
 func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
 	match type:
-		"get_players":
+		REQ_GET_PLAYERS:
 			if ok:
 				_statuses = data.get("statuses", {}) as Dictionary
 				update_games_list(data.get("games", []))
 				update_players_list(data.get("players", []))
 			else:
-				_show_error_popup(error, PopupMessages.MSG_POPUP_LOBBY_GET_PLAYERS_ERROR)
+				_show_error_popup(error, Protocol.MSG_POPUP_LOBBY_GET_PLAYERS_ERROR)
 
-		"join_game", "spectate_game":
+		REQ_JOIN_GAME, REQ_SPECTATE_GAME:
 			if not ok:
-				_show_error_popup(error, PopupMessages.MSG_POPUP_UI_ACTION_IMPOSSIBLE)
+				_show_error_popup(error, Protocol.MSG_POPUP_UI_ACTION_IMPOSSIBLE)
 
-		"invite":
+		REQ_INVITE:
 			if ok:
 				PopupUi.show_ui_message({
-					"text": PopupMessages.MSG_POPUP_INVITE_SENT,
-					"code": Protocol.GAME_MESSAGE["INFO"],
+					"message_code": Protocol.MSG_POPUP_INVITE_SENT,
 				})
 			else:
-				_show_error_popup(error, PopupMessages.MSG_POPUP_INVITE_FAILED)
+				_show_error_popup(error, Protocol.MSG_POPUP_INVITE_FAILED)
 
 # --------------------
 # EVT (push serveur)
@@ -69,17 +85,33 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			var from_user := String(data.get("from", ""))
 			if from_user != "":
 				PopupUi.show_invite_request(from_user, {
-					"flow": String(Protocol.POPUP_FLOW["INVITE_REQUEST"]),
+					"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST_FALLBACK),
 					"from": from_user
 				})
 
-		"invite_response":
+		REQ_INVITE_RESPONSE:
 			var ui := Protocol.normalize_invite_response_ui(data)
 			if String(ui.get("text", "")) != "":
 				PopupUi.show_ui_message(ui)
 
+		"invite_cancelled":
+			_handle_invite_cancelled(data)
+
 func _show_error_popup(error: Dictionary, fallback_message: String) -> void:
 	var ui := Protocol.normalize_error_message(error, fallback_message)
+	PopupUi.show_ui_message(ui)
+
+func _on_network_disconnected(_code: int, reason: String) -> void:
+	if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
+		return
+	PopupUi.show_ui_message({
+		"message_code": Protocol.MSG_POPUP_AUTH_CONNECTION_ERROR,
+	})
+
+func _handle_invite_cancelled(data: Dictionary) -> void:
+	var ui := Protocol.invite_cancelled_ui(data)
+	if String(ui.get("text", "")).strip_edges() == "":
+		return
 	PopupUi.show_ui_message(ui)
 
 # --------------------
@@ -131,7 +163,7 @@ func create_game_box(game: Variant) -> Button:
 	var players: Array = g.get("players", [])
 
 	var btn := Button.new()
-	btn.text = "Partie " + game_id + " : " + str(players)
+	btn.text = GAME_ROW_PREFIX + game_id + " : " + str(players)
 	btn.custom_minimum_size = Vector2(300, 40)
 	btn.focus_mode = Control.FOCUS_NONE
 
@@ -166,56 +198,58 @@ func _on_game_clicked(game_id: String, players: Array) -> void:
 
 	PopupUi.show_confirm(
 		Protocol.popup_text(
-			PopupMessages.MSG_POPUP_SPECTATE_CONFIRM,
+			Protocol.MSG_POPUP_SPECTATE_CONFIRM,
 			{
 				"game_id": game_id,
 				"players": str(players),
 			}
 		),
-		"Oui", "Non",
-		{"flow": "spectate_game", "game_id": game_id}
+		BUTTON_YES,
+		BUTTON_NO,
+		{"flow": FLOW_SPECTATE_GAME, "game_id": game_id}
 	)
 
 # --------------------
 # ACTIONS
 # --------------------
 func send_invite(target: String) -> void:
-	NetworkManager.request("invite", { "to": target })
+	NetworkManager.request(REQ_INVITE, { "to": target })
 
 func _do_spectate_game(game_id: String) -> void:
 	if game_id == "":
 		return
 
-	NetworkManager.request("spectate_game", { "game_id": game_id })
+	NetworkManager.request(REQ_SPECTATE_GAME, { "game_id": game_id })
 
 # --------------------
 # Déconnexion (bouton Lobby)
 # --------------------
 func _on_deconnexion_pressed() -> void:
 	PopupUi.show_confirm(
-		Protocol.popup_text(PopupMessages.MSG_POPUP_LOGOUT_CONFIRM),
-		"Oui", "Non",
-		{"flow": "logout"}
+		Protocol.popup_text(Protocol.MSG_POPUP_LOGOUT_CONFIRM),
+		BUTTON_YES,
+		BUTTON_NO,
+		{"flow": FLOW_LOGOUT}
 	)
 
 func _on_popup_action(action_id: String, payload: Dictionary) -> void:
 	var invite_req := Protocol.invite_action_request(action_id, payload)
 	if not invite_req.is_empty():
-		NetworkManager.request("invite_response", invite_req)
+		NetworkManager.request(REQ_INVITE_RESPONSE, invite_req)
 		return
 
 	var flow := String(payload.get("flow", ""))
 	match flow:
-		"spectate_game":
-			if action_id == String(Protocol.POPUP_ACTION["CONFIRM_YES"]):
+		FLOW_SPECTATE_GAME:
+			if action_id == Protocol.popup_action("CONFIRM_YES", ACTION_CONFIRM_YES_FALLBACK):
 				_do_spectate_game(String(payload.get("game_id", "")))
-		"logout":
-			if action_id == String(Protocol.POPUP_ACTION["CONFIRM_YES"]):
+		FLOW_LOGOUT:
+			if action_id == Protocol.popup_action("CONFIRM_YES", ACTION_CONFIRM_YES_FALLBACK):
 				await _do_logout()
 
 func _do_logout() -> void:
-	NetworkManager.request("logout", {})
-	NetworkManager.close()
+	await NetworkManager.request_async(REQ_LOGOUT, {}, 3.0)
+	NetworkManager.close(1000, "logout")
 
 	# ✅ reset "session"
 	Global.username = ""
@@ -242,5 +276,7 @@ func _exit_tree() -> void:
 		NetworkManager.evt.disconnect(_on_evt)
 	if NetworkManager.response.is_connected(_on_response):
 		NetworkManager.response.disconnect(_on_response)
+	if NetworkManager.disconnected.is_connected(_on_network_disconnected):
+		NetworkManager.disconnected.disconnect(_on_network_disconnected)
 	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)

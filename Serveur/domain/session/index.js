@@ -159,7 +159,7 @@ export function createGameNotifier({
     const game = games.get(game_id);
     if (!game) return false;
 
-    // ✅ meta existe dès le start_game (stabilise ready_for_game / end / dedupe)
+    // ✅ meta existe dès le start_game (stabilise l'init / end / dedupe)
     ensureGameMeta(gameMeta, game_id, { initialSent: !!game.turn });
 
     sendEvtUser(username, "start_game", {

@@ -7,7 +7,6 @@ import { ensureGameMeta } from "./meta.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
 import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
-import { RESPONSE_CODE } from "../../shared/responseCodes.js";
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
   const {
@@ -35,14 +34,14 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   if (rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, POPUP_MESSAGE.TECH_FORBIDDEN)) return true;
   if (rejectIfEndedOrRes(ctx, ws, req, game_id, game)) return true;
   if (game?.turn?.paused) {
-    return resError(sendRes, ws, req, RESPONSE_CODE.GAME_PAUSED, POPUP_MESSAGE.GAME_PAUSED, { game_id });
+    return resError(sendRes, ws, req, POPUP_MESSAGE.GAME_PAUSED, { game_id });
   }
 
   // ✅ TURN EXPIRY CHECK
   if (typeof processTurnTimeout === "function") {
     const didExpire = processTurnTimeout(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
-      return resError(sendRes, ws, req, RESPONSE_CODE.TURN_TIMEOUT, INLINE_MESSAGE.TURN_TIMEOUT, { game_id });
+      return resError(sendRes, ws, req, INLINE_MESSAGE.TURN_TIMEOUT, { game_id });
     }
   }
 
@@ -58,7 +57,6 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     resBadRequest(sendRes, ws, req, INLINE_MESSAGE.MOVE_INVALID_SLOT, {
       from_slot_id: raw_from,
       to_slot_id: raw_to,
-      move_code: MOVE_RESULT_CODE.MOVE_DENIED,
       message_code: INLINE_MESSAGE.MOVE_INVALID_SLOT,
     });
     return true;
@@ -93,7 +91,6 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
       card_id,
       from_slot_id: client_from,
       to_slot_id: client_to,
-      move_code: orchResult.code ?? RESPONSE_CODE.UNKNOWN,
       message_code: orchResult.reason ?? "",
       message_params: orchResult.reason_params ?? {},
     };

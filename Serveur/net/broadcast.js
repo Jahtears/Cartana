@@ -3,8 +3,8 @@ import { ensureGameMeta } from "../domain/game/meta.js";
 import { SLOT_TYPES } from "../domain/game/constants/slots.js";
 import { getSlotContent, parseSlotId, slotIdToString } from "../domain/game/helpers/slotHelpers.js";
 import { buildTurnPayload } from "../domain/game/helpers/turnPayloadHelpers.js";
-import { UI_EVENT } from "../shared/constants.js";
 import { toUiMessage } from "../shared/uiMessage.js";
+const GAME_MESSAGE_EVENT = "show_game_message";
 
 function slotKey(slot_id) {
   return slotIdToString(slot_id);
@@ -139,7 +139,7 @@ export function createFlush(bc, trace) {
   const message = (type, data, { to = null } = {}) => {
     if (!type) return;
     const payload =
-      type === UI_EVENT.GAME_MESSAGE
+      type === GAME_MESSAGE_EVENT
         ? toUiMessage(data ?? {})
         : (data ?? {});
     messages.push({ type, data: payload, to });

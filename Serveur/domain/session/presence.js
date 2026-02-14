@@ -12,6 +12,7 @@ export function createPresence(ctx) {
     // state
     games,
     gameMeta,
+    gameSpectators,
     userToGame,
     userToSpectate,
     userByWs,
@@ -76,6 +77,15 @@ export function createPresence(ctx) {
         sendEvtUser(p, "opponent_disconnected", { game_id, username });
       }
     }
+
+    const spectators = gameSpectators.get(game_id);
+    if (spectators?.size) {
+      for (const s of spectators) {
+        if (s && s !== username) {
+          sendEvtUser(s, "opponent_disconnected", { game_id, username });
+        }
+      }
+    }
   }
 
   function handleReconnect(username) {
@@ -123,6 +133,15 @@ export function createPresence(ctx) {
       for (const p of game.players) {
         if (p !== username) {
           sendEvtUser(p, "opponent_rejoined", { game_id, username });
+        }
+      }
+    }
+
+    const spectators = gameSpectators.get(game_id);
+    if (spectators?.size) {
+      for (const s of spectators) {
+        if (s && s !== username) {
+          sendEvtUser(s, "opponent_rejoined", { game_id, username });
         }
       }
     }

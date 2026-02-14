@@ -1,12 +1,7 @@
 extends RefCounted
-class_name InlineMessages
+class_name GameMessage
 
-const UI_CODE_TURN_START := "TURN_START"
-const UI_CODE_MOVE_OK := "MOVE_OK"
-const UI_CODE_MOVE_DENIED := "MOVE_DENIED"
-const UI_CODE_INFO := "INFO"
-const UI_CODE_WARN := "WARN"
-const UI_CODE_ERROR := "ERROR"
+const INLINE_PREFIX := "MSG_INLINE_"
 
 const MSG_INLINE_MOVE_OK := "MSG_INLINE_MOVE_OK"
 const MSG_INLINE_MOVE_DENIED := "MSG_INLINE_MOVE_DENIED"
@@ -58,18 +53,6 @@ const TEXT_BY_CODE := {
 	MSG_INLINE_TURN_TIMEOUT: "Temps ecoule",
 }
 
-const ALIAS_TEXT_TO_CODE := {
-	"a vous de commencer": MSG_INLINE_TURN_START_FIRST,
-	"a vous de commencer.": MSG_INLINE_TURN_START_FIRST,
-	"a vous de jouer": MSG_INLINE_TURN_START,
-	"a vous de jouer.": MSG_INLINE_TURN_START,
-	"valider": MSG_INLINE_MOVE_OK,
-	"deplacement refuse": MSG_INLINE_MOVE_DENIED,
-	"deplacement refuse.": MSG_INLINE_MOVE_DENIED,
-	"temps ecoule": MSG_INLINE_TURN_TIMEOUT,
-	"temps ecoule.": MSG_INLINE_TURN_TIMEOUT,
-}
-
 const INLINE_GREEN_CODES := {
 	MSG_INLINE_TURN_START_FIRST: true,
 	MSG_INLINE_TURN_START: true,
@@ -108,70 +91,28 @@ static func text_for_code(message_code: String, params: Dictionary = {}) -> Stri
 		return ""
 	return _format_template(template, params)
 
-static func infer_message_code(payload: Dictionary) -> String:
-	var explicit_code := String(payload.get("message_code", "")).strip_edges()
-	if explicit_code != "" and (INLINE_GREEN_CODES.has(explicit_code) or INLINE_RED_CODES.has(explicit_code)):
-		return explicit_code
-
-	var text := String(payload.get("text", "")).strip_edges()
-	if TEXT_BY_CODE.has(text):
-		return text
-	var text_norm := _normalize_text(text)
-	if text_norm != "" and ALIAS_TEXT_TO_CODE.has(text_norm):
-		return String(ALIAS_TEXT_TO_CODE.get(text_norm, ""))
-
-	var ui_code := String(payload.get("code", "")).strip_edges()
-	match ui_code:
-		UI_CODE_MOVE_OK:
-			return MSG_INLINE_MOVE_OK
-		UI_CODE_MOVE_DENIED:
-			return MSG_INLINE_MOVE_DENIED
-		UI_CODE_TURN_START:
-			if text_norm == _normalize_text(text_for_code(MSG_INLINE_TURN_START_FIRST)):
-				return MSG_INLINE_TURN_START_FIRST
-			return MSG_INLINE_TURN_START
-		UI_CODE_WARN:
-			if text_norm == _normalize_text(text_for_code(MSG_INLINE_TURN_TIMEOUT)):
-				return MSG_INLINE_TURN_TIMEOUT
-	return ""
-
-static func is_inline_message(payload: Dictionary) -> bool:
-	return infer_message_code(payload) != ""
-
-static func color_for_payload(payload: Dictionary) -> Color:
-	var message_code := infer_message_code(payload)
-	if INLINE_GREEN_CODES.has(message_code):
-		return INLINE_GREEN_COLOR
-	if INLINE_RED_CODES.has(message_code):
-		return INLINE_RED_COLOR
-
-	var ui_code := String(payload.get("code", "")).strip_edges()
-	if ui_code == UI_CODE_TURN_START or ui_code == UI_CODE_MOVE_OK:
-		return INLINE_GREEN_COLOR
-	return INLINE_RED_COLOR
-
-static func normalize_payload(payload: Dictionary, default_ui_code := UI_CODE_INFO) -> Dictionary:
-	var text := String(payload.get("text", "")).strip_edges()
+static func normalize_inline_message(ui_message: Dictionary) -> Dictionary:
+	var text := String(ui_message.get("text", "")).strip_edges()
 	if text == "":
-		text = String(payload.get("message", "")).strip_edges()
-	var params_val = payload.get("message_params", payload.get("params", {}))
+		text = String(ui_message.get("message", "")).strip_edges()
+	var params_val = ui_message.get("message_params", ui_message.get("params", {}))
 	var params: Dictionary = params_val if params_val is Dictionary else {}
-
-	var ui_code := String(payload.get("code", default_ui_code)).strip_edges()
-	if ui_code == "":
-		ui_code = String(default_ui_code)
 
 	var message_code := infer_message_code({
 		"text": text,
-		"code": ui_code,
-		"message_code": String(payload.get("message_code", "")),
+		"message_code": String(ui_message.get("message_code", "")),
 	})
+	if not message_code.begins_with(INLINE_PREFIX):
+		return {}
 
-	if message_code != "" and (text == "" or text == message_code):
+	if text == "" or text == message_code:
 		text = text_for_code(message_code, params)
 
-	var color := _color_for_ui_code(ui_code)
-	var color_val = payload.get("color", null)
+	var color := color_for_payload({
+		"message_code": message_code,
+		"text": text,
+	})
+	var color_val = ui_message.get("color", null)
 	if color_val is Color:
 		color = color_val
 	elif color_val is String and String(color_val) != "":
@@ -179,27 +120,59 @@ static func normalize_payload(payload: Dictionary, default_ui_code := UI_CODE_IN
 
 	return {
 		"text": text,
-		"code": ui_code,
-		"color": color,
 		"message_code": message_code,
+		"message_params": params,
+		"color": color,
 	}
 
-static func _color_for_ui_code(ui_code: String) -> Color:
-	match String(ui_code).strip_edges():
-		UI_CODE_TURN_START:
-			return INLINE_GREEN_COLOR
-		UI_CODE_MOVE_OK:
-			return INLINE_GREEN_COLOR
-		UI_CODE_MOVE_DENIED:
-			return INLINE_RED_COLOR
-		UI_CODE_WARN:
-			return Color(1.0, 0.8, 0.0)
-		UI_CODE_ERROR:
-			return INLINE_RED_COLOR
-	return Color.WHITE
+static func show_inline_message(ui_message: Dictionary, inline_label, inline_timer = null) -> void:
+	var normalized := normalize_inline_message(ui_message)
+	if normalized.is_empty():
+		return
 
-static func _normalize_text(value: String) -> String:
-	return String(value).strip_edges().to_lower()
+	var text := String(normalized.get("text", ""))
+	if text == "" or inline_label == null:
+		return
+
+	inline_label.bbcode_enabled = true
+	inline_label.text = "[center][color=%s]%s[/color][/center]" % [
+		inline_color(String(normalized.get("message_code", "")), text).to_html(),
+		text
+	]
+	inline_label.visible = true
+
+	if inline_timer != null and inline_timer.has_method("start"):
+		inline_timer.start()
+
+static func infer_message_code(payload: Dictionary) -> String:
+	var explicit_code := String(payload.get("message_code", "")).strip_edges()
+	if explicit_code.begins_with(INLINE_PREFIX):
+		return explicit_code
+
+	var text := String(payload.get("text", "")).strip_edges()
+	if text.begins_with(INLINE_PREFIX):
+		return text
+	return ""
+
+static func is_inline_message(message_code: String, text: String) -> bool:
+	return infer_message_code(_payload(message_code, text)) != ""
+
+static func inline_color(message_code: String, text: String) -> Color:
+	return color_for_payload(_payload(message_code, text))
+
+static func color_for_payload(payload: Dictionary) -> Color:
+	var message_code := infer_message_code(payload)
+	if INLINE_GREEN_CODES.has(message_code):
+		return INLINE_GREEN_COLOR
+	if INLINE_RED_CODES.has(message_code):
+		return INLINE_RED_COLOR
+	return INLINE_RED_COLOR
+
+static func _payload(message_code: String, text: String) -> Dictionary:
+	return {
+		"message_code": String(message_code),
+		"text": String(text),
+	}
 
 static func _format_template(template: String, params: Dictionary) -> String:
 	var out := String(template)

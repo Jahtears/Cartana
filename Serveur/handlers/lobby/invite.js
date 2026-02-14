@@ -2,10 +2,8 @@
 import { ensureGameMeta } from "../../domain/game/meta.js";
 import { requireParam, rejectIfBusyOrRes } from "../../net/guards.js";
 import { resError } from "../../net/transport.js";
-import { GAME_MESSAGE } from "../../shared/constants.js";
 import { emitPopupMessage } from "../../shared/uiMessage.js";
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
-import { RESPONSE_CODE } from "../../shared/responseCodes.js";
 
 export function handleInvite(ctx, ws, req, data, actor) {
   const {
@@ -24,23 +22,43 @@ export function handleInvite(ctx, ws, req, data, actor) {
 
   // destinataire a déjà une invite reçue
   if (pendingInviteTo.has(to)) {
-    return resError(sendRes, ws, req, RESPONSE_CODE.BUSY, POPUP_MESSAGE.INVITE_BUSY);
+    return resError(
+      sendRes,
+      ws,
+      req,
+      POPUP_MESSAGE.INVITE_TARGET_ALREADY_INVITED
+    );
   }
   // destinataire invite déjà quelqu'un
   for (const inv of pendingInviteTo.values()) {
     if (inv.from === to) {
-      return resError(sendRes, ws, req, RESPONSE_CODE.BUSY, POPUP_MESSAGE.INVITE_BUSY);
+      return resError(
+        sendRes,
+        ws,
+        req,
+        POPUP_MESSAGE.INVITE_TARGET_ALREADY_INVITING
+      );
     }
   }
 
   // acteur a déjà une invite reçue
   if (pendingInviteTo.has(actor)) {
-    return resError(sendRes, ws, req, RESPONSE_CODE.BUSY, POPUP_MESSAGE.INVITE_BUSY);
+    return resError(
+      sendRes,
+      ws,
+      req,
+      POPUP_MESSAGE.INVITE_ACTOR_ALREADY_INVITED
+    );
   }
   // acteur invite déjà quelqu'un
   for (const inv of pendingInviteTo.values()) {
     if (inv.from === actor) {
-      return resError(sendRes, ws, req, RESPONSE_CODE.BUSY, POPUP_MESSAGE.INVITE_BUSY);
+      return resError(
+        sendRes,
+        ws,
+        req,
+        POPUP_MESSAGE.INVITE_ACTOR_ALREADY_INVITING
+      );
     }
   }
 
@@ -75,7 +93,7 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
  
   const pending = pendingInviteTo.get(actor);
   if (!pending || pending.from !== to) {
-    return resError(sendRes, ws, req, RESPONSE_CODE.NO_INVITE, POPUP_MESSAGE.INVITE_NOT_FOUND);
+    return resError(sendRes, ws, req, POPUP_MESSAGE.INVITE_NOT_FOUND);
   }
   pendingInviteTo.delete(actor);
 
@@ -90,11 +108,9 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
         to,
       },
       {
-        text: POPUP_MESSAGE.INVITE_DECLINED,
-        code: GAME_MESSAGE.INFO,
-        meta: { actor },
-      },
-      {}
+        message_code: POPUP_MESSAGE.INVITE_DECLINED,
+        message_params: { actor },
+      }
     );
     sendRes(ws, req, true, { accepted: false });
 

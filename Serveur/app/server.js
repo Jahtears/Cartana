@@ -19,7 +19,6 @@ import { emitSlotState, emitFullState } from '../domain/session/index.js';
 import { handleLogin } from '../handlers/auth/login.js';
 import { handleLogout } from '../handlers/auth/logout.js';
 import { handleInvite, handleInviteResponse } from '../handlers/lobby/invite.js';
-import { handleReadyForGame } from '../handlers/game/readyForGame.js';
 import { handleJoinGame } from '../handlers/game/joinGame.js';
 import { handleSpectateGame } from '../handlers/game/spectateGame.js';
 import { handleMoveRequest } from '../domain/game/moveRequest.js';
@@ -60,6 +59,7 @@ const { baseCtx, loginCtx, onSocketClose } = createServerContext({
   loadGameState,
   deleteGameState,
   verifyOrCreateUser,
+  onTransportSend: () => metrics.recordMessageSent(),
 });
 
 // 2️⃣ Créer le HTTP server (pour metrics + WebSocket)
@@ -101,7 +101,6 @@ const router = createRouter({
   handleLogout,
   handleInvite,
   handleInviteResponse,
-  handleReadyForGame,
   handleJoinGame,
   handleSpectateGame,
   handleMoveRequest,
@@ -128,7 +127,6 @@ wss.on("connection", async (ws) => {
   ws.on("message", async (msg) => {
     try {
       await onMessageWithMetrics(ws, msg.toString());
-      metrics.recordMessageSent();
     } catch (err) {
       console.error("[MESSAGE_ERROR]", err);
     }

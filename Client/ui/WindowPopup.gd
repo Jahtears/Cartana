@@ -3,7 +3,7 @@ extends Window
 class_name WindowPopup
 
 const Protocol = preload("res://Client/net/Protocol.gd")
-const PopupMessages = preload("res://Client/game/messages/PopupMessages.gd")
+const POPUP_PREFIX := "MSG_POPUP_"
 
 signal action_selected(action_id: String, payload: Dictionary)
 
@@ -37,32 +37,16 @@ func show_info(message: String, payload: Dictionary = {}) -> void:
 
 func show_ui_message(ui_message: Dictionary, payload: Dictionary = {}) -> void:
 	var normalized := Protocol.normalize_game_message(ui_message)
-	var extra := payload.duplicate(true)
-	extra["message_code"] = String(normalized.get("message_code", ""))
-	show_info(String(normalized.get("text", "")), extra)
-
-func show_gameplay_message(ui_message: Dictionary, inline_label, inline_timer = null) -> void:
-	var normalized := Protocol.normalize_game_message(ui_message)
-	var text := String(normalized.get("text", ""))
-	if text == "":
+	var message_code := String(normalized.get("message_code", "")).strip_edges()
+	if not message_code.begins_with(POPUP_PREFIX):
 		return
-
-	if Protocol.is_inline_game_message(normalized):
-		_show_inline_game_message(
-			text,
-			Protocol.inline_message_color(normalized),
-			inline_label,
-			inline_timer
-		)
-		return
-
-	show_ui_message(normalized)
+	_show_normalized_ui_message(normalized, payload)
 
 func show_confirm(message: String, yes_text := "Oui", no_text := "Non", payload: Dictionary = {}) -> void:
 	_mode = Mode.CONFIRM
 	_payload = payload.duplicate(true)
-	_action_accept = String(payload.get("yes_action_id", ACTION_CONFIRM_YES))
-	_action_refuse = String(payload.get("no_action_id", ACTION_CONFIRM_NO))
+	_action_accept = String(payload.get("yes_action_id", _popup_action_id("CONFIRM_YES", ACTION_CONFIRM_YES)))
+	_action_refuse = String(payload.get("no_action_id", _popup_action_id("CONFIRM_NO", ACTION_CONFIRM_NO)))
 
 	_label.text = message
 	_btn_accept.text = yes_text
@@ -78,22 +62,19 @@ func show_invite_request(from_user: String, payload: Dictionary = {}) -> void:
 	invite_payload["flow"] = invite_payload.get("flow", String(Protocol.POPUP_FLOW["INVITE_REQUEST"]))
 	invite_payload["from"] = invite_payload.get("from", from_user)
 	show_confirm(
-		Protocol.popup_text(PopupMessages.MSG_POPUP_INVITE_RECEIVED, { "from": from_user }),
+		Protocol.popup_text(Protocol.MSG_POPUP_INVITE_RECEIVED, { "from": from_user }),
 		"Accepter",
 		"Refuser",
 		invite_payload
 	)
 
-func _show_inline_game_message(text: String, color: Color, inline_label, inline_timer = null) -> void:
-	if inline_label == null:
-		return
+func _show_normalized_ui_message(normalized: Dictionary, payload: Dictionary = {}) -> void:
+	var extra := payload.duplicate(true)
+	extra["message_code"] = String(normalized.get("message_code", ""))
+	show_info(String(normalized.get("text", "")), extra)
 
-	inline_label.bbcode_enabled = true
-	inline_label.text = "[center][color=%s]%s[/color][/center]" % [color.to_html(), text]
-	inline_label.visible = true
-
-	if inline_timer != null and inline_timer.has_method("start"):
-		inline_timer.start()
+func _popup_action_id(key: String, fallback: String) -> String:
+	return String(Protocol.POPUP_ACTION.get(key, fallback))
 
 func _on_button_accept_pressed() -> void:
 	if _mode == Mode.CONFIRM:
