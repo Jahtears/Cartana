@@ -1,9 +1,9 @@
 // handlers/invite.js v1.0
-import { ensureGameMeta } from "../../domain/game/meta.js";
+import { ensureGameMeta } from "../../game/meta.js";
 import { requireParam, rejectIfBusyOrRes } from "../../net/guards.js";
 import { resError } from "../../net/transport.js";
-import { GAME_MESSAGE } from "../../shared/constants.js";
-import { toUiMessage } from "../../shared/uiMessage.js";
+import { emitPopupMessage } from "../../shared/uiMessage.js";
+import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 export function handleInvite(ctx, ws, req, data, actor) {
   const {
@@ -17,28 +17,48 @@ export function handleInvite(ctx, ws, req, data, actor) {
   const to = requireParam(sendRes, ws, req, data, "to");
   if (!to) return true;
 
-  if (rejectIfBusyOrRes(ctx, ws, req, actor, "Tu es déjà en partie")) return true;
-  if (rejectIfBusyOrRes(ctx, ws, req, to, "Le joueur est déjà en partie")) return true;
+  if (rejectIfBusyOrRes(ctx, ws, req, actor, POPUP_MESSAGE.TECH_BAD_STATE)) return true;
+  if (rejectIfBusyOrRes(ctx, ws, req, to, POPUP_MESSAGE.TECH_BAD_STATE)) return true;
 
   // destinataire a déjà une invite reçue
   if (pendingInviteTo.has(to)) {
-      return resError(sendRes, ws, req, "BUSY", "Le joueur a déjà une invitation en attente");
+    return resError(
+      sendRes,
+      ws,
+      req,
+      POPUP_MESSAGE.INVITE_TARGET_ALREADY_INVITED
+    );
   }
   // destinataire invite déjà quelqu'un
   for (const inv of pendingInviteTo.values()) {
     if (inv.from === to) {
-      return resError(sendRes, ws, req, "BUSY", "Le joueur a déjà une invitation en cours");
+      return resError(
+        sendRes,
+        ws,
+        req,
+        POPUP_MESSAGE.INVITE_TARGET_ALREADY_INVITING
+      );
     }
   }
 
   // acteur a déjà une invite reçue
   if (pendingInviteTo.has(actor)) {
-    return resError(sendRes, ws, req, "BUSY", "Tu as déjà une invitation en attente");
+    return resError(
+      sendRes,
+      ws,
+      req,
+      POPUP_MESSAGE.INVITE_ACTOR_ALREADY_INVITED
+    );
   }
   // acteur invite déjà quelqu'un
   for (const inv of pendingInviteTo.values()) {
     if (inv.from === actor) {
-      return resError(sendRes, ws, req, "BUSY", "Tu as déjà une invitation en cours");
+      return resError(
+        sendRes,
+        ws,
+        req,
+        POPUP_MESSAGE.INVITE_ACTOR_ALREADY_INVITING
+      );
     }
   }
 
@@ -73,18 +93,24 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
  
   const pending = pendingInviteTo.get(actor);
   if (!pending || pending.from !== to) {
-    return resError(sendRes, ws, req, "NO_INVITE", "Aucune invitation correspondante");
+    return resError(sendRes, ws, req, POPUP_MESSAGE.INVITE_NOT_FOUND);
   }
   pendingInviteTo.delete(actor);
 
   if (!accepted) {
-    sendEvtUser(
+    emitPopupMessage(
+      sendEvtUser,
       to,
       "invite_response",
-      toUiMessage({
-        text: `${actor} a refusé ton invitation`,
-        code: GAME_MESSAGE.INFO,
-      })
+      {
+        accepted: false,
+        from: actor,
+        to,
+      },
+      {
+        message_code: POPUP_MESSAGE.INVITE_DECLINED,
+        message_params: { actor },
+      }
     );
     sendRes(ws, req, true, { accepted: false });
 

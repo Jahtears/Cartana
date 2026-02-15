@@ -4,25 +4,24 @@ import { WebSocketServer } from "ws";
 import http from "http";
 
 // ============= IMPORTS MÉTIER =============
-import { createGame } from "../domain/game/builders/gameBuilder.js";
-import { getCardById } from "../domain/game/helpers/cardHelpers.js";
-import { mapSlotFromClientToServer, mapSlotForClient } from "../domain/game/helpers/slotHelpers.js";
-import { getTableSlots } from "../domain/game/helpers/tableHelper.js";
-import { applyMove } from '../domain/game/MoveApplier.js';
-import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot } from '../domain/game/Regles.js';
-import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../domain/game/helpers/turnFlowHelpers.js";
+import { createGame } from "../game/builders/gameBuilder.js";
+import { getCardById } from "../game/helpers/cardHelpers.js";
+import { mapSlotFromClientToServer, mapSlotForClient } from "../game/helpers/slotHelpers.js";
+import { getTableSlots } from "../game/helpers/tableHelper.js";
+import { applyMove } from '../game/MoveApplier.js';
+import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot } from '../game/Regles.js';
+import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../game/helpers/turnFlowHelpers.js";
 import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
-import { verifyOrCreateUser } from '../domain/auth/usersStore.js';
+import { verifyOrCreateUser } from '../handlers/auth/usersStore.js';
 import { emitSlotState, emitFullState } from '../domain/session/index.js';
 
 // ============= IMPORTS HANDLERS =============
 import { handleLogin } from '../handlers/auth/login.js';
 import { handleLogout } from '../handlers/auth/logout.js';
 import { handleInvite, handleInviteResponse } from '../handlers/lobby/invite.js';
-import { handleReadyForGame } from '../handlers/game/readyForGame.js';
 import { handleJoinGame } from '../handlers/game/joinGame.js';
 import { handleSpectateGame } from '../handlers/game/spectateGame.js';
-import { handleMoveRequest } from '../handlers/game/moveRequest.js';
+import { handleMoveRequest } from '../game/moveRequest.js';
 import { handleLeaveGame, handleAckGameEnd } from '../handlers/game/gameEnd.js';
 
 // ============= IMPORTS APP =============
@@ -33,6 +32,9 @@ import { createWSManager } from '../net/wsManager.js';
 // ============= IMPORTS NETWORK =============
 import { stopHeartbeatManager } from '../net/heartbeat.js';
 import { metrics, createMetricsMiddleware } from '../net/monitoring.js';
+
+const DEBUG_TRACE_ENABLED = process.env.DEBUG_TRACE === "1";
+const GAME_DEBUG_ENABLED = process.env.GAME_DEBUG === "1" || DEBUG_TRACE_ENABLED;
 
 // ============= INITIALISATION =============
 
@@ -57,6 +59,7 @@ const { baseCtx, loginCtx, onSocketClose } = createServerContext({
   loadGameState,
   deleteGameState,
   verifyOrCreateUser,
+  onTransportSend: () => metrics.recordMessageSent(),
 });
 
 // 2️⃣ Créer le HTTP server (pour metrics + WebSocket)
@@ -98,7 +101,6 @@ const router = createRouter({
   handleLogout,
   handleInvite,
   handleInviteResponse,
-  handleReadyForGame,
   handleJoinGame,
   handleSpectateGame,
   handleMoveRequest,
@@ -125,7 +127,6 @@ wss.on("connection", async (ws) => {
   ws.on("message", async (msg) => {
     try {
       await onMessageWithMetrics(ws, msg.toString());
-      metrics.recordMessageSent();
     } catch (err) {
       console.error("[MESSAGE_ERROR]", err);
     }
@@ -185,4 +186,7 @@ httpServer.listen(PORT, HOST, () => {
   console.log(`🚀 Server listening on http://${HOST}:${PORT}`);
   console.log(`📊 Metrics available at http://${HOST}:${PORT}/metrics`);
   console.log(`❤️ Health check at http://${HOST}:${PORT}/health`);
+  if (DEBUG_TRACE_ENABLED || GAME_DEBUG_ENABLED) {
+    console.log(`🧪 Debug flags: DEBUG_TRACE=${DEBUG_TRACE_ENABLED ? "1" : "0"} GAME_DEBUG=${GAME_DEBUG_ENABLED ? "1" : "0"}`);
+  }
 });

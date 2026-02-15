@@ -1,6 +1,6 @@
 // net/heartbeat.js - Gestion centralisée du heartbeat WebSocket
 
-const DEFAULT_HEARTBEAT_INTERVAL_MS = 30000;
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 5000;
 const DEFAULT_HEARTBEAT_TIMEOUT_MS = 5000;
 
 /**

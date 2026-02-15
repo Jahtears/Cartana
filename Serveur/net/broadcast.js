@@ -1,9 +1,10 @@
 // net/broadcast.js v1.1
-import { ensureGameMeta } from "../domain/game/meta.js";
-import { SLOT_TYPES } from "../domain/game/constants/slots.js";
-import { getSlotContent, parseSlotId, slotIdToString } from "../domain/game/helpers/slotHelpers.js";
-import { buildTurnPayload } from "../domain/game/helpers/turnPayloadHelpers.js";
+import { ensureGameMeta } from "../game/meta.js";
+import { SLOT_TYPES } from "../game/constants/slots.js";
+import { getSlotContent, parseSlotId, slotIdToString } from "../game/helpers/slotHelpers.js";
+import { buildTurnPayload } from "../game/helpers/turnPayloadHelpers.js";
 import { toUiMessage } from "../shared/uiMessage.js";
+const GAME_MESSAGE_EVENT = "show_game_message";
 
 function slotKey(slot_id) {
   return slotIdToString(slot_id);
@@ -138,7 +139,7 @@ export function createFlush(bc, trace) {
   const message = (type, data, { to = null } = {}) => {
     if (!type) return;
     const payload =
-      type === "show_game_message"
+      type === GAME_MESSAGE_EVENT
         ? toUiMessage(data ?? {})
         : (data ?? {});
     messages.push({ type, data: payload, to });
@@ -188,7 +189,7 @@ export function createFlush(bc, trace) {
  *   - snapshot audience (inject result + reset dedupe)
  */
 export function emitGameEndThenSnapshot(ctx, game_id, result, opts) {
-  ctx?.trace?.("GAME_END_ONCE", { game_id, winner: result?.winner ?? null, reason: result?.reason ?? "" });
+  ctx?.trace?.("GAME_END_ONCE", { game_id, winner: result?.winner ?? null });
   if (typeof ctx.emitGameEndOnce === "function") {
     ctx.emitGameEndOnce(game_id, result, opts);
   }

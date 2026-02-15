@@ -5,6 +5,7 @@
   "main": "app/server.js",
   "scripts": {
     "start": "node app/server.js",
+    "start:trace": "node -e \"process.env.DEBUG_TRACE='1'; import('./app/server.js')\"",
     "test": "jest"
   },
   "dependencies": {
@@ -18,4 +19,3 @@
   }
   
 }
-

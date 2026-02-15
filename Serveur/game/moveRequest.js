@@ -1,9 +1,12 @@
-// handlers/moveRequest.js v2.0 - Thin handler using MoveOrchestrator
-import { emitGameEndThenSnapshot } from "../../net/broadcast.js";
-import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../../net/guards.js";
-import { resBadRequest, resBadState, resError, resNotFound } from "../../net/transport.js";
-import { orchestrateMove } from "../../domain/game/moveOrchestrator.js";
-import { ensureGameMeta } from "../../domain/game/meta.js";
+// game/moveRequest.js v2.0 - Thin handler using MoveOrchestrator
+import { emitGameEndThenSnapshot } from "../net/broadcast.js";
+import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../net/guards.js";
+import { resBadRequest, resBadState, resError, resNotFound } from "../net/transport.js";
+import { orchestrateMove, MOVE_RESULT_CODE } from "./moveOrchestrator.js";
+import { ensureGameMeta } from "./meta.js";
+import { GAME_END_REASONS } from "./constants/gameEnd.js";
+import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
+import { POPUP_MESSAGE } from "../shared/popupMessages.js";
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
   const {
@@ -28,17 +31,17 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const { game_id, game } = pg;
   ensureGameMeta(ctx.state.gameMeta, game_id, { initialSent: !!game?.turn });
 
-  if (rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, "Spectateur: déplacement interdit")) return true;
+  if (rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, POPUP_MESSAGE.TECH_FORBIDDEN)) return true;
   if (rejectIfEndedOrRes(ctx, ws, req, game_id, game)) return true;
   if (game?.turn?.paused) {
-    return resError(sendRes, ws, req, "GAME_PAUSED", "Partie en pause: adversaire deconnecte", { game_id });
+    return resError(sendRes, ws, req, POPUP_MESSAGE.GAME_PAUSED, { game_id });
   }
 
   // ✅ TURN EXPIRY CHECK
   if (typeof processTurnTimeout === "function") {
     const didExpire = processTurnTimeout(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
-      return resError(sendRes, ws, req, "TURN_TIMEOUT", "Temps ecoule.", { game_id });
+      return resError(sendRes, ws, req, INLINE_MESSAGE.TURN_TIMEOUT, { game_id });
     }
   }
 
@@ -51,9 +54,10 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const to_slot_id = mapSlotFromClientToServer(raw_to, actor, game);
 
   if (!from_slot_id || !to_slot_id) {
-    resBadRequest(sendRes, ws, req, "slot_id invalide", {
+    resBadRequest(sendRes, ws, req, INLINE_MESSAGE.MOVE_INVALID_SLOT, {
       from_slot_id: raw_from,
       to_slot_id: raw_to,
+      message_code: INLINE_MESSAGE.MOVE_INVALID_SLOT,
     });
     return true;
   }
@@ -87,25 +91,26 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
       card_id,
       from_slot_id: client_from,
       to_slot_id: client_to,
-      move_code: orchResult.code ?? "UNKNOWN",
+      message_code: orchResult.reason ?? "",
+      message_params: orchResult.reason_params ?? {},
     };
 
-    if (orchResult.code === "NOT_FOUND") {
+    if (orchResult.code === MOVE_RESULT_CODE.NOT_FOUND) {
       return resNotFound(sendRes, ws, req, orchResult.reason, details);
     }
 
-    if (orchResult.code === "MOVE_DENIED") {
+    if (orchResult.code === MOVE_RESULT_CODE.MOVE_DENIED) {
       return resBadRequest(sendRes, ws, req, orchResult.reason, details);
     }
 
-    return resBadState(sendRes, ws, req, orchResult.reason || "MOVE_ERROR", details);
+    return resBadState(sendRes, ws, req, orchResult.reason || INLINE_MESSAGE.MOVE_REJECTED, details);
   }
 
   // ✅ GAME END: emit end then broadcast
   if (orchResult.winner) {
     emitGameEndThenSnapshot(ctx, game_id, {
       winner: orchResult.winner,
-      reason: "deck_empty",
+      reason: GAME_END_REASONS.DECK_EMPTY,
       by: actor,
       at: Date.now(),
     });

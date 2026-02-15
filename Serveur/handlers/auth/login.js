@@ -1,5 +1,6 @@
 // handlers/login.js v2.0
 import { resBadRequest, resServerError } from "../../net/transport.js";
+import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 export async function handleLogin(ctx, ws, req, data) {
   const {
@@ -17,19 +18,23 @@ export async function handleLogin(ctx, ws, req, data) {
   const pin = String(safeData.pin ?? "").trim();
 
   if (!username || !pin) {
-    resBadRequest(sendRes, ws, req, "username/pin manquant");
-    return true;
-  }
-
-  if (state.getWS(username)) {
-    sendRes(ws, req, false, { code: "ALREADY_CONNECTED", message: "Utilisateur déjà connecté" });
+    resBadRequest(sendRes, ws, req, POPUP_MESSAGE.AUTH_MISSING_CREDENTIALS);
     return true;
   }
 
   try {
     const ok = await verifyOrCreateUser(username, pin);
     if (!ok) {
-      sendRes(ws, req, false, { code: "AUTH_BAD_PIN", message: "PIN incorrect" });
+      sendRes(ws, req, false, {
+        message_code: POPUP_MESSAGE.AUTH_BAD_PIN,
+      });
+      return true;
+    }
+
+    if (state.getWS(username)) {
+      sendRes(ws, req, false, {
+        message_code: POPUP_MESSAGE.AUTH_ALREADY_CONNECTED,
+      });
       return true;
     }
 
@@ -46,7 +51,7 @@ export async function handleLogin(ctx, ws, req, data) {
     
   } catch (err) {
     console.error("Erreur login:", err);
-    resServerError(sendRes, ws, req, "Erreur serveur");
+    resServerError(sendRes, ws, req, POPUP_MESSAGE.TECH_INTERNAL_ERROR);
     return true;
   }
 }

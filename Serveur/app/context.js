@@ -6,10 +6,9 @@ import { createRoles } from "../domain/roles/roles.js";
 import { createLobbyLists } from "../domain/lobby/lists.js";
 import { createGameNotifier, emitSlotState, emitFullState } from "../domain/session/index.js";
 import { createPresence } from "../domain/session/presence.js";
-import { TURN_FLOW_MESSAGES } from "../domain/game/helpers/turnFlowHelpers.js";
+import { TURN_FLOW_MESSAGES } from "../game/helpers/turnFlowHelpers.js";
 import { createStateManager } from "./stateManager.js";
-import { GAME_MESSAGE } from "../shared/constants.js";
-import { toUiMessage } from "../shared/uiMessage.js";
+import { emitGameMessage } from "../shared/uiMessage.js";
 
 export function createServerContext(deps) {
   const {
@@ -30,6 +29,7 @@ export function createServerContext(deps) {
     loadGameState,
     deleteGameState,
     verifyOrCreateUser,
+    onTransportSend,
   } = deps;
 
   // ========================
@@ -46,7 +46,8 @@ export function createServerContext(deps) {
     sendEvtUser,
     sendEvtLobby,
   } = createTransport({
-    wsByUser: state.wsByUser
+    wsByUser: state.wsByUser,
+    onSend: onTransportSend,
   });
 
   // ========================
@@ -181,17 +182,17 @@ export function createServerContext(deps) {
     const next = String(timeoutResult.next ?? "").trim();
 
     if (prev) {
-      sendEvtUser(
+      emitGameMessage(
+        sendEvtUser,
         prev,
-        "show_game_message",
-        toUiMessage({ text: TURN_FLOW_MESSAGES.TIMEOUT, code: GAME_MESSAGE.WARN }, { code: GAME_MESSAGE.WARN })
+        { message_code: TURN_FLOW_MESSAGES.TIMEOUT }
       );
     }
     if (next) {
-      sendEvtUser(
+      emitGameMessage(
+        sendEvtUser,
         next,
-        "show_game_message",
-        toUiMessage({ text: TURN_FLOW_MESSAGES.TURN_START, code: GAME_MESSAGE.TURN_START }, { code: GAME_MESSAGE.INFO })
+        { message_code: TURN_FLOW_MESSAGES.TURN_START }
       );
     }
 
@@ -206,6 +207,7 @@ export function createServerContext(deps) {
   const { handleReconnect, onSocketClose } = createPresence({
     games: state.games,
     gameMeta: state.gameMeta,
+    gameSpectators: state.gameSpectators,
     userToGame: state.userToGame,
     userToSpectate: state.userToSpectate,
     userByWs: state.userByWs,

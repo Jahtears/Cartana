@@ -28,11 +28,12 @@ import {
   refillEmptyHandSlotsFromPile,
 } from "./pileFlowHelpers.js";
 import { debugLog } from "./debugHelpers.js";
+import { INLINE_MESSAGE } from "../constants/inlineMessages.js";
 
 const TURN_FLOW_MESSAGES = {
-  START: "A vous de commencer",
-  TIMEOUT: "Temps ecoule.",
-  TURN_START: "A vous de jouer.",
+  START: INLINE_MESSAGE.TURN_START_FIRST,
+  TIMEOUT: INLINE_MESSAGE.TURN_TIMEOUT,
+  TURN_START: INLINE_MESSAGE.TURN_START,
 };
 
 function initTurnForGame(game) {

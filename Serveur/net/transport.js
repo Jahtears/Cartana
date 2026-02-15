@@ -1,5 +1,6 @@
 // net/transport.js v3.0 - Transport et réponses
 // Le heartbeat est maintenant centralisé dans heartbeat.js
+import { POPUP_MESSAGE } from "../shared/popupMessages.js";
 
 /**
  * Vérifier si un WebSocket est ouvert
@@ -8,16 +9,52 @@ function wsIsOpen(ws) {
   return !!ws && ws.readyState === 1;
 }
 
+function safeObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value;
+}
+
+function normalizeMessageCode(raw, fallback = POPUP_MESSAGE.TECH_ERROR_GENERIC) {
+  const candidate = String(raw ?? "").trim();
+  if (!candidate) return fallback;
+  if (candidate.startsWith("MSG_POPUP_") || candidate.startsWith("MSG_INLINE_")) {
+    return candidate;
+  }
+  return fallback;
+}
+
+function normalizeErrorPayload(payload) {
+  const src = safeObject(payload);
+  const details = safeObject(src.details);
+
+  const message_code = normalizeMessageCode(src.message_code, POPUP_MESSAGE.TECH_ERROR_GENERIC);
+
+  const message_params = {
+    ...safeObject(details.message_params),
+    ...safeObject(src.message_params),
+  };
+
+  const out = {
+    message_code,
+  };
+
+  if (Object.keys(message_params).length > 0) out.message_params = message_params;
+  if (Object.keys(details).length > 0) out.details = details;
+  return out;
+}
+
 /**
  * Envoyer un message brut de manière sûre
  * @param {WebSocket} ws - Client WebSocket
  * @param {Object} envelope - Enveloppe de message
+ * @param {Function} onSend - Callback appelé si envoi réussi
  * @returns {boolean} true si envoyé, false sinon
  */
-function safeSend(ws, envelope) {
+function safeSend(ws, envelope, onSend) {
   if (!wsIsOpen(ws)) return false;
   try {
     ws.send(JSON.stringify(envelope));
+    if (typeof onSend === "function") onSend(envelope);
     return true;
   } catch {
     return false;
@@ -26,10 +63,10 @@ function safeSend(ws, envelope) {
 
 /**
  * Créer le transport (fonctions d'envoi)
- * @param {Object} config - {wsByUser}
+ * @param {Object} config - {wsByUser, onSend?}
  * @returns {Object} Transport avec API V2
  */
-export function createTransport({ wsByUser }) {
+export function createTransport({ wsByUser, onSend }) {
   /**
    * Envoyer une réponse à une requête
    * @param {WebSocket} ws - Client WebSocket
@@ -39,8 +76,12 @@ export function createTransport({ wsByUser }) {
    */
   function sendRes(ws, req, ok, payload) {
     const base = { v: 1, kind: "res", type: req.type, rid: req.rid, ok: !!ok };
-    if (ok) return safeSend(ws, { ...base, data: payload ?? {} });
-    return safeSend(ws, { ...base, error: payload ?? { code: "UNKNOWN", message: "Erreur" } });
+    if (ok) return safeSend(ws, { ...base, data: payload ?? {} }, onSend);
+    const error = normalizeErrorPayload(payload);
+    return safeSend(ws, {
+      ...base,
+      error,
+    }, onSend);
   }
 
   /**
@@ -50,7 +91,7 @@ export function createTransport({ wsByUser }) {
    * @param {Object} data - Données de l'événement
    */
   function sendEvtSocket(ws, type, data) {
-    return safeSend(ws, { v: 1, kind: "evt", type, data: data ?? {} });
+    return safeSend(ws, { v: 1, kind: "evt", type, data: data ?? {} }, onSend);
   }
 
   /**
@@ -93,41 +134,40 @@ export function createTransport({ wsByUser }) {
  * @param {Function} sendRes - Fonction sendRes
  * @param {WebSocket} ws - Client WebSocket
  * @param {Object} req - Requête originale
- * @param {string} code - Code d'erreur
- * @param {string} message - Message d'erreur
+ * @param {string} message_code - Code de message UI (MSG_POPUP_* / MSG_INLINE_*)
  * @param {Object} details - Détails additionnels
  */
-export function resError(sendRes, ws, req, code, message, details) {
-   const error = { code, message };
-   if (details && typeof details === "object") error.details = details;
-   sendRes(ws, req, false, error);
-   return true;
+export function resError(sendRes, ws, req, message_code, details) {
+  const error = { message_code };
+  if (details && typeof details === "object") error.details = details;
+  sendRes(ws, req, false, error);
+  return true;
 }
 
-export function resBadRequest(sendRes, ws, req, message = "BAD_REQUEST", details) {
-  return resError(sendRes, ws, req, "BAD_REQUEST", message, details);
+export function resBadRequest(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_BAD_REQUEST, details) {
+  return resError(sendRes, ws, req, message_code, details);
 }
 
-export function resNotFound(sendRes, ws, req, message = "NOT_FOUND", details) {
-  return resError(sendRes, ws, req, "NOT_FOUND", message, details);
+export function resNotFound(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_NOT_FOUND, details) {
+  return resError(sendRes, ws, req, message_code, details);
 }
 
-export function resForbidden(sendRes, ws, req, message = "FORBIDDEN", details) {
-  return resError(sendRes, ws, req, "FORBIDDEN", message, details);
+export function resForbidden(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_FORBIDDEN, details) {
+  return resError(sendRes, ws, req, message_code, details);
 }
 
-export function resBadState(sendRes, ws, req, message = "BAD_STATE", details) {
-  return resError(sendRes, ws, req, "BAD_STATE", message, details);
+export function resBadState(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_BAD_STATE, details) {
+  return resError(sendRes, ws, req, message_code, details);
 }
 
-export function resGameEnd(sendRes, ws, req, message = "Partie terminée", details) {
-  return resError(sendRes, ws, req, "GAME_END", message, details);
+export function resGameEnd(sendRes, ws, req, message_code = POPUP_MESSAGE.GAME_ENDED, details) {
+  return resError(sendRes, ws, req, message_code, details);
 }
 
-export function resNotImplemented(sendRes, ws, req, message = "Type non géré", details) {
-  return resError(sendRes, ws, req, "NOT_IMPLEMENTED", message, details);
+export function resNotImplemented(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_NOT_IMPLEMENTED, details) {
+  return resError(sendRes, ws, req, message_code, details);
 }
 
-export function resServerError(sendRes, ws, req, message = "Erreur serveur", details) {
-  return resError(sendRes, ws, req, "SERVER_ERROR", message, details);
+export function resServerError(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_INTERNAL_ERROR, details) {
+  return resError(sendRes, ws, req, message_code, details);
 }

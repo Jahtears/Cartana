@@ -10,14 +10,16 @@ signal evt(type: String, data: Dictionary)
 # ============= CONSTANTS =============
 const DEFAULT_TIMEOUT_SEC = 10.0
 const MAX_RETRIES = 3
-const RETRY_DELAY_MS = 500
 const MAX_QUEUE_SIZE = 100
 const HEARTBEAT_CHECK_MS = 5000
 
 # ✅ NOUVEAU: Reconnexion automatique
-const RECONNECT_INITIAL_DELAY_SEC = 3.0
+const RECONNECT_INITIAL_DELAY_SEC = 1.0
 const RECONNECT_MAX_DELAY_SEC = 30.0
 const RECONNECT_BACKOFF_MULTIPLIER = 1.5
+const DISCONNECT_REASON_CLOSE = "close"
+const DISCONNECT_REASON_LOGOUT = "logout"
+const LOCAL_ERROR_MESSAGE_CODE = "MSG_POPUP_TECH_ERROR_GENERIC"
 
 # ============= STATE =============
 var _ws := WebSocketPeer.new()
@@ -26,6 +28,7 @@ var _rid_counter: int = 0
 var server_clock_offset_ms: int = 0
 var _was_open: bool = false
 var _last_pong_ms: int = 0
+var _connect_in_flight: bool = false
 
 # Queue + Retry
 var _request_queue: Array = []
@@ -43,34 +46,54 @@ var _max_reconnect_attempts: int = 10
 var _auth_credentials: Dictionary = {}
 var _is_authenticated: bool = false
 var _login_in_flight: bool = false
+var _allow_reconnect: bool = true
+var _disconnect_reason: String = ""
 
 # ============= LIFECYCLE =============
 
 func _ready() -> void:
 	pass
 
-func connect_to_server(url: String = "ws://192.168.1.40:3000") -> void:
-	_url = url
-	_reset_reconnect_state()
-	var err := _ws.connect_to_url(url)
+func connect_to_server(url: String = "ws://192.168.1.40:3000", reset_backoff: bool = true) -> void:
+	if String(url).strip_edges() != "":
+		_url = url
+	if _url == "":
+		return
+
+	_allow_reconnect = true
+	_disconnect_reason = ""
+	if reset_backoff:
+		_reset_reconnect_state()
+
+	_connect_in_flight = true
+	var err := _ws.connect_to_url(_url)
 	if err != OK:
 		push_error("WebSocket connect error: %s" % err)
 		_schedule_reconnect()
 		return
-	print("[NET] Connecting to %s" % url)
+	print("[NET] Connecting to %s" % _url)
 
 
 func is_open() -> bool:
 	return _ws.get_ready_state() == WebSocketPeer.STATE_OPEN
 
 func close(code: int = 1000, reason: String = "") -> void:
+	_allow_reconnect = false
+	_disconnect_reason = String(reason).strip_edges()
+	if _disconnect_reason == "":
+		_disconnect_reason = DISCONNECT_REASON_CLOSE
+
 	_request_queue.clear()
 	_pending_requests.clear()
+	_pending_results.clear()
 	_cancel_reconnect_timer()
 	_is_authenticated = false
 	_login_in_flight = false
+	_connect_in_flight = false
 	if is_open():
-		_ws.close(code, reason)
+		_ws.close(code, _disconnect_reason)
+	else:
+		_was_open = false
 
 func set_login_credentials(username: String, pin: String) -> void:
 	var user := username.strip_edges()
@@ -107,6 +130,10 @@ func _cancel_reconnect_timer() -> void:
 
 # ✅ NOUVEAU: Planifier reconnexion avec backoff exponentiel
 func _schedule_reconnect() -> void:
+	if not _allow_reconnect:
+		return
+	if _url == "":
+		return
 	if _reconnect_attempts >= _max_reconnect_attempts:
 		push_error("[NET] Max reconnect attempts reached (%d)" % _max_reconnect_attempts)
 		disconnected.emit(1000, "Max reconnect attempts exceeded")
@@ -114,26 +141,28 @@ func _schedule_reconnect() -> void:
 	
 	_cancel_reconnect_timer()
 	
-	# Backoff exponentiel: 3s → 4.5s → 6.7s → ... → 30s (max)
+	var delay_sec := _reconnect_delay_sec
+	_reconnect_attempts += 1
 	_reconnect_delay_sec = minf(
 		_reconnect_delay_sec * RECONNECT_BACKOFF_MULTIPLIER,
 		RECONNECT_MAX_DELAY_SEC
 	)
-	_reconnect_attempts += 1
 	
-	print("[NET] Scheduling reconnect attempt %d in %.1fs" % [_reconnect_attempts, _reconnect_delay_sec])
+	print("[NET] Scheduling reconnect attempt %d in %.1fs" % [_reconnect_attempts, delay_sec])
 	
 	_reconnect_timer = Timer.new()
 	add_child(_reconnect_timer)
 	_reconnect_timer.one_shot = true
-	_reconnect_timer.wait_time = _reconnect_delay_sec
+	_reconnect_timer.wait_time = delay_sec
 	_reconnect_timer.timeout.connect(_on_reconnect_timeout)
 	_reconnect_timer.start()
 
 func _on_reconnect_timeout() -> void:
+	if not _allow_reconnect:
+		return
 	print("[NET] Attempting reconnect #%d" % _reconnect_attempts)
 	_reconnect_timer = null
-	connect_to_server(_url)
+	connect_to_server(_url, false)
 
 # ============= PROCESS LOOP =============
 
@@ -144,6 +173,7 @@ func _process(_delta: float) -> void:
 	if st == WebSocketPeer.STATE_OPEN:
 		if not _was_open:
 			_was_open = true
+			_connect_in_flight = false
 			_last_pong_ms = Time.get_ticks_msec()
 			_reset_reconnect_state()  # ✅ Reset backoff on success
 			if has_login_credentials() and not _is_authenticated:
@@ -153,13 +183,19 @@ func _process(_delta: float) -> void:
 			connected.emit()
 			print("[NET] Connected to server")
 	elif st == WebSocketPeer.STATE_CLOSED:
-		if _was_open:
+		if _was_open or _connect_in_flight:
 			_was_open = false
+			_connect_in_flight = false
 			_is_authenticated = false
 			_login_in_flight = false
-			disconnected.emit(0, "Connection lost")
-			print("[NET] Connection closed, scheduling reconnect")
-			_schedule_reconnect()  # ✅ Reconnect auto
+			var reason := _disconnect_reason if _disconnect_reason != "" else "Connection lost"
+			disconnected.emit(0, reason)
+			if _allow_reconnect:
+				print("[NET] Connection closed, scheduling reconnect")
+				_schedule_reconnect()
+			else:
+				print("[NET] Connection closed (manual): %s" % reason)
+			_disconnect_reason = ""
 		return
 
 	# Recevoir les messages
@@ -194,6 +230,7 @@ func _add_to_queue(
 		"priority": priority,
 		"retries": retries,
 		"deadline_ms": deadline_ms,
+		"timeout_ms": int(timeout_sec * 1000.0),
 		"added_at": Time.get_ticks_msec()
 	}
 
@@ -257,7 +294,8 @@ func _check_request_timeouts() -> void:
 		if req["retries"] < MAX_RETRIES:
 			# Retry
 			req["retries"] += 1
-			req["deadline_ms"] = Time.get_ticks_msec() + RETRY_DELAY_MS
+			var timeout_ms := int(req.get("timeout_ms", int(DEFAULT_TIMEOUT_SEC * 1000.0)))
+			req["deadline_ms"] = Time.get_ticks_msec() + timeout_ms
 			_request_queue.insert(0, req)
 			_request_queue.sort_custom(func(a, b): return a["priority"] > b["priority"])
 			_drain_queue()
@@ -265,8 +303,7 @@ func _check_request_timeouts() -> void:
 			# Fail
 			_pending_requests.erase(rid)
 			response.emit(rid, req["type"], false, {}, {
-				"code": "TIMEOUT",
-				"message": "Request timeout after %d retries" % MAX_RETRIES
+				"message_code": LOCAL_ERROR_MESSAGE_CODE
 			})
 
 # ============= PACKET HANDLING =============
@@ -305,6 +342,10 @@ func _handle_packet(pkt: String) -> void:
 		if type == "login":
 			_login_in_flight = false
 			_is_authenticated = ok
+		elif type == "logout":
+			clear_login_credentials()
+			_allow_reconnect = false
+			_disconnect_reason = DISCONNECT_REASON_LOGOUT
 
 		_pending_results[rid] = {"rid": rid, "type": type, "ok": ok, "data": data, "error": err}
 		_pending_requests.erase(rid)
@@ -323,9 +364,16 @@ func request(
 		set_login_credentials(String(data.get("username", "")), String(data.get("pin", "")))
 		_login_in_flight = true
 	elif type == "logout":
+		_allow_reconnect = false
+		_disconnect_reason = DISCONNECT_REASON_LOGOUT
 		clear_login_credentials()
 
-	return _add_to_queue(type, data, priority, 0, DEFAULT_TIMEOUT_SEC)
+	var rid := _add_to_queue(type, data, priority, 0, DEFAULT_TIMEOUT_SEC)
+	if rid == "" and type == "login":
+		_login_in_flight = false
+	if rid == "" and type == "logout":
+		close(1000, DISCONNECT_REASON_LOGOUT)
+	return rid
 
 func request_async(
 	type: String,
@@ -340,7 +388,7 @@ func request_async(
 			"type": type,
 			"ok": false,
 			"data": {},
-			"error": {"code": "CLIENT_ERROR", "message": "Queue full"}
+			"error": {"message_code": LOCAL_ERROR_MESSAGE_CODE}
 		}
 
 	var deadline_msec := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
@@ -358,7 +406,7 @@ func request_async(
 		"type": type,
 		"ok": false,
 		"data": {},
-		"error": {"code": "TIMEOUT", "message": "Request timeout"}
+		"error": {"message_code": LOCAL_ERROR_MESSAGE_CODE}
 	}
 
 # ============= CLOCK SYNC =============

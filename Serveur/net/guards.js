@@ -1,7 +1,8 @@
 //\game\guards.js 
 
-import { ensureGameMeta } from "../domain/game/meta.js";
+import { ensureGameMeta } from "../game/meta.js";
 import { resBadRequest, resNotFound, resBadState, resForbidden, resGameEnd } from "./transport.js";
+import { POPUP_MESSAGE } from "../shared/popupMessages.js";
 
 function getResponder(ctx) {
   return ctx?.sendRes;
@@ -10,7 +11,10 @@ function getResponder(ctx) {
 export function requireParam(sendRes, ws, req, data, key, label = key) {
   const value = String(data?.[key] ?? "").trim();
   if (!value) {
-    resBadRequest(sendRes, ws, req, `${label} manquant`);
+    resBadRequest(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_REQUEST, {
+      field: label,
+      message_params: { field: label },
+    });
     return null;
   }
   return value;
@@ -21,7 +25,7 @@ export function getExistingGameOrRes(ctx, ws, req, game_id) {
   const sendRes = getResponder(ctx);
 
   if (!game_id || !state.hasGame(game_id)) {
-    resNotFound(sendRes, ws, req, "Partie introuvable");
+    resNotFound(sendRes, ws, req, POPUP_MESSAGE.TECH_NOT_FOUND);
     return null;
   }
   return state.getGame(game_id);
@@ -36,7 +40,7 @@ export function getPlayerGameOrRes(ctx, ws, req, actor) {
 
   const game_id = state.getUserGame(actor);
   if (!game_id || !state.hasGame(game_id)) {
-    resNotFound(sendRes, ws, req, "Partie introuvable");
+    resNotFound(sendRes, ws, req, POPUP_MESSAGE.TECH_NOT_FOUND);
     return null;
   }
   return { game_id, game: state.getGame(game_id) };
@@ -62,7 +66,10 @@ export function getGameIdFromDataOrMapping(
   if (Array.isArray(allowedKeys) && allowedKeys.length) {
     if (!allowedKeys.includes(key)) {
       if (required) {
-        resBadRequest(sendRes, ws, req, `clé invalide: ${key}`)
+        resBadRequest(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_REQUEST, {
+          key,
+          message_params: { key },
+        });
       }
       return null;
     }
@@ -76,7 +83,11 @@ export function getGameIdFromDataOrMapping(
       if (allowedKeys.includes(k)) continue;
       // détecte gameId vs game_id (ou autres variantes équivalentes)
       if (norm(k) === expected) {
-        resBadRequest(sendRes, ws, req, `champ inattendu: ${k} (attendu: ${allowedKeys.join(", ")})`);
+        resBadRequest(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_REQUEST, {
+          field: k,
+          allowed_keys: allowedKeys,
+          message_params: { field: k, allowed: allowedKeys.join(", ") },
+        });
         return null;
       }
     }
@@ -95,7 +106,7 @@ export function getGameIdFromDataOrMapping(
   return game_id;
 }
 
-export function rejectIfBusyOrRes(ctx, ws, req, username, message = "Tu es déjà en partie") {
+export function rejectIfBusyOrRes(ctx, ws, req, username, message = POPUP_MESSAGE.TECH_BAD_STATE) {
   const sendRes = getResponder(ctx);
   const state = ctx?.state;
 
@@ -110,7 +121,14 @@ export function rejectIfBusyOrRes(ctx, ws, req, username, message = "Tu es déj�
   return false;
 }
 
-export function rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, message = "Spectateur: action interdite") {
+export function rejectIfSpectatorOrRes(
+  ctx,
+  ws,
+  req,
+  game_id,
+  actor,
+  message = POPUP_MESSAGE.TECH_FORBIDDEN
+) {
   const sendRes = getResponder(ctx);
   const state = ctx?.state;
 
@@ -132,7 +150,7 @@ export function rejectIfEndedOrRes(ctx, ws, req, game_id, game) {
   const sendRes = getResponder(ctx);
   const meta = ensureGameMeta(state.gameMeta, game_id, { initialSent: !!game?.turn });
   if (meta?.result) {
-    resGameEnd(sendRes, ws, req, "Partie terminée");
+    resGameEnd(sendRes, ws, req, POPUP_MESSAGE.GAME_ENDED);
     return true;
   }
   return false;

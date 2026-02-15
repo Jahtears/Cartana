@@ -1,9 +1,15 @@
-// domain/game/moveOrchestrator.js - Centralized move orchestration
+// game/moveOrchestrator.js - Centralized move orchestration
 // Coordinates: validate → apply → check win → track updates → prepare response 
 
 import { SLOT_TYPES, SlotId } from "./constants/slots.js";
 import { DEFAULT_HAND_SIZE } from "./constants/turnFlow.js";
 import { isTableSlot } from "./helpers/slotHelpers.js";
+import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
+
+export const MOVE_RESULT_CODE = Object.freeze({
+  NOT_FOUND: "NOT_FOUND",
+  MOVE_DENIED: "MOVE_DENIED",
+});
 
 /**
  * Orchestrate a complete move: validate -> apply -> refill -> track updates -> check win.
@@ -58,8 +64,8 @@ export function orchestrateMove(params) {
   if (!card) {
     return {
       valid: false,
-      reason: "Carte introuvable",
-      code: "NOT_FOUND",
+      reason: INLINE_MESSAGE.RULE_CARD_NOT_FOUND,
+      code: MOVE_RESULT_CODE.NOT_FOUND,
     };
   }
 
@@ -71,7 +77,8 @@ export function orchestrateMove(params) {
     return {
       valid: false,
       reason: validation.reason,
-      code: "MOVE_DENIED",
+      reason_params: validation.reason_params ?? {},
+      code: MOVE_RESULT_CODE.MOVE_DENIED,
     };
   }
 
@@ -82,8 +89,8 @@ export function orchestrateMove(params) {
   if (!moveResult) {
     return {
       valid: false,
-      reason: "applyMove rejected",
-      code: "MOVE_DENIED", 
+      reason: INLINE_MESSAGE.MOVE_REJECTED,
+      code: MOVE_RESULT_CODE.MOVE_DENIED,
     };
   }
 
