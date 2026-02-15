@@ -29,19 +29,22 @@ var _in_drag_layer := false
 var _drag_original_parent: Node = null
 var _drag_original_z := 0
 
+# ============= PREVIEW & SLOT =============
+var _current_preview_slot: Node2D = null
+var _current_preview_card: Node2D = null  # ← NOUVEAU : carte en preview
+var slot: Node2D = null
+var _slot_cache: Array = []
+var _slot_cache_valid := false
+var _last_preview_frame := -1
+
 # ============= CONSTANTS =============
 const DRAG_Z := 3000
 const MIN_OVERLAP_AREA := 200.0
 const DRAG_SCALE := 1.05
 const HOVER_SCALE := 1.08
 const PREVIEW_CHECK_INTERVAL := 3
-
-# ============= PREVIEW & SLOT =============
-var _current_preview_slot: Node2D = null
-var slot: Node2D = null
-var _slot_cache: Array = []
-var _slot_cache_valid := false
-var _last_preview_frame := -1
+const PREVIEW_CARD_BORDER_COLOR := Color.GREEN  # ← Couleur du Bord en drag
+const PREVIEW_CARD_BORDER_COLOR_NORMAL := Color(0, 0, 0, 1)  
 
 # ============= BASE STATE =============
 var _base_scale := Vector2.ONE
@@ -59,7 +62,95 @@ func _process(_delta: float) -> void:
 		var frame = get_tree().get_frame()
 		if frame - _last_preview_frame >= PREVIEW_CHECK_INTERVAL:
 			_preview_slot_under_card()
+			_preview_card_under_card()  # ← NOUVEAU : détect cartes aussi
 			_last_preview_frame = frame
+	else:
+		# ===== HOVER STATE MANAGEMENT =====
+		_update_hover_state()
+
+# ============= PREVIEW CARD (VISUAL FEEDBACK) =============
+func _preview_card_under_card() -> void:
+	var card_rect = _get_card_rect_global()
+	var cards_group = get_tree().get_nodes_in_group("cards")
+	
+	var best_card: Node2D = null
+	var best_overlap := 0.0
+	
+	for card in cards_group:
+		if not (card is Node2D):
+			continue
+		if card == self:  # Ignore self
+			continue
+		if not is_instance_valid(card):
+			continue
+		
+		var other_rect = card._get_card_rect_global()
+		var intersection = _rect_intersection(card_rect, other_rect)
+		var overlap_area = intersection.get_area()
+		
+		if overlap_area > best_overlap:
+			best_overlap = overlap_area
+			best_card = card
+	
+	# Si overlap suffisant, on highlight
+	if best_overlap >= MIN_OVERLAP_AREA:
+		_set_preview_card(best_card)
+	else:
+		_set_preview_card(null)
+
+func _set_preview_card(card: Node2D) -> void:
+	# Si c'est la même, rien à faire
+	if _current_preview_card == card:
+		return
+	
+	# Reset l'ancienne carte
+	if _current_preview_card != null and is_instance_valid(_current_preview_card):
+		_current_preview_card._reset_card_preview()
+	
+	# Set la nouvelle
+	_current_preview_card = card
+	if _current_preview_card != null and is_instance_valid(_current_preview_card):
+		_current_preview_card._highlight_card_preview()
+
+# ============= VISUAL METHODS =============
+func _highlight_card_preview() -> void:
+	"""Met le Bord en vert pendant le drag"""
+	var bord = $Front/Bord
+	if bord:
+		var style = bord.get_theme_stylebox("panel")
+		if style and style is StyleBoxFlat:
+			# Créer une copie pour ne pas modifier l'originale
+			var new_style = style.duplicate()
+			new_style.border_color = PREVIEW_CARD_BORDER_COLOR
+			bord.add_theme_stylebox_override("panel", new_style)
+
+func _reset_card_preview() -> void:
+	"""Remet le Bord à sa couleur normale"""
+	var bord = $Front/Bord
+	if bord:
+		var style = bord.get_theme_stylebox("panel")
+		if style and style is StyleBoxFlat:
+			# Créer une copie avec la couleur normale
+			var new_style = style.duplicate()
+			new_style.border_color = PREVIEW_CARD_BORDER_COLOR_NORMAL
+			bord.add_theme_stylebox_override("panel", new_style)
+		
+func _update_hover_state() -> void:
+	# Si on ne peut pas interagir, forcer IDLE
+	if not _can_interact() or dragging:
+		if state != CardState.IDLE:
+			set_state(CardState.IDLE)
+		return
+
+	# Vérifier si la souris est topmost sur cette carte
+	if _is_topmost_card_at_mouse():
+		# Passer en HOVER_TOP si on n'y est pas
+		if state != CardState.HOVER_TOP:
+			set_state(CardState.HOVER_TOP)
+	else:
+		# Pas topmost → IDLE
+		if state == CardState.HOVER_TOP or state == CardState.HOVER:
+			set_state(CardState.IDLE)
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -167,19 +258,6 @@ func _show_back() -> void:
 	$Back.visible = true
 
 # ============= HOVER =============
-func _on_area_2d_mouse_entered() -> void:
-	if not _can_interact() or dragging:
-		return
-
-	# Ne hover que si topmost
-	if _is_topmost_card_at_mouse():
-		set_state(CardState.HOVER_TOP)
-		# (on ne fait rien sinon, surtout pas de HOVER ni IDLE ici)
-
-func _on_area_2d_mouse_exited() -> void:
-	# Si cette carte était en hover, on la reset
-	if state == CardState.HOVER or state == CardState.HOVER_TOP:
-		set_state(CardState.IDLE)
 
 func _is_topmost_card_at_mouse() -> bool:
 	var mouse_pos = get_global_mouse_position()
@@ -212,6 +290,9 @@ func _start_drag(mouse_pos: Vector2) -> void:
 
 func _end_drag() -> void:
 	dragging = false
+	
+	# Reset preview card
+	_set_preview_card(null)
 
 	if not _can_interact():
 		_rollback_drag()
@@ -232,6 +313,7 @@ func _end_drag() -> void:
 	_set_preview_slot(null)
 
 func _rollback_drag() -> void:
+	_set_preview_card(null)  # ← Reset card preview aussi
 	_leave_drag_layer_to_original()
 	global_position = original_position
 	set_state(CardState.IDLE)

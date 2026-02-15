@@ -1,8 +1,9 @@
-# Slot.gd v2.2 - Fix: tri par index, slot MAIN invisible, layout cohérent
+# Slot.gd
 
 extends Area2D
 
 const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
+const HitboxUtil = preload("res://Client/game/helpers/hitbox.gd")
 
 # ============= EXPORTS =============
 @export var slot_id: String = ""
@@ -14,6 +15,7 @@ var preview_active := false
 var _cached_rect: Rect2 = Rect2()
 var _rect_cache_dirty := true
 var _is_hand_slot := false
+var _is_mouse_over := false  # ← NOUVEAU : track hover state
 
 # ============= FAN PARAMETERS (HAND layout) =============
 const HAND_FAN_X_STEP := 60.0
@@ -41,6 +43,37 @@ func _process(_delta: float) -> void:
 	if _rect_cache_dirty:
 		_update_cached_rect()
 		_rect_cache_dirty = false
+	
+	# ===== HOVER STATE MANAGEMENT =====
+	_update_hover_state()
+
+# ============= HOVER STATE =============
+func _update_hover_state() -> void:
+	# Si preview active, ne pas changer l'état
+	if preview_active:
+		return
+	
+	# Vérifier si la souris est sur ce slot
+	var mouse_pos = get_global_mouse_position()
+	var is_mouse_over_now = HitboxUtil.contains_global_point(self, mouse_pos)
+	
+	# State a changé
+	if is_mouse_over_now != _is_mouse_over:
+		_is_mouse_over = is_mouse_over_now
+		
+		if _is_mouse_over:
+			_on_slot_mouse_entered()
+		else:
+			_on_slot_mouse_exited()
+
+func _on_slot_mouse_entered() -> void:
+	# Ici vous pouvez ajouter du feedback visuel si souhaité
+	# Pour l'instant, c'est juste pour tracker l'état
+	pass
+
+func _on_slot_mouse_exited() -> void:
+	# Ici vous pouvez ajouter du feedback visuel si souhaité
+	pass
 
 # ============= PUBLIC API =============
 

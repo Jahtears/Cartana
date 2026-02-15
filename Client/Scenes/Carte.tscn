@@ -16,11 +16,6 @@ border_color = Color(0, 0, 0, 1)
 [node name="Carte" type="Node2D" unique_id=616561034]
 z_index = 1
 script = ExtResource("1_d822b")
-valeur = null
-couleur = null
-dos = null
-dos_couleur = null
-draggable = null
 
 [node name="Area2D" type="Area2D" parent="." unique_id=759047316]
 
@@ -104,5 +99,3 @@ mouse_filter = 2
 speed_scale = -4.0
 
 [connection signal="input_event" from="Area2D" to="." method="_on_area_2d_input_event"]
-[connection signal="mouse_entered" from="Area2D" to="." method="_on_area_2d_mouse_entered"]
-[connection signal="mouse_exited" from="Area2D" to="." method="_on_area_2d_mouse_exited"]
