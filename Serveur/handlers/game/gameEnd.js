@@ -2,8 +2,8 @@
 
 import { getExistingGameOrRes, getGameIdFromDataOrMapping } from "../../net/guards.js";
 import { resForbidden } from "../../net/transport.js";
-import { ensureGameMeta } from "../../domain/game/meta.js";
-import { GAME_END_REASONS } from "../../domain/game/constants/gameEnd.js";
+import { ensureGameMeta } from "../../game/meta.js";
+import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 const CLEANUP_TTL_MS = 2 * 60 * 1000;

@@ -1,8 +1,8 @@
 // net/broadcast.js v1.1
-import { ensureGameMeta } from "../domain/game/meta.js";
-import { SLOT_TYPES } from "../domain/game/constants/slots.js";
-import { getSlotContent, parseSlotId, slotIdToString } from "../domain/game/helpers/slotHelpers.js";
-import { buildTurnPayload } from "../domain/game/helpers/turnPayloadHelpers.js";
+import { ensureGameMeta } from "../game/meta.js";
+import { SLOT_TYPES } from "../game/constants/slots.js";
+import { getSlotContent, parseSlotId, slotIdToString } from "../game/helpers/slotHelpers.js";
+import { buildTurnPayload } from "../game/helpers/turnPayloadHelpers.js";
 import { toUiMessage } from "../shared/uiMessage.js";
 const GAME_MESSAGE_EVENT = "show_game_message";
 

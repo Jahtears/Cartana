@@ -1,5 +1,5 @@
 // handlers/invite.js v1.0
-import { ensureGameMeta } from "../../domain/game/meta.js";
+import { ensureGameMeta } from "../../game/meta.js";
 import { requireParam, rejectIfBusyOrRes } from "../../net/guards.js";
 import { resError } from "../../net/transport.js";
 import { emitPopupMessage } from "../../shared/uiMessage.js";

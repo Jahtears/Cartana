@@ -6,7 +6,7 @@ import { createRoles } from "../domain/roles/roles.js";
 import { createLobbyLists } from "../domain/lobby/lists.js";
 import { createGameNotifier, emitSlotState, emitFullState } from "../domain/session/index.js";
 import { createPresence } from "../domain/session/presence.js";
-import { TURN_FLOW_MESSAGES } from "../domain/game/helpers/turnFlowHelpers.js";
+import { TURN_FLOW_MESSAGES } from "../game/helpers/turnFlowHelpers.js";
 import { createStateManager } from "./stateManager.js";
 import { emitGameMessage } from "../shared/uiMessage.js";
 

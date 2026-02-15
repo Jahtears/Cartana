@@ -1,6 +1,6 @@
 // services/session/presence.js v1.1
-import { ensureGameMeta } from "../game/meta.js";
-import { pauseTurnClock, resumeTurnClock } from "../game/turnClock.js";
+import { ensureGameMeta } from "../../game/meta.js";
+import { pauseTurnClock, resumeTurnClock } from "../../game/turnClock.js";
 
 /**
  * Presence/session : déconnexion / reconnexion + wrapper close WS.

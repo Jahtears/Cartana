@@ -1,23 +1,23 @@
-import { ensureGameMeta, ensureGameResult } from "../game/meta.js";
+import { ensureGameMeta, ensureGameResult } from "../../game/meta.js";
 import {
   mapSlotForClient,
   isOwnerForSlot,
-} from "../game/helpers/slotHelpers.js";
-import { buildCardData } from "../game/builders/gameBuilder.js";
-import { getTableSlots } from "../game/helpers/tableHelper.js";
+} from "../../game/helpers/slotHelpers.js";
+import { buildCardData } from "../../game/builders/gameBuilder.js";
+import { getTableSlots } from "../../game/helpers/tableHelper.js";
 import {
   getSlotContent,
   isTableSlot,
   parseSlotId,
   slotIdToString,
-} from "../game/helpers/slotHelpers.js";
+} from "../../game/helpers/slotHelpers.js";
 import {
   applySlotDragPolicy,
   getVisibleCardIdsForSlot,
   toSlotStack,
-} from "../game/helpers/slotViewHelpers.js";
-import { getCardById } from "../game/helpers/cardHelpers.js";
-import { buildTurnPayload } from "../game/helpers/turnPayloadHelpers.js";
+} from "../../game/helpers/slotViewHelpers.js";
+import { getCardById } from "../../game/helpers/cardHelpers.js";
+import { buildTurnPayload } from "../../game/helpers/turnPayloadHelpers.js";
 
 /* =========================
    HELPERS FOR SLOT STATE

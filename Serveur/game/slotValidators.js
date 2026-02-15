@@ -1,4 +1,4 @@
-// domain/game/slotValidators.js - Slot-specific validators extracted from Regles.js
+// game/slotValidators.js - Slot-specific validators extracted from Regles.js
 
 import { SLOT_TYPES } from "./constants/slots.js";
 import {

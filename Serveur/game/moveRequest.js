@@ -1,12 +1,12 @@
-// domain/game/moveRequest.js v2.0 - Thin handler using MoveOrchestrator
-import { emitGameEndThenSnapshot } from "../../net/broadcast.js";
-import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../../net/guards.js";
-import { resBadRequest, resBadState, resError, resNotFound } from "../../net/transport.js";
+// game/moveRequest.js v2.0 - Thin handler using MoveOrchestrator
+import { emitGameEndThenSnapshot } from "../net/broadcast.js";
+import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../net/guards.js";
+import { resBadRequest, resBadState, resError, resNotFound } from "../net/transport.js";
 import { orchestrateMove, MOVE_RESULT_CODE } from "./moveOrchestrator.js";
 import { ensureGameMeta } from "./meta.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
 import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
-import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
+import { POPUP_MESSAGE } from "../shared/popupMessages.js";
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
   const {

@@ -1,6 +1,6 @@
 // handlers/joinGame.js
-import { ensureGameMeta } from "../../domain/game/meta.js";
-import { TURN_FLOW_MESSAGES } from "../../domain/game/helpers/turnFlowHelpers.js";
+import { ensureGameMeta } from "../../game/meta.js";
+import { TURN_FLOW_MESSAGES } from "../../game/helpers/turnFlowHelpers.js";
 import { emitGameMessage } from "../../shared/uiMessage.js";
 import { requireParam, getExistingGameOrRes } from "../../net/guards.js";
 import { resBadState, resForbidden } from "../../net/transport.js";

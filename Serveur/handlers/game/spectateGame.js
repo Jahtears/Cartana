@@ -1,5 +1,5 @@
 //handlers\spectateGame.js
-import { ensureGameMeta } from "../../domain/game/meta.js";
+import { ensureGameMeta } from "../../game/meta.js";
 import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from "../../net/guards.js";
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 

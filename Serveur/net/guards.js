@@ -1,6 +1,6 @@
 //\game\guards.js 
 
-import { ensureGameMeta } from "../domain/game/meta.js";
+import { ensureGameMeta } from "../game/meta.js";
 import { resBadRequest, resNotFound, resBadState, resForbidden, resGameEnd } from "./transport.js";
 import { POPUP_MESSAGE } from "../shared/popupMessages.js";
 

@@ -1,4 +1,4 @@
-// domain/game/moveOrchestrator.js - Centralized move orchestration
+// game/moveOrchestrator.js - Centralized move orchestration
 // Coordinates: validate → apply → check win → track updates → prepare response 
 
 import { SLOT_TYPES, SlotId } from "./constants/slots.js";

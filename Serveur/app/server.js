@@ -4,13 +4,13 @@ import { WebSocketServer } from "ws";
 import http from "http";
 
 // ============= IMPORTS MÉTIER =============
-import { createGame } from "../domain/game/builders/gameBuilder.js";
-import { getCardById } from "../domain/game/helpers/cardHelpers.js";
-import { mapSlotFromClientToServer, mapSlotForClient } from "../domain/game/helpers/slotHelpers.js";
-import { getTableSlots } from "../domain/game/helpers/tableHelper.js";
-import { applyMove } from '../domain/game/MoveApplier.js';
-import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot } from '../domain/game/Regles.js';
-import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../domain/game/helpers/turnFlowHelpers.js";
+import { createGame } from "../game/builders/gameBuilder.js";
+import { getCardById } from "../game/helpers/cardHelpers.js";
+import { mapSlotFromClientToServer, mapSlotForClient } from "../game/helpers/slotHelpers.js";
+import { getTableSlots } from "../game/helpers/tableHelper.js";
+import { applyMove } from '../game/MoveApplier.js';
+import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot } from '../game/Regles.js';
+import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../game/helpers/turnFlowHelpers.js";
 import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
 import { verifyOrCreateUser } from '../handlers/auth/usersStore.js';
 import { emitSlotState, emitFullState } from '../domain/session/index.js';
@@ -21,7 +21,7 @@ import { handleLogout } from '../handlers/auth/logout.js';
 import { handleInvite, handleInviteResponse } from '../handlers/lobby/invite.js';
 import { handleJoinGame } from '../handlers/game/joinGame.js';
 import { handleSpectateGame } from '../handlers/game/spectateGame.js';
-import { handleMoveRequest } from '../domain/game/moveRequest.js';
+import { handleMoveRequest } from '../game/moveRequest.js';
 import { handleLeaveGame, handleAckGameEnd } from '../handlers/game/gameEnd.js';
 
 // ============= IMPORTS APP =============
