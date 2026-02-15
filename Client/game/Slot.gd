@@ -36,13 +36,6 @@ const PREVIEW_CARD_SCALE := Vector2(1.03, 1.03)
 func _ready() -> void:
 	add_to_group("slots")
 	modulate = PREVIEW_NORMAL_COLOR
-	
-	# ✅ Détecter slot HAND et le rendre quasi-invisible
-	var parsed := SlotIdHelper.parse_slot_id(SlotIdHelper.normalize_slot_id(String(slot_id)))
-	_is_hand_slot = String(parsed.get("type", "")) == "HAND"
-	
-	if _is_hand_slot:
-		modulate = Color(1, 1, 1, 1)  # 10% opacity pour HAND
 
 func _process(_delta: float) -> void:
 	if _rect_cache_dirty:
@@ -78,33 +71,6 @@ func _set_preview(active: bool) -> void:
 	else:
 		$Background.modulate = PREVIEW_NORMAL_COLOR
 
-	_apply_preview_to_cards(active)
-
-func _apply_preview_to_cards(active: bool) -> void:
-	for c in stacked_cards:
-		if !is_instance_valid(c):
-			continue
-		if !(c is Node2D):
-			continue
-
-		var n := c as Node2D
-
-		# Modulate (highlight)
-		n.modulate = Color(1.0, 1.0, 0.85) if active else Color(1, 1, 1)
-
-		# Scale (petit boost)
-		if active:
-			if !n.has_meta("_preview_base_scale"):
-				n.set_meta("_preview_base_scale", n.scale)
-			var base_scale: Vector2 = n.get_meta("_preview_base_scale")
-			n.scale = base_scale * PREVIEW_CARD_SCALE
-		else:
-			if n.has_meta("_preview_base_scale"):
-				n.scale = n.get_meta("_preview_base_scale")
-				n.remove_meta("_preview_base_scale")
-			else:
-				n.scale = Vector2(1, 1)
-
 # ============= SNAP (PLACEMENT) =============
 
 func _remove_card_ref(card: Node) -> void:
@@ -129,9 +95,6 @@ func snap_card(card: Node2D, animate: bool = true) -> void:
 	_remove_card_ref(card)
 	stacked_cards.append(card)
 
-	# ✅ CORRECTION #3: TRIER par index serveur si disponible
-	_sort_cards_by_server_order()
-
 	# Kill tween précédent
 	if card.has_meta("_snap_tween"):
 		var old_t := card.get_meta("_snap_tween") as Tween
@@ -143,7 +106,6 @@ func snap_card(card: Node2D, animate: bool = true) -> void:
 
 func clear_slot() -> void:
 	if stacked_cards.is_empty():
-		_apply_preview_to_cards(false)
 		_reset_background()
 		return
 
@@ -166,24 +128,10 @@ func clear_slot() -> void:
 			c.reparent(root, true)
 	
 	stacked_cards.clear()
-	_apply_preview_to_cards(false)
 	_reset_background()
 	_rect_cache_dirty = true
 
 # ============= LAYOUT =============
-
-# ✅ CORRECTION #3: Trier par index serveur
-func _sort_cards_by_server_order() -> void:
-	stacked_cards.sort_custom(func(a, b):
-		var idx_a = int(a.get_meta("_array_order", -1))
-		var idx_b = int(b.get_meta("_array_order", -1))
-		
-		# Si l'un n'a pas d'index, garder l'ordre original
-		if idx_a < 0 or idx_b < 0:
-			return false
-		
-		return idx_a < idx_b
-	)
 
 func _layout_stack(animate: bool) -> void:
 	var parsed := SlotIdHelper.parse_slot_id(get_slot_id())
@@ -200,7 +148,6 @@ func _layout_stack(animate: bool) -> void:
 		_:
 			_layout_cascade(animate, CASCADE_DEFAULT)
 
-# ✅ HAND FAN layout (ordre serveur respecté)
 func _layout_hand_fan(animate: bool, player_id: int) -> void:
 	var card_count = stacked_cards.size()
 	
