@@ -50,10 +50,6 @@ const PIOCHE_RIGHT_MARGIN := 80.0
 const START_POS := Vector2.ZERO
 
 # ============= TIMEBAR COLORS =============
-static var TIMEBAR_GREEN: Color = Color.from_hsv(0.333, 0.85, 0.95, 1.0)
-static var TIMEBAR_YELLOW: Color = Color.from_hsv(0.166, 0.85, 0.95, 1.0)
-static var TIMEBAR_ORANGE: Color = Color.from_hsv(0.083, 0.85, 0.95, 1.0)
-static var TIMEBAR_RED: Color = Color.from_hsv(0.000, 0.85, 0.95, 1.0)
 const TIMEBAR_SPEC: Color = Color(0.85, 0.85, 0.85)
 
 # ============= STATE =============
@@ -105,10 +101,6 @@ var _timebar_state: Dictionary = {
 }
 
 var _timebar_colors: Dictionary = {
-	"green": TIMEBAR_GREEN,
-	"yellow": TIMEBAR_YELLOW,
-	"orange": TIMEBAR_ORANGE,
-	"red": TIMEBAR_RED,
 	"spec": TIMEBAR_SPEC,
 }
 
