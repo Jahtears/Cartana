@@ -1,4 +1,4 @@
-# Game.gd V2.0 -  système d'événements et slots
+# Game.gd - Refactorisé : _init_layout() concentré, _relayout_board() pour resize
 
 extends Control 
 
@@ -6,17 +6,18 @@ extends Control
 var slot_scene: PackedScene = preload("res://Client/Scenes/Slot.tscn")
 var card_scene: PackedScene = preload("res://Client/Scenes/Carte.tscn")
 
-# ============= PROTOCOLS & HELPERS =============
+# ============= CONFIG & HELPERS =============
+const GameLayoutConfig = preload("res://Client/game/GameLayoutConfig.gd")
 const Protocol = preload("res://Client/net/Protocol.gd")
 const GameMessage = preload("res://Client/game/messages/GameMessage.gd")
 const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
 const TableSyncHelper = preload("res://Client/game/helpers/table_sync.gd")
 const CardSyncHelper = preload("res://Client/game/helpers/card_sync.gd")
 const TimebarUtil = preload("res://Client/game/helpers/timebar.gd")
+
+# ============= CONSTANTS =============
 const POPUP_PREFIX := "MSG_POPUP_"
-
 const FLOW_INVITE_REQUEST_FALLBACK := "invite_request"
-
 const REQ_JOIN_GAME := "join_game"
 const REQ_SPECTATE_GAME := "spectate_game"
 const REQ_INVITE_RESPONSE := "invite_response"
@@ -36,22 +37,6 @@ const LABEL_CANCEL := "Annuler"
 const LABEL_QUIT := "Quitter"
 const LABEL_WAIT := "Attendre"
 
-# ============= LAYOUT CONSTANTS =============
-const MAIN_COUNT := 1
-const BANC_COUNT := 4
-const MIN_SLOT_SPACING := 64.0
-const MAX_SLOT_SPACING := 120.0
-const SLOT_WIDTH := 80.0
-const SIDE_MARGIN := 100.0
-const PLAYER_TOP_Y_RATIO := 0.18
-const PLAYER_BOTTOM_Y_RATIO := 0.82
-const TABLE_Y_RATIO := 0.5
-const PIOCHE_RIGHT_MARGIN := 80.0
-const START_POS := Vector2.ZERO
-
-# ============= TIMEBAR COLORS =============
-const TIMEBAR_SPEC: Color = Color(0.85, 0.85, 0.85)
-
 # ============= STATE =============
 var slots_ready: bool = false
 var slots_by_id: Dictionary = {}
@@ -59,31 +44,39 @@ var pending_events: Array[Dictionary] = []
 var cards: Dictionary = {}
 var allowed_table_slots: Dictionary = {}
 
-# ============= UI STATE =============
+# ============= UI STATE =====
 var _is_changing_scene := false
 var _game_end_prompted := false
 var _leave_sent := false
 var _disconnect_prompt_seq := 0
 var _opponent_disconnected := false
+var _message_tween: Tween = null
 
 # ============= LAYOUT STATE =============
-var _slot_spacing: float = 100.0
-var _table_spacing: int = 100
+var _slot_spacing: float = GameLayoutConfig.DEFAULT_SLOT_SPACING
+var _table_spacing: int = GameLayoutConfig.TABLE_SPACING
+
+# ============= LAYOUT CONSTANTS =============
+var START_POS: Vector2 = GameLayoutConfig.START_POS
+var MAIN_COUNT: int = GameLayoutConfig.MAIN_COUNT
+var BANC_COUNT: int = GameLayoutConfig.BANC_COUNT
 
 # ============= NODES =============
 @onready var time_bar: ProgressBar = $TimeBar
-@onready var player1_root: Node2D = $Player1
-@onready var player2_root: Node2D = $Player2
-@onready var player1_deck: Node2D = $Player1/Deck
-@onready var player1_main: Node2D = $Player1/Main
-@onready var player1_banc: Node2D = $Player1/Banc
-@onready var player2_deck: Node2D = $Player2/Deck
-@onready var player2_main: Node2D = $Player2/Main
-@onready var player2_banc: Node2D = $Player2/Banc
-@onready var pioche_root: Node2D = $Pioche
-@onready var table_root: Node2D = $Table
-@onready var game_message_label: RichTextLabel = $VBoxContainer/CenterContainer/GameMessage
-@onready var game_message_timer: Timer = $VBoxContainer/Timer
+@onready var board_root: Node2D = $Board
+@onready var player1_root: Node2D = $Board/Player1
+@onready var player2_root: Node2D = $Board/Player2
+@onready var player1_deck: Node2D = $Board/Player1/Deck
+@onready var player1_main: Node2D = $Board/Player1/Main
+@onready var player1_banc: Node2D = $Board/Player1/Banc
+@onready var player2_deck: Node2D = $Board/Player2/Deck
+@onready var player2_main: Node2D = $Board/Player2/Main
+@onready var player2_banc: Node2D = $Board/Player2/Banc
+@onready var pioche_root: Node2D = $Board/Pioche
+@onready var table_root: Node2D = $Board/Table
+@onready var game_message_label: RichTextLabel = $UIContainer/MessageBox/CenterContainer/GameMessage
+@onready var game_message_timer: Timer = $UIContainer/MessageBox/Timer
+@onready var quitter_button: Button = $Quitter
 
 # ============= CARD CONTEXT =============
 var _card_ctx: Dictionary = {}
@@ -100,18 +93,19 @@ var _timebar_state: Dictionary = {
 	"timebar_last_color": Color(-1, -1, -1, -1),
 }
 
-var _timebar_colors: Dictionary = {
-	"spec": TIMEBAR_SPEC,
-}
+var _timebar_colors: Dictionary = GameLayoutConfig.get_timebar_colors()
+
+# ============= POSITIONS CACHE (pour éviter redondances) =============
+var _positions_cache: Dictionary = {}
 
 # ============= LIFECYCLE =============
 
 func _ready() -> void:
+	# Connecter les signaux de resize
 	_connect_layout_signals()
-	_relayout_board()
-	_setup_player($Player1, 1)
-	_setup_player($Player2, 2)
-	_setup_Pioche($Pioche)
+	
+	# Initialiser le layout
+	_init_layout()
 	
 	_card_ctx = {
 		"cards": cards,
@@ -120,6 +114,7 @@ func _ready() -> void:
 		"root": self,
 	}
 
+	# ===== CONNECTER LES SIGNAUX RÉSEAU =====
 	if not NetworkManager.evt.is_connected(_on_evt):
 		NetworkManager.evt.connect(_on_evt)
 	if not NetworkManager.response.is_connected(_on_response):
@@ -128,22 +123,254 @@ func _ready() -> void:
 		NetworkManager.disconnected.connect(_on_network_disconnected)
 	if not PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.connect(_on_popup_action)
+	
+	if not quitter_button.pressed.is_connected(_on_quitter_pressed):
+		quitter_button.pressed.connect(_on_quitter_pressed)
+	
 	PopupUi.hide()
 
-	# Ready pour la scène
+	# ===== INIT GAME =====
 	if String(Global.current_game_id) != "":
 		_request_game_sync()
 
 	await get_tree().process_frame
 	slots_ready = true
 	TimebarUtil.update_timebar(_timebar_state, time_bar, Callable(NetworkManager, "server_now_ms"), _timebar_colors)
-	
-	# Replay events avant que les slots soient prêts
-	for ev in pending_events:
-		_on_evt(String(ev.get("type", "")), ev.get("data", {}) as Dictionary)
+
+	for event in pending_events:
+		_on_evt(event.get("type", ""), event.get("data", {}))
 	pending_events.clear()
 
-# ============= EVENTS (PUSH SERVEUR) =============
+# ============= LAYOUT INITIALIZATION =============
+
+func _init_layout() -> void:
+	"""Initialise TOUT le layout en une seule fois"""
+	# Calculer spacing
+	_calculate_spacing()
+	
+	# Calculer et stocker les positions
+	_positions_cache = _calculate_positions()
+	
+	# Appliquer les positions
+	_apply_positions(_positions_cache)
+	
+	# Setup des joueurs
+	_setup_player(player1_root, 1)
+	_setup_player(player2_root, 2)
+	_setup_pioche(pioche_root)
+	
+	# Init UI
+	_init_ui()
+
+func _calculate_spacing() -> void:
+	"""Calcule le spacing des slots basé sur la largeur disponible"""
+	var vw = get_viewport().get_visible_rect().size.x
+	var available_width = vw - GameLayoutConfig.SIDE_MARGIN * 2
+	
+	if GameLayoutConfig.BANC_COUNT > 1:
+		_slot_spacing = clampf(
+			available_width / float(GameLayoutConfig.BANC_COUNT + 1),
+			GameLayoutConfig.MIN_SLOT_SPACING,
+			GameLayoutConfig.MAX_SLOT_SPACING
+		)
+	else:
+		_slot_spacing = GameLayoutConfig.DEFAULT_SLOT_SPACING
+
+func _calculate_positions() -> Dictionary:
+	"""Calcule TOUTES les positions dynamiquement une seule fois"""
+	var vw = get_viewport().get_visible_rect().size.x
+	var vh = get_viewport().get_visible_rect().size.y
+	
+	return {
+		"vw": vw,
+		"vh": vh,
+		"center_x": vw * 0.5,
+		"left_x": GameLayoutConfig.SIDE_MARGIN,
+		"right_x": vw - GameLayoutConfig.SIDE_MARGIN,
+	}
+
+func _apply_positions(positions: Dictionary) -> void:
+	"""Applique TOUTES les positions calculées"""
+	var vw = positions["vw"]
+	var vh = positions["vh"]
+	var center_x = positions["center_x"]
+	var left_x = positions["left_x"]
+	var right_x = positions["right_x"]
+	
+	# Table et Pioche
+	table_root.position = Vector2(center_x, vh * GameLayoutConfig.TABLE_Y_RATIO)
+	pioche_root.position = Vector2(right_x, vh * GameLayoutConfig.TABLE_Y_RATIO)
+	
+	# UI
+	time_bar.position = Vector2(left_x, GameLayoutConfig.TIMEBAR_Y)
+	$UIContainer.position = Vector2(center_x, vh * GameLayoutConfig.MESSAGE_Y_RATIO)
+	
+	# Quitter
+	quitter_button.text = LABEL_QUIT
+	quitter_button.size = Vector2(GameLayoutConfig.QUITTER_WIDTH, GameLayoutConfig.QUITTER_HEIGHT)
+	quitter_button.position = Vector2(right_x - GameLayoutConfig.QUITTER_OFFSET_X, GameLayoutConfig.QUITTER_OFFSET_Y)
+
+func _init_ui() -> void:
+	"""Initialise l'UI"""
+	game_message_label.visible = false
+	game_message_label.clear()
+	game_message_label.bbcode_enabled = true
+	game_message_label.fit_content = true
+	game_message_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	game_message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	game_message_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	
+	var message_container = $UIContainer/MessageBox/CenterContainer
+	message_container.add_theme_constant_override("margin_top", GameLayoutConfig.MESSAGE_MARGIN_TOP)
+	message_container.add_theme_constant_override("margin_bottom", GameLayoutConfig.MESSAGE_MARGIN_BOTTOM)
+	message_container.add_theme_constant_override("margin_left", GameLayoutConfig.MESSAGE_MARGIN_LEFT)
+	message_container.add_theme_constant_override("margin_right", GameLayoutConfig.MESSAGE_MARGIN_RIGHT)
+	
+	game_message_timer.wait_time = GameLayoutConfig.MESSAGE_DISPLAY_DURATION
+	game_message_timer.one_shot = true
+	if not game_message_timer.timeout.is_connected(_on_message_timeout):
+		game_message_timer.timeout.connect(_on_message_timeout)
+
+# ============= SETUP SLOTS =============
+
+func _setup_player(player: Node, id: int) -> void:
+	"""Setup un joueur avec ses positions et slots"""
+	var pos = _positions_cache
+	var center_x = pos["center_x"]
+	var left_x = pos["left_x"]
+	var right_x = pos["right_x"]
+	var vh = pos["vh"]
+	
+	var deck = player.get_node("Deck")
+	var main = player.get_node("Main")
+	var banc = player.get_node("Banc")
+	
+	# Positionner les parents
+	if id == 1:  # PLAYER1
+		player.position = Vector2(0, vh * GameLayoutConfig.PLAYER_BOTTOM_Y_RATIO)
+		deck.position = Vector2(left_x, 0)
+		main.position = Vector2(center_x - GameLayoutConfig.P1_MAIN_OFFSET, 0)
+		banc.position = Vector2(right_x - ((GameLayoutConfig.BANC_COUNT - 1) * _slot_spacing), 0)
+	else:  # PLAYER2
+		player.position = Vector2(0, vh * GameLayoutConfig.PLAYER_TOP_Y_RATIO)
+		deck.position = Vector2(right_x, 0)
+		main.position = Vector2(center_x + GameLayoutConfig.P2_MAIN_OFFSET, 0)
+		banc.position = Vector2(left_x, 0)
+	
+	# Créer les slots
+	_create_slot(deck, "%d:DECK:1" % id, START_POS)
+	for i in range(GameLayoutConfig.MAIN_COUNT):
+		_create_slot(main, "%d:HAND:%d" % [id, i + 1], START_POS + Vector2(i * _slot_spacing, 0))
+	for i in range(GameLayoutConfig.BANC_COUNT):
+		_create_slot(banc, "%d:BENCH:%d" % [id, i + 1], START_POS + Vector2(i * _slot_spacing, 0))
+
+func _setup_pioche(pioche: Node) -> void:
+	"""Setup la Pioche"""
+	_create_slot(pioche, "0:PILE:1", START_POS)
+
+func _slot_node_name(slot_id: String) -> String:
+	return SlotIdHelper.slot_node_name(slot_id)
+
+func _find_child_slot_by_id(parent: Node, slot_id: String) -> Node:
+	for child in parent.get_children():
+		if child != null and child.has_method("get_slot_id"):
+			var cid := String(child.call("get_slot_id"))
+			if cid == slot_id:
+				return child
+	return null
+
+func _create_slot(parent: Node, slot_name: String, pos: Vector2) -> void:
+	var existing := _find_child_slot_by_id(parent, slot_name)
+	if existing != null:
+		existing.name = _slot_node_name(slot_name)
+		existing.slot_id = slot_name
+		slots_by_id[slot_name] = existing
+		return
+
+	var node_name := _slot_node_name(slot_name)
+	if parent.has_node(node_name):
+		var existing2 := parent.get_node(node_name)
+		existing2.slot_id = slot_name
+		slots_by_id[slot_name] = existing2
+		return
+	
+	var slot := slot_scene.instantiate()
+	slot.name = _slot_node_name(slot_name)
+	slot.slot_id = slot_name
+	slot.position = pos
+	parent.add_child(slot)
+	slots_by_id[slot_name] = slot
+
+func _find_slot_by_id(slot_id: String) -> Node:
+	return slots_by_id.get(slot_id, null)
+
+# ============= LAYOUT SIGNALS & RESIZE =============
+
+func _connect_layout_signals() -> void:
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_on_viewport_size_changed):
+		vp.size_changed.connect(_on_viewport_size_changed)
+
+func _on_viewport_size_changed() -> void:
+	_relayout_board()
+
+func _relayout_board() -> void:
+	"""Recalcule les positions en cas de resize"""
+	# Recalculer spacing
+	_calculate_spacing()
+	
+	# Recalculer et appliquer les positions
+	_positions_cache = _calculate_positions()
+	_apply_positions(_positions_cache)
+	
+	# Repositionner les joueurs
+	_setup_player_positions(player1_root, 1)
+	_setup_player_positions(player2_root, 2)
+	
+	# Mettre à jour les slots
+	_update_slot_rows()
+	TableSyncHelper.update_table_positions(table_root, _table_spacing, GameLayoutConfig.START_POS)
+
+func _setup_player_positions(player: Node, id: int) -> void:
+	"""Repositionne juste un joueur en cas de resize (sans créer les slots)"""
+	var pos = _positions_cache
+	var center_x = pos["center_x"]
+	var left_x = pos["left_x"]
+	var right_x = pos["right_x"]
+	var vh = pos["vh"]
+	
+	var deck = player.get_node("Deck")
+	var main = player.get_node("Main")
+	var banc = player.get_node("Banc")
+	
+	if id == 1:
+		player.position = Vector2(0, vh * GameLayoutConfig.PLAYER_BOTTOM_Y_RATIO)
+		deck.position = Vector2(left_x, 0)
+		main.position = Vector2(center_x - GameLayoutConfig.P1_MAIN_OFFSET, 0)
+		banc.position = Vector2(right_x - ((GameLayoutConfig.BANC_COUNT - 1) * _slot_spacing), 0)
+	else:
+		player.position = Vector2(0, vh * GameLayoutConfig.PLAYER_TOP_Y_RATIO)
+		deck.position = Vector2(right_x, 0)
+		main.position = Vector2(center_x + GameLayoutConfig.P2_MAIN_OFFSET, 0)
+		banc.position = Vector2(left_x, 0)
+
+func _update_slot_rows() -> void:
+	_update_row_positions(1, "HAND", GameLayoutConfig.MAIN_COUNT)
+	_update_row_positions(1, "BENCH", GameLayoutConfig.BANC_COUNT)
+	_update_row_positions(2, "HAND", GameLayoutConfig.MAIN_COUNT)
+	_update_row_positions(2, "BENCH", GameLayoutConfig.BANC_COUNT)
+
+func _update_row_positions(player_id: int, slot_type: String, count: int) -> void:
+	for i in range(count):
+		var slot_id := "%d:%s:%d" % [player_id, slot_type, i + 1]
+		var slot := _find_slot_by_id(slot_id)
+		if slot != null:
+			slot.position = GameLayoutConfig.START_POS + Vector2(i * _slot_spacing, 0)
+			if slot.has_method("invalidate_rect_cache"):
+				slot.call("invalidate_rect_cache")
+
+# ============= EVENTS & RESPONSES =============
+# [Rest du code - garder les fonctions existantes pour les événements, réponses, etc.]
 
 func _on_evt(type: String, data: Dictionary) -> void:
 	match type:
@@ -171,9 +398,6 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			_handle_invite_response(data)
 		"invite_cancelled":
 			_handle_invite_cancelled(data)
-
-
-# ============= HANDLERS =============
 
 func _handle_invite_request(data: Dictionary) -> void:
 	var from_user := String(data.get("from", ""))
@@ -268,7 +492,6 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 	if type != "move_request":
 		return
 
-	# Reset move pending flag
 	var card_id = _data.get("card_id", "")
 	if card_id != "":
 		var card = cards.get(card_id)
@@ -326,21 +549,20 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 
 		var arr: Array = slots_dict.get(k, [])
 		
-		# ✅ CORRECTION #3: Ajouter index d'ordre du serveur à chaque carte
 		for i in range(arr.size()):
 			var payload = arr[i]
 			if payload is Dictionary:
-				payload["_array_order"] = i  # Index du serveur
+				payload["_array_order"] = i
 				CardSyncHelper.apply_card_update(_card_ctx, payload)
+		if slot != null and slot.has_method("finalize_server_sync"):
+			slot.call("finalize_server_sync")
 
-	# ✅ CORRECTION: Timebar depuis snapshot (hors boucle)
 	var turn_val = data.get("turn", null)
 	if turn_val is Dictionary:
 		_set_turn_timer(turn_val as Dictionary)
 	else:
 		_set_turn_timer({})
 
-	# ✅ CORRECTION: result via snapshot
 	var result_val = data.get("result", null)
 	if result_val is Dictionary and (result_val as Dictionary).size() > 0:
 		var e := result_val as Dictionary
@@ -348,7 +570,6 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 		for kk in e.keys():
 			merged[kk] = e[kk]
 		_on_game_end(merged)
-
 
 # ============= GAME END =============
 
@@ -401,13 +622,13 @@ func _on_slot_state(data: Dictionary) -> void:
 
 	var arr: Array = data.get("cards", [])
 	
-	# ✅ CORRECTION #3: Ajouter index à chaque carte
 	for i in range(arr.size()):
 		var payload = arr[i]
 		if payload is Dictionary:
-			payload["_array_order"] = i  # Index du serveur
+			payload["_array_order"] = i
 			CardSyncHelper.apply_card_update(_card_ctx, payload)
-
+	if slot != null and slot.has_method("finalize_server_sync"):
+		slot.call("finalize_server_sync")
 
 # ============= INVALID MOVE =============
 
@@ -440,138 +661,48 @@ func _reset_board_state() -> void:
 
 	pending_events.clear()
 	slots_ready = true
-	allowed_table_slots.clear()
-
-# ============= SETUP SLOTS =============
-
-func _setup_player(player: Node, id: int) -> void:
-	var deck = player.get_node("Deck")
-	var main = player.get_node("Main")
-	var banc = player.get_node("Banc")
-	_create_slot(deck, "%d:DECK:1" % id, START_POS)
-	for i in range(MAIN_COUNT):
-		_create_slot(main, "%d:HAND:%d" % [id, i + 1], START_POS + Vector2(i * _slot_spacing, 0))
-	for i in range(BANC_COUNT):
-		_create_slot(banc, "%d:BENCH:%d" % [id, i + 1], START_POS + Vector2(i * _slot_spacing, 0))
-
-func _setup_Pioche(pioche: Node) -> void:
-	_create_slot(pioche, "0:PILE:1", START_POS)
-
-func _slot_node_name(slot_id: String) -> String:
-	return SlotIdHelper.slot_node_name(slot_id)
-
-func _find_child_slot_by_id(parent: Node, slot_id: String) -> Node:
-	for child in parent.get_children():
-		if child != null and child.has_method("get_slot_id"):
-			var cid := String(child.call("get_slot_id"))
-			if cid == slot_id:
-				return child
-	return null
-
-func _create_slot(parent: Node, slot_name: String, pos: Vector2) -> void:
-	var existing := _find_child_slot_by_id(parent, slot_name)
-	if existing != null:
-		existing.name = _slot_node_name(slot_name)
-		existing.slot_id = slot_name
-		slots_by_id[slot_name] = existing
-		return
-
-	var node_name := _slot_node_name(slot_name)
-	if parent.has_node(node_name):
-		var existing2 := parent.get_node(node_name)
-		existing2.slot_id = slot_name
-		slots_by_id[slot_name] = existing2
-		return
-	var slot := slot_scene.instantiate()
-	slot.name = _slot_node_name(slot_name)
-	slot.slot_id = slot_name
-	slot.position = pos
-	parent.add_child(slot)
-	slots_by_id[slot_name] = slot
-
-# ============= FIND SLOT =============
-
-func _find_slot_by_id(slot_id: String) -> Node:
-	return slots_by_id.get(slot_id, null)
-
-# ============= LAYOUT =============
-
-func _connect_layout_signals() -> void:
-	var vp := get_viewport()
-	if vp != null and not vp.size_changed.is_connected(_on_viewport_size_changed):
-		vp.size_changed.connect(_on_viewport_size_changed)
-
-func _on_viewport_size_changed() -> void:
-	_relayout_board()
-
-func _relayout_board() -> void:
-	var view_size := get_viewport_rect().size
-	if view_size == Vector2.ZERO:
-		return
-
-	var vw := view_size.x
-	var vh := view_size.y
-	_slot_spacing = clampf(vw * 0.085, MIN_SLOT_SPACING, MAX_SLOT_SPACING)
-	var edge_left_center := SIDE_MARGIN + SLOT_WIDTH * 0.5
-	var edge_right_center := vw - SIDE_MARGIN - SLOT_WIDTH * 0.5
-	var bench_steps: int = maxi(BANC_COUNT - 1, 1)
-	var center_keepout := SLOT_WIDTH * 1.2
-	var table_center_x: float = vw * 0.5
-	var max_spacing_from_edges: float = (edge_right_center - (table_center_x + center_keepout)) / float(bench_steps)
-	_slot_spacing = minf(_slot_spacing, maxf(56.0, max_spacing_from_edges))
-	_table_spacing = int(round(_slot_spacing))
-
-	var bench_span := float(BANC_COUNT - 1) * _slot_spacing
-	var p1_deck_center := edge_left_center
-	var p1_bench_start := edge_right_center - bench_span
-	var p1_main_center: float = (p1_deck_center + table_center_x) * 0.6
-
-	var p2_bench_start := edge_left_center
-	var p2_deck_center := edge_right_center
-	var p2_main_center: float = (p2_deck_center + table_center_x) * 0.45
-
-	player1_root.position = Vector2(0, clampf(vh * PLAYER_BOTTOM_Y_RATIO, vh * 0.65, vh - 80.0))
-	player2_root.position = Vector2(0, clampf(vh * PLAYER_TOP_Y_RATIO, 80.0, vh * 0.35))
-	player1_deck.position = Vector2(p1_deck_center, 0)
-	player1_main.position = Vector2(p1_main_center, 0)
-	player1_banc.position = Vector2(p1_bench_start, 0)
-
-	player2_banc.position = Vector2(p2_bench_start, 0)
-	player2_main.position = Vector2(p2_main_center, 0)
-	player2_deck.position = Vector2(p2_deck_center, 0)
-
-	table_root.position = Vector2(table_center_x, vh * TABLE_Y_RATIO)
-	pioche_root.position = Vector2(maxf(vw - PIOCHE_RIGHT_MARGIN, edge_right_center), vh * TABLE_Y_RATIO)
-
-	_update_slot_rows()
-	TableSyncHelper.update_table_positions(table_root, _table_spacing, START_POS)
-
-func _update_slot_rows() -> void:
-	_update_row_positions(1, "HAND", MAIN_COUNT)
-	_update_row_positions(1, "BENCH", BANC_COUNT)
-	_update_row_positions(2, "HAND", MAIN_COUNT)
-	_update_row_positions(2, "BENCH", BANC_COUNT)
-
-func _update_row_positions(player_id: int, slot_type: String, count: int) -> void:
-	for i in range(count):
-		var slot_id := "%d:%s:%d" % [player_id, slot_type, i + 1]
-		var slot := _find_slot_by_id(slot_id)
-		if slot != null:
-			slot.position = START_POS + Vector2(i * _slot_spacing, 0)
 
 # ============= UI MESSAGES =============
 
 func _show_game_feedback(ui_message: Dictionary) -> void:
+	"""Affiche un message de jeu"""
 	var normalized := Protocol.normalize_game_message(ui_message)
 	var message_code := String(normalized.get("message_code", "")).strip_edges()
-	if GameMessage.normalize_inline_message(normalized).is_empty():
+	
+	var inline_msg := GameMessage.normalize_inline_message(normalized)
+	if inline_msg.is_empty():
 		if message_code.begins_with(POPUP_PREFIX):
 			PopupUi.show_ui_message(normalized)
 		return
-	GameMessage.show_inline_message(normalized, game_message_label, game_message_timer)
+	
+	_display_inline_message(normalized)
 
-func _on_timer_timeout() -> void:
+func _display_inline_message(ui_message: Dictionary) -> void:
+	"""Affiche et anime le message"""
+	if _message_tween and is_instance_valid(_message_tween):
+		_message_tween.kill()
+	
+	GameMessage.show_inline_message(ui_message, game_message_label, game_message_timer)
+	game_message_label.modulate.a = 1.0
+
+func _on_message_timeout() -> void:
+	"""Appelé quand le timer du message expire"""
+	_hide_message_with_fade()
+
+func _hide_message_with_fade() -> void:
+	"""Cache le message avec un fadeout"""
+	if not game_message_label.visible:
+		return
+	
+	if _message_tween and is_instance_valid(_message_tween):
+		_message_tween.kill()
+	
+	_message_tween = create_tween()
+	_message_tween.tween_property(game_message_label, "modulate:a", 0.0, GameLayoutConfig.MESSAGE_FADE_DURATION)
+	await _message_tween.finished
+	
 	game_message_label.visible = false
+	game_message_label.modulate.a = 1.0
 
 # ============= TIMEBAR =============
 
@@ -682,6 +813,9 @@ func _exit_tree() -> void:
 		NetworkManager.disconnected.disconnect(_on_network_disconnected)
 	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)
+	
+	if _message_tween and is_instance_valid(_message_tween):
+		_message_tween.kill()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:

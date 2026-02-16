@@ -38,8 +38,13 @@ static func apply_card_update(game_ctx: Dictionary, data: Dictionary) -> void:
 	var dos: bool = bool(data.get("dos", false))
 	var dos_couleur: String = String(data.get("dos_couleur", ""))
 	var draggable: bool = bool(data.get("draggable", false))
+	var array_order: int = int(data.get("_array_order", -1))
 
 	card.set_card_data(valeur, couleur, dos, dos_couleur, draggable)
+	if array_order >= 0:
+		card.set_meta("_server_array_order", array_order)
+	else:
+		card.set_meta("_server_array_order", 2147483647)
 
 	var slot_id: String = SlotIdHelper.normalize_slot_id(String(data.get("slot_id", "")))
 	var slots_by_id: Dictionary = game_ctx.get("slots_by_id", {})

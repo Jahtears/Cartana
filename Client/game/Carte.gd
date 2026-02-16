@@ -1,5 +1,16 @@
 extends Node2D
+
 const HitboxUtil = preload("res://Client/game/helpers/hitbox.gd")
+const GameLayoutConfig = preload("res://Client/game/GameLayoutConfig.gd")
+
+# ============= CONSTANTS =============
+const DRAG_Z = GameLayoutConfig.DRAG_Z
+const MIN_OVERLAP_AREA = GameLayoutConfig.MIN_OVERLAP_AREA
+const DRAG_SCALE = GameLayoutConfig.DRAG_SCALE
+const HOVER_SCALE = GameLayoutConfig.HOVER_SCALE
+const PREVIEW_CHECK_INTERVAL = GameLayoutConfig.PREVIEW_CHECK_INTERVAL
+const PREVIEW_CARD_BORDER_COLOR = GameLayoutConfig.PREVIEW_CARD_BORDER_COLOR
+const PREVIEW_CARD_BORDER_COLOR_NORMAL = GameLayoutConfig.PREVIEW_CARD_BORDER_COLOR_NORMAL
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
@@ -36,15 +47,6 @@ var slot: Node2D = null
 var _slot_cache: Array = []
 var _slot_cache_valid := false
 var _last_preview_frame := -1
-
-# ============= CONSTANTS =============
-const DRAG_Z := 3000
-const MIN_OVERLAP_AREA := 200.0
-const DRAG_SCALE := 1.05
-const HOVER_SCALE := 1.08
-const PREVIEW_CHECK_INTERVAL := 3
-const PREVIEW_CARD_BORDER_COLOR := Color.GREEN  # ← Couleur du Bord en drag
-const PREVIEW_CARD_BORDER_COLOR_NORMAL := Color(0, 0, 0, 1)  
 
 # ============= BASE STATE =============
 var _base_scale := Vector2.ONE
@@ -293,6 +295,9 @@ func _end_drag() -> void:
 	
 	# Reset preview card
 	_set_preview_card(null)
+	# Recalculer une dernière fois le slot sous la carte au moment du release.
+	# Evite les drops ratés si PREVIEW_CHECK_INTERVAL n'a pas encore rafraichi.
+	_preview_slot_under_card(true)
 
 	if not _can_interact():
 		_rollback_drag()
@@ -372,9 +377,9 @@ func _leave_drag_layer_to_original() -> void:
 	_slot_cache_valid = false
 
 # ============= PREVIEW SLOT =============
-func _preview_slot_under_card() -> void:
+func _preview_slot_under_card(ignore_topmost: bool = false) -> void:
 	# 🔥 Ne preview que si la carte est topmost sous la souris
-	if not _is_topmost_card_at_mouse():
+	if not ignore_topmost and not _is_topmost_card_at_mouse():
 		_set_preview_slot(null)
 		return
 
@@ -476,6 +481,7 @@ func _send_move_if_valid(to_slot_id: String) -> void:
 
 	if from_slot_id == to_slot_id:
 		print("[MOVE] Ignoring same slot drop: %s → %s" % [from_slot_id, to_slot_id])
+		_rollback_drag()
 		return
 
 	var card_id := get_card_id()

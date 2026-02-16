@@ -3,6 +3,7 @@
 import { SlotId, SLOT_TYPES } from "../constants/slots.js";
 import { createEmptySlots } from "../builders/gameBuilder.js";
 import { isSlotEmpty } from "./slotStackHelpers.js";
+import { debugLog } from "./debugHelpers.js";
 
 function ensureSlots(game) {
   if (!game.slots) {
@@ -23,8 +24,10 @@ function getTableTopology(game) {
     tableSlots.push(slotId);
     if (slotId.index > maxIndex) maxIndex = slotId.index;
 
-    if (!firstEmpty && isSlotEmpty(game, slotId)) {
-      firstEmpty = slotId;
+    if (isSlotEmpty(game, slotId)) {
+      if (!firstEmpty || slotId.index < firstEmpty.index) {
+        firstEmpty = slotId;
+      }
     }
   }
 
@@ -42,6 +45,10 @@ function addTableSlot(game) {
   const nextIndex = maxIndex + 1;
   const newSlot = SlotId.create(0, SLOT_TYPES.TABLE, nextIndex);
   game.slots.set(newSlot, []);
+  debugLog("[TABLE] ADD_SLOT", {
+    created: String(newSlot),
+    nextIndex,
+  });
   return newSlot;
 }
 
@@ -49,10 +56,16 @@ function ensureEmptyTableSlot(game) {
   ensureSlots(game);
   const { firstEmpty } = getTableTopology(game);
   if (firstEmpty) {
+    debugLog("[TABLE] ENSURE_EMPTY_REUSE", {
+      slot: String(firstEmpty),
+    });
     return { slotId: firstEmpty, created: false };
   }
 
   const slotId = addTableSlot(game);
+  debugLog("[TABLE] ENSURE_EMPTY_CREATE", {
+    slot: String(slotId),
+  });
   return { slotId, created: true };
 }
 
@@ -63,6 +76,10 @@ function cleanupExtraEmptyTableSlots(game) {
 
   const toDelete = empty.slice(1);
   toDelete.forEach((id) => game.slots.delete(id));
+  debugLog("[TABLE] CLEANUP_EXTRA_EMPTY", {
+    removed: toDelete.map((id) => String(id)),
+    keep: String(empty[0]),
+  });
   return toDelete;
 }
 

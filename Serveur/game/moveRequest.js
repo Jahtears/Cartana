@@ -53,6 +53,17 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const from_slot_id = mapSlotFromClientToServer(raw_from, actor, game);
   const to_slot_id = mapSlotFromClientToServer(raw_to, actor, game);
 
+  ctx.trace?.("MOVE_REQ", {
+    actor,
+    card_id,
+    raw_from,
+    raw_to,
+    from_slot_id: from_slot_id ? String(from_slot_id) : null,
+    to_slot_id: to_slot_id ? String(to_slot_id) : null,
+    turn_current: String(game?.turn?.current ?? ""),
+    turn_number: Number(game?.turn?.number ?? 0),
+  });
+
   if (!from_slot_id || !to_slot_id) {
     resBadRequest(sendRes, ws, req, INLINE_MESSAGE.MOVE_INVALID_SLOT, {
       from_slot_id: raw_from,
@@ -87,6 +98,14 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
 
   // ✅ HANDLE RESULT
   if (!orchResult.valid) {
+    ctx.trace?.("MOVE_DENIED", {
+      actor,
+      card_id,
+      from_slot_id: String(client_from),
+      to_slot_id: String(client_to),
+      reason: String(orchResult.reason ?? ""),
+    });
+
     const details = {
       card_id,
       from_slot_id: client_from,

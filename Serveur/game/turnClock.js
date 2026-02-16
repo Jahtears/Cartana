@@ -1,6 +1,6 @@
 // turnClock.js - Pure turn clock operations
 
-const TURN_MS = 15000;
+const TURN_MS = 150000;
 
 function getRemainingMs(turn, now = Date.now()) {
   if (!turn || typeof turn !== "object") return 0;
