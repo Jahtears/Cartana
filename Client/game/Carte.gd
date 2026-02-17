@@ -9,8 +9,8 @@ const MIN_OVERLAP_AREA = GameLayoutConfig.MIN_OVERLAP_AREA
 const DRAG_SCALE = GameLayoutConfig.DRAG_SCALE
 const HOVER_SCALE = GameLayoutConfig.HOVER_SCALE
 const PREVIEW_CHECK_INTERVAL = GameLayoutConfig.PREVIEW_CHECK_INTERVAL
-const PREVIEW_CARD_BORDER_COLOR = GameLayoutConfig.PREVIEW_CARD_BORDER_COLOR
-const PREVIEW_CARD_BORDER_COLOR_NORMAL = GameLayoutConfig.PREVIEW_CARD_BORDER_COLOR_NORMAL
+const PREVIEW_CARD_GLOW_COLOR = GameLayoutConfig.PREVIEW_CARD_GLOW_COLOR
+const PREVIEW_CARD_GLOW_SIZE = GameLayoutConfig.PREVIEW_CARD_GLOW_SIZE
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
@@ -116,25 +116,30 @@ func _set_preview_card(card: Node2D) -> void:
 
 # ============= VISUAL METHODS =============
 func _highlight_card_preview() -> void:
-	"""Met le Bord en vert pendant le drag"""
+	"""Applique un glow léger pendant le drag"""
 	var bord = $Front/Bord
 	if bord:
 		var style = bord.get_theme_stylebox("panel")
 		if style and style is StyleBoxFlat:
-			# Créer une copie pour ne pas modifier l'originale
+			# Le glow est une ombre diffuse: on garde la couleur du bord inchangée.
 			var new_style = style.duplicate()
-			new_style.border_color = PREVIEW_CARD_BORDER_COLOR
+			new_style.shadow_size = PREVIEW_CARD_GLOW_SIZE
+			new_style.shadow_color = PREVIEW_CARD_GLOW_COLOR
+			new_style.shadow_offset = Vector2.ZERO
 			bord.add_theme_stylebox_override("panel", new_style)
 
 func _reset_card_preview() -> void:
-	"""Remet le Bord à sa couleur normale"""
+	"""Retire le glow et restaure l'état normal"""
 	var bord = $Front/Bord
 	if bord:
 		var style = bord.get_theme_stylebox("panel")
 		if style and style is StyleBoxFlat:
-			# Créer une copie avec la couleur normale
+			# On retire uniquement le glow; la couleur du bord reste pilotée par dos_couleur.
 			var new_style = style.duplicate()
-			new_style.border_color = PREVIEW_CARD_BORDER_COLOR_NORMAL
+			new_style.shadow_size = 0
+			new_style.shadow_color = Color(0, 0, 0, 0)
+			new_style.shadow_offset = Vector2.ZERO
+			new_style.border_color = _get_back_color(dos_couleur)
 			bord.add_theme_stylebox_override("panel", new_style)
 		
 func _update_hover_state() -> void:
@@ -219,8 +224,10 @@ func set_card_data(v: String, c: String, d: bool, d_couleur: String, can_drag: b
 	update_card()
 
 func update_card() -> void:
+	_apply_back_visual(dos_couleur)
+	_apply_border_visual(dos_couleur)
+
 	if dos:
-		_apply_back_visual(dos_couleur)
 		_show_back()
 		return
 
@@ -246,10 +253,24 @@ func update_card() -> void:
 	$Front/Bottom/SymboleB.modulate = texte_couleur
 
 func _apply_back_visual(code: String) -> void:
+	$Back.modulate = _get_back_color(code)
+
+func _apply_border_visual(code: String) -> void:
+	var bord = $Front/Bord
+	if not bord:
+		return
+
+	var style = bord.get_theme_stylebox("panel")
+	if style and style is StyleBoxFlat:
+		var new_style = style.duplicate()
+		new_style.border_color = _get_back_color(code)
+		bord.add_theme_stylebox_override("panel", new_style)
+
+func _get_back_color(code: String) -> Color:
 	var col := Color(0.2, 0.4, 1.0)
 	if code == "rouge":
 		col = Color(0.77, 0.435, 0.597, 1.0)
-	$Back.modulate = col
+	return col
 
 func _show_front() -> void:
 	$Front.visible = true

@@ -1,6 +1,6 @@
 # Game.gd - Layout simplifié + Handlers complets du code original
 
-extends Control 
+extends Control
 
 # ============= SCENES =============
 var slot_scene: PackedScene = preload("res://Client/Scenes/Slot.tscn")
@@ -51,6 +51,9 @@ var _leave_sent := false
 var _disconnect_prompt_seq := 0
 var _opponent_disconnected := false
 var _message_tween: Tween = null
+var _deck_count_badges: Dictionary = {}
+var _deck_count_labels: Dictionary = {}
+var _deck_count_pulse_tweens: Dictionary = {}
 
 # ============= LAYOUT STATE =============
 var _slot_spacing: float = GameLayoutConfig.DEFAULT_SLOT_SPACING
@@ -62,7 +65,6 @@ var START_POS: Vector2 = GameLayoutConfig.START_POS
 
 # ============= NODES =============
 @onready var time_bar: ProgressBar = $TimeBar
-@onready var board_root: Node2D = $Board
 @onready var player1_root: Node2D = $Board/Player1
 @onready var player2_root: Node2D = $Board/Player2
 @onready var pioche_root: Node2D = $Board/Pioche
@@ -82,6 +84,7 @@ var _timebar_state: Dictionary = {
 	"turn_paused": false,
 	"turn_remaining_ms": 0,
 	"timebar_mode": -1,
+	"timebar_bg_sb": null,
 	"timebar_fill_sb": null,
 	"timebar_last_color": Color(-1, -1, -1, -1),
 }
@@ -128,60 +131,94 @@ func _ready() -> void:
 # ============= LAYOUT INITIALIZATION (SIMPLIFIÉ) =============
 
 func _init_layout() -> void:
-	"""Initialise TOUT le layout en une seule fois"""
-	_calculate_spacing()
-	_positions_cache = _calculate_positions()
-	_apply_positions(_positions_cache)
-	
-	_setup_player(player1_root, 1, true)
-	_setup_player(player2_root, 2, true)
-	_create_slot(pioche_root, "0:PILE:1", START_POS)
-	
+	"""Initialise layout + slots fixes (sans reflow rows)"""
+	_reflow_layout(true, false, false)
 	_init_ui()
 
-func _calculate_spacing() -> void:
-	"""Calcule le spacing des slots basé sur la largeur disponible"""
-	var vw = get_viewport().get_visible_rect().size.x
-	var available_width = vw - GameLayoutConfig.SIDE_MARGIN * 2
-	
+func _compute_layout_context() -> Dictionary:
+	var view_size := get_viewport().get_visible_rect().size
+	var vw := view_size.x
+	var vh := view_size.y
+	var slot_spacing := GameLayoutConfig.DEFAULT_SLOT_SPACING
+
 	if GameLayoutConfig.BANC_COUNT > 1:
-		_slot_spacing = clampf(
+		var available_width := vw - GameLayoutConfig.SIDE_MARGIN * 2
+		slot_spacing = clampf(
 			available_width / float(GameLayoutConfig.BANC_COUNT + 1),
 			GameLayoutConfig.MIN_SLOT_SPACING,
 			GameLayoutConfig.MAX_SLOT_SPACING
 		)
-	else:
-		_slot_spacing = GameLayoutConfig.DEFAULT_SLOT_SPACING
 
-func _calculate_positions() -> Dictionary:
-	"""Calcule TOUTES les positions dynamiquement une seule fois"""
-	var vw = get_viewport().get_visible_rect().size.x
-	var vh = get_viewport().get_visible_rect().size.y
-	
 	return {
 		"vw": vw,
 		"vh": vh,
 		"center_x": vw * 0.5,
 		"left_x": GameLayoutConfig.SIDE_MARGIN,
 		"right_x": vw - GameLayoutConfig.SIDE_MARGIN,
+		"slot_spacing": slot_spacing,
 	}
+
+func _apply_layout_context(ctx: Dictionary) -> void:
+	_positions_cache = ctx
+	_slot_spacing = float(ctx.get("slot_spacing", GameLayoutConfig.DEFAULT_SLOT_SPACING))
+	_apply_positions(_positions_cache)
+
+func _apply_players_layout(create_slots: bool) -> void:
+	_setup_player(player1_root, 1, create_slots)
+	_setup_player(player2_root, 2, create_slots)
+
+func _ensure_static_slots_once() -> void:
+	_create_slot(pioche_root, "0:PILE:1", START_POS)
+
+func _reflow_layout(create_slots: bool, apply_linked_ui: bool, refresh_slot_rows: bool) -> void:
+	var ctx := _compute_layout_context()
+	_apply_layout_context(ctx)
+	_apply_players_layout(create_slots)
+
+	if create_slots:
+		_ensure_static_slots_once()
+
+	if apply_linked_ui:
+		_apply_player_linked_ui_layout()
+
+	if refresh_slot_rows:
+		_update_all_slot_rows()
+		TableSyncHelper.update_table_positions(table_root, _table_spacing, GameLayoutConfig.START_POS)
 
 func _apply_positions(positions: Dictionary) -> void:
 	"""Applique TOUTES les positions calculées"""
-	var vw = positions["vw"]
 	var vh = positions["vh"]
 	var center_x = positions["center_x"]
-	var left_x = positions["left_x"]
 	var right_x = positions["right_x"]
 	
 	table_root.position = Vector2(center_x, vh * GameLayoutConfig.TABLE_Y_RATIO)
 	pioche_root.position = Vector2(right_x, vh * GameLayoutConfig.TABLE_Y_RATIO)
-	time_bar.position = Vector2(left_x, GameLayoutConfig.TIMEBAR_Y)
-	$UIContainer.position = Vector2(center_x, vh * GameLayoutConfig.MESSAGE_Y_RATIO)
 	
 	quitter_button.text = LABEL_QUIT
 	quitter_button.size = Vector2(GameLayoutConfig.QUITTER_WIDTH, GameLayoutConfig.QUITTER_HEIGHT)
 	quitter_button.position = Vector2(right_x - GameLayoutConfig.QUITTER_OFFSET_X, GameLayoutConfig.QUITTER_OFFSET_Y)
+
+func _apply_timebar_layout() -> void:
+	var timebar_size := GameLayoutConfig.TIMEBAR_SIZE
+	time_bar.custom_minimum_size = timebar_size
+	time_bar.size = timebar_size
+	time_bar.show_percentage = GameLayoutConfig.TIMEBAR_SHOW_PERCENTAGE
+
+	var p1_banc := player1_root.get_node_or_null("Banc") as Node2D
+	if p1_banc == null:
+		return
+	time_bar.position = p1_banc.global_position + GameLayoutConfig.TIMEBAR_CENTER_OFFSET_P1_BANC - timebar_size * 0.5
+
+func _apply_game_message_layout() -> void:
+	var p1_hand := player1_root.get_node_or_null("Main") as Node2D
+	if p1_hand == null:
+		return
+	$UIContainer.position = p1_hand.global_position + GameLayoutConfig.MESSAGE_CENTER_OFFSET_P1_HAND
+
+func _apply_player_linked_ui_layout() -> void:
+	_apply_timebar_layout()
+	_apply_game_message_layout()
+	_update_deck_count_ui_positions()
 
 func _init_ui() -> void:
 	"""Initialise l'UI"""
@@ -204,6 +241,10 @@ func _init_ui() -> void:
 	game_message_timer.one_shot = true
 	if not game_message_timer.timeout.is_connected(_on_message_timeout):
 		game_message_timer.timeout.connect(_on_message_timeout)
+
+	_ensure_deck_count_ui()
+	_reset_deck_count_ui()
+	_apply_player_linked_ui_layout()
 
 # ============= SETUP JOUEURS ET SLOTS (SIMPLIFIÉ) =============
 
@@ -261,16 +302,7 @@ func _on_viewport_size_changed() -> void:
 	_relayout_board()
 
 func _relayout_board() -> void:
-	"""Recalcule les positions en cas de resize"""
-	_calculate_spacing()
-	_positions_cache = _calculate_positions()
-	_apply_positions(_positions_cache)
-	
-	_setup_player(player1_root, 1, false)
-	_setup_player(player2_root, 2, false)
-	
-	_update_all_slot_rows()
-	TableSyncHelper.update_table_positions(table_root, _table_spacing, GameLayoutConfig.START_POS)
+	_reflow_layout(false, true, true)
 
 func _update_all_slot_rows() -> void:
 	"""Met à jour positions de tous les slots"""
@@ -287,6 +319,140 @@ func _update_row_positions(player_id: int, slot_type: String, count: int) -> voi
 			slot.position = START_POS + Vector2(i * _slot_spacing, 0)
 			if slot.has_method("invalidate_rect_cache"):
 				slot.call("invalidate_rect_cache")
+
+# ============= DECK COUNT UI =============
+
+func _ensure_deck_count_ui() -> void:
+	for player_id in [1, 2]:
+		if not _deck_count_badges.has(player_id):
+			_create_deck_count_badge(player_id)
+
+func _create_deck_count_badge(player_id: int) -> void:
+	var badge := PanelContainer.new()
+	badge.name = "DeckCountBadgeP%d" % player_id
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.z_index = 3
+	badge.custom_minimum_size = GameLayoutConfig.DECK_COUNT_BADGE_SIZE
+	badge.size = GameLayoutConfig.DECK_COUNT_BADGE_SIZE
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = GameLayoutConfig.DECK_COUNT_BADGE_BG_COLOR
+	style.border_color = GameLayoutConfig.DECK_COUNT_BADGE_BORDER_COLOR
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_right = 8
+	style.corner_radius_bottom_left = 8
+	badge.add_theme_stylebox_override("panel", style)
+
+	var label := Label.new()
+	label.name = "Value"
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", GameLayoutConfig.DECK_COUNT_FONT_SIZE)
+	label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_NORMAL)
+	label.add_theme_constant_override("outline_size", 2)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.75))
+	badge.add_child(label)
+
+	add_child(badge)
+	_deck_count_badges[player_id] = badge
+	_deck_count_labels[player_id] = label
+
+func _update_deck_count_ui_positions() -> void:
+	_ensure_deck_count_ui()
+
+	var p1_deck := player1_root.get_node_or_null("Deck") as Node2D
+	var p2_deck := player2_root.get_node_or_null("Deck") as Node2D
+
+	_position_deck_count_badge(1, p1_deck, GameLayoutConfig.DECK_COUNT_CENTER_OFFSET_P1)
+	_position_deck_count_badge(2, p2_deck, GameLayoutConfig.DECK_COUNT_CENTER_OFFSET_P2)
+
+func _position_deck_count_badge(player_id: int, deck_node: Node2D, center_offset: Vector2) -> void:
+	var badge := _deck_count_badges.get(player_id) as Control
+	if badge == null or deck_node == null:
+		return
+
+	var size := GameLayoutConfig.DECK_COUNT_BADGE_SIZE
+	badge.size = size
+	badge.position = deck_node.global_position + center_offset - size * 0.5
+
+func _reset_deck_count_ui() -> void:
+	for player_id in [1, 2]:
+		_set_deck_count(player_id, -1)
+
+func _update_deck_count_from_slot(slot_id: String, count: int) -> void:
+	var player_id := _extract_deck_player_id(slot_id)
+	if player_id <= 0:
+		return
+	_set_deck_count(player_id, count)
+
+func _extract_deck_player_id(slot_id: String) -> int:
+	var parsed := SlotIdHelper.parse_slot_id(slot_id)
+	if String(parsed.get("type", "")) != String(GameLayoutConfig.DECK_COUNT_SOURCE_SLOT_TYPE):
+		return 0
+	var player_id := int(parsed.get("player", 0))
+	return player_id if player_id in [1, 2] else 0
+
+func _set_deck_count(player_id: int, count: int) -> void:
+	var label := _deck_count_labels.get(player_id) as Label
+	if label == null:
+		return
+
+	if count < 0:
+		label.text = "--/%d" % GameLayoutConfig.DECK_TOTAL_CARDS
+		label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_UNKNOWN)
+		_stop_deck_count_pulse(player_id)
+		return
+
+	var current := maxi(0, count)
+	label.text = "%d/%d" % [current, GameLayoutConfig.DECK_TOTAL_CARDS]
+
+	if current <= 0:
+		label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_EMPTY)
+	elif current <= GameLayoutConfig.DECK_COUNT_WARN_THRESHOLD:
+		label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_WARN)
+	else:
+		label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_NORMAL)
+
+	if current > 0 and current <= GameLayoutConfig.DECK_COUNT_WARN_THRESHOLD:
+		_start_deck_count_pulse(player_id)
+	else:
+		_stop_deck_count_pulse(player_id)
+
+func _start_deck_count_pulse(player_id: int) -> void:
+	var badge := _deck_count_badges.get(player_id) as Control
+	if badge == null:
+		return
+
+	if _deck_count_pulse_tweens.has(player_id):
+		var existing := _deck_count_pulse_tweens[player_id] as Tween
+		if existing != null and is_instance_valid(existing):
+			return
+
+	_stop_deck_count_pulse(player_id)
+
+	var tween := create_tween()
+	tween.set_loops()
+	tween.tween_property(badge, "scale", Vector2(1.04, 1.04), 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(badge, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_deck_count_pulse_tweens[player_id] = tween
+
+func _stop_deck_count_pulse(player_id: int) -> void:
+	if _deck_count_pulse_tweens.has(player_id):
+		var tween := _deck_count_pulse_tweens[player_id] as Tween
+		if tween != null and is_instance_valid(tween):
+			tween.kill()
+		_deck_count_pulse_tweens.erase(player_id)
+
+	var badge := _deck_count_badges.get(player_id) as Control
+	if badge != null:
+		badge.scale = Vector2.ONE
 
 # ============= EVENTS & RESPONSES (ORIGINAL COMPLET) =============
 
@@ -457,10 +623,13 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 	for s in slots_by_id.values():
 		if s and s.has_method("clear_slot"):
 			s.clear_slot()
+	_reset_deck_count_ui()
 
 	TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, data.get("table", []), _table_spacing, START_POS)
 
 	var slots_dict: Dictionary = data.get("slots", {})
+	var slot_counts_val = data.get("slot_counts", null)
+	var slot_counts: Dictionary = slot_counts_val if slot_counts_val is Dictionary else {}
 	for k in slots_dict.keys():
 		var slot_id := SlotIdHelper.normalize_slot_id(String(k))
 		var slot :Variant= slots_by_id.get(slot_id)
@@ -469,6 +638,12 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 			slot = slots_by_id.get(slot_id)
 
 		var arr: Array = slots_dict.get(k, [])
+		var count_for_slot := arr.size()
+		if slot_counts.has(k):
+			count_for_slot = maxi(0, int(slot_counts.get(k, count_for_slot)))
+		if slot != null and slot.has_method("set_server_count"):
+			slot.call("set_server_count", count_for_slot)
+		_update_deck_count_from_slot(slot_id, count_for_slot)
 		if slot != null and slot.has_method("begin_server_sync"):
 			slot.call("begin_server_sync", false)
 		
@@ -544,6 +719,12 @@ func _on_slot_state(data: Dictionary) -> void:
 		slot.clear_slot()
 
 	var arr: Array = data.get("cards", [])
+	var count_for_slot := arr.size()
+	if data.has("count"):
+		count_for_slot = maxi(0, int(data.get("count", count_for_slot)))
+	if slot != null and slot.has_method("set_server_count"):
+		slot.call("set_server_count", count_for_slot)
+	_update_deck_count_from_slot(slot_id, count_for_slot)
 	if slot != null and slot.has_method("begin_server_sync"):
 		slot.call("begin_server_sync", true)
 	
@@ -575,6 +756,7 @@ func _reset_board_state() -> void:
 	for s in slots_by_id.values():
 		if s and s.has_method("clear_slot"):
 			s.clear_slot()
+	_reset_deck_count_ui()
 
 	TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, ["0:TABLE:1"], _table_spacing, START_POS)
 

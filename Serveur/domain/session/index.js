@@ -17,6 +17,7 @@ import {
   toSlotStack,
 } from "../../game/helpers/slotViewHelpers.js";
 import { getCardById } from "../../game/helpers/cardHelpers.js";
+import { getSlotCount } from "../../game/helpers/slotStackHelpers.js";
 import { buildTurnPayload } from "../../game/helpers/turnPayloadHelpers.js";
 
 /* =========================
@@ -39,8 +40,9 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
 
   const slotValue = getSlotContent(game, slot_id);
   const stack = toSlotStack(slotValue);
+  const count = getSlotCount(game, slot_id);
 
-  if (!stack.length) return { slot_id: clientSlot, cards };
+  if (!stack.length) return { slot_id: clientSlot, cards, count };
 
   const slotType = parseSlotId(slotIdToString(slot_id))?.type ?? null;
   const ids = getVisibleCardIdsForSlot(slotType, stack);
@@ -55,7 +57,7 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
     cards.push(payload);
   }
 
-  return { slot_id: clientSlot, cards };
+  return { slot_id: clientSlot, cards, count };
 }
 
 function publicGameEndResult(result) {
@@ -75,6 +77,7 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
   );
 
   const slots = {};
+  const slot_counts = {};
 
   // Ordre stable (non-table puis table)
   const allSlots = game?.slots instanceof Map ? Array.from(game.slots.keys()) : [];
@@ -83,13 +86,15 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
   const orderedTable = tableSlotIds;
 
   for (const slot_id of nonTable) {
-    const { slot_id: clientSlot, cards } = buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag });
+    const { slot_id: clientSlot, cards, count } = buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag });
     slots[clientSlot] = cards;
+    slot_counts[clientSlot] = count;
   }
 
   for (const slot_id of orderedTable) {
-    const { slot_id: clientSlot, cards } = buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag });
+    const { slot_id: clientSlot, cards, count } = buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag });
     slots[clientSlot] = cards;
+    slot_counts[clientSlot] = count;
   }
 
   const turn = buildTurnPayload(game.turn, { includeEmpty: false });
@@ -98,6 +103,7 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
     view, // "player" | "spectator"
     table, // ["0:TABLE:1","0:TABLE:2",...]
     slots, // { "1:HAND:1":[...], "0:PILE:1":[...], ... }
+    slot_counts, // { "1:HAND:1": 5, "1:DECK:1": 26, ... }
     turn, // { current, turnNumber } | null
     result, // { winner } | null
   };

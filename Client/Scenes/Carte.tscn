@@ -7,10 +7,10 @@ size = Vector2(80, 119)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3122v"]
 draw_center = false
-border_width_left = 4
-border_width_top = 4
-border_width_right = 3
-border_width_bottom = 3
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
 border_color = Color(0, 0, 0, 1)
 
 [node name="Carte" type="Node2D" unique_id=616561034]

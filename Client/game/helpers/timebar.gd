@@ -58,17 +58,31 @@ static func update_timebar(state: Dictionary, time_bar: ProgressBar, server_now_
 	time_bar.max_value = 1.0
 	time_bar.value = ratio
 
-	_ensure_timebar_fill_override(state, time_bar)
+	_ensure_timebar_style_overrides(state, time_bar)
 	_update_timebar_fill_by_ratio(state, time_bar, ratio)
 
-static func _ensure_timebar_fill_override(state: Dictionary, time_bar: ProgressBar) -> void:
-	if state.get("timebar_fill_sb", null) != null:
-		return
-	var fill := time_bar.get_theme_stylebox("fill")
-	if fill is StyleBoxFlat:
-		state["timebar_fill_sb"] = (fill as StyleBoxFlat).duplicate() as StyleBoxFlat
-		time_bar.add_theme_stylebox_override("fill", state["timebar_fill_sb"])
-		time_bar.self_modulate = Color(1, 1, 1, 1)
+static func _ensure_timebar_style_overrides(state: Dictionary, time_bar: ProgressBar) -> void:
+	if state.get("timebar_bg_sb", null) == null:
+		var background := StyleBoxFlat.new()
+		background.bg_color = Color(0.02, 0.16, 0.09, 0.55)
+		background.corner_radius_top_left = 6
+		background.corner_radius_top_right = 6
+		background.corner_radius_bottom_right = 6
+		background.corner_radius_bottom_left = 6
+		state["timebar_bg_sb"] = background
+		time_bar.add_theme_stylebox_override("background", background)
+
+	if state.get("timebar_fill_sb", null) == null:
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = Color(0.22, 0.95, 0.28, 1.0)
+		fill.corner_radius_top_left = 6
+		fill.corner_radius_top_right = 6
+		fill.corner_radius_bottom_right = 6
+		fill.corner_radius_bottom_left = 6
+		state["timebar_fill_sb"] = fill
+		time_bar.add_theme_stylebox_override("fill", fill)
+
+	time_bar.self_modulate = Color(1, 1, 1, 1)
 
 static func _update_timebar_fill_by_ratio(state: Dictionary, time_bar: ProgressBar, ratio: float) -> void:
 	var mode := int(state.get("timebar_mode", -1))
