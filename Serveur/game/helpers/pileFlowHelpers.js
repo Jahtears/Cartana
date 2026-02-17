@@ -9,6 +9,7 @@ import { shuffle } from "./cardHelpers.js";
 import { getTableSlots } from "./tableHelper.js";
 import {
   drawTop,
+  getSlotCount,
   getSlotStack,
   putBottom,
   putTop,
@@ -24,11 +25,10 @@ function refillEmptyHandSlotsFromPile(game, player, maxCards = DEFAULT_HAND_SIZE
   const slotPlayerIndex = playerIndex + 1;
 
   const handSlot = SlotId.create(slotPlayerIndex, SLOT_TYPES.HAND, 1);
-  const handStack = getSlotStack(game, handSlot);
   const pileSlot = SlotId.create(0, SLOT_TYPES.PILE, 1);
 
   const given = [];
-  const needed = maxCards - handStack.length;
+  const needed = Math.max(0, maxCards - getSlotCount(game, handSlot));
 
   for (let i = 0; i < needed; i++) {
     const cardId = drawTop(game, pileSlot);

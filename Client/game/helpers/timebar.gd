@@ -27,7 +27,7 @@ static func update_timebar_mode(state: Dictionary, is_spectator: bool, username:
 	else:
 		state["timebar_mode"] = 1
 
-static func update_timebar(state: Dictionary, time_bar: ProgressBar, server_now_ms: Callable, colors: Dictionary) -> void:
+static func update_timebar(state: Dictionary, time_bar: ProgressBar, server_now_ms: Callable) -> void:
 	if time_bar == null:
 		return
 
@@ -59,7 +59,7 @@ static func update_timebar(state: Dictionary, time_bar: ProgressBar, server_now_
 	time_bar.value = ratio
 
 	_ensure_timebar_fill_override(state, time_bar)
-	_update_timebar_fill_by_ratio(state, time_bar, ratio, colors)
+	_update_timebar_fill_by_ratio(state, time_bar, ratio)
 
 static func _ensure_timebar_fill_override(state: Dictionary, time_bar: ProgressBar) -> void:
 	if state.get("timebar_fill_sb", null) != null:
@@ -70,18 +70,18 @@ static func _ensure_timebar_fill_override(state: Dictionary, time_bar: ProgressB
 		time_bar.add_theme_stylebox_override("fill", state["timebar_fill_sb"])
 		time_bar.self_modulate = Color(1, 1, 1, 1)
 
-static func _update_timebar_fill_by_ratio(state: Dictionary, time_bar: ProgressBar, ratio: float, colors: Dictionary) -> void:
+static func _update_timebar_fill_by_ratio(state: Dictionary, time_bar: ProgressBar, ratio: float) -> void:
 	var mode := int(state.get("timebar_mode", -1))
 	var last_color: Color = state.get("timebar_last_color", Color(-1, -1, -1, -1))
 
 	var c: Color
 	match mode:
 		2:
-			c = colors.get("spec", Color(0.85, 0.85, 0.85))
+			c = _timebar_gradient(1.0)
 		0:
-			c = _timebar_gradient(ratio, colors)
+			c = _timebar_gradient(ratio)
 		1:
-			c = _timebar_gradient(0.0, colors)
+			c = _timebar_gradient(0.0)
 		_:
 			return
 
@@ -96,12 +96,12 @@ static func _update_timebar_fill_by_ratio(state: Dictionary, time_bar: ProgressB
 	else:
 		time_bar.self_modulate = c
 
-static func _timebar_gradient(ratio: float, colors: Dictionary) -> Color:
+static func _timebar_gradient(ratio: float) -> Color:
 	ratio = clampf(ratio, 0.0, 1.0)
 
-	var green: Color = colors.get("green", Color.from_hsv(0.333, 0.85, 0.95, 1.0))
-	var orange: Color = colors.get("orange", Color.from_hsv(0.083, 0.85, 0.95, 1.0))
-	var red: Color = colors.get("red", Color.from_hsv(0.000, 0.85, 0.95, 1.0))
+	var green: Color = Color.from_hsv(0.333, 0.85, 0.95, 1.0)
+	var orange: Color = Color.from_hsv(0.083, 0.85, 0.95, 1.0)
+	var red: Color = Color.from_hsv(0.000, 0.85, 0.95, 1.0)
 
 	if ratio > 0.66:
 		return green

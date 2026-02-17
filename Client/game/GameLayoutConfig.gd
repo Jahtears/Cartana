@@ -1,4 +1,4 @@
-# GameLayoutConfig.gd - Centralise toutes les constantes de layout du jeu
+# GameLayoutConfig.gd - Centralise toutes les constantes et helpers de layout
 
 extends RefCounted
 class_name GameLayoutConfig
@@ -24,24 +24,21 @@ const TABLE_Y_RATIO := 0.5
 const START_POS := Vector2.ZERO
 
 # ============= LAYOUT DYNAMIQUE - POSITIONS DES JOUEURS =============
-const P1_MAIN_OFFSET := 150      # Décalage de Main vers la gauche du centre
-const P2_MAIN_OFFSET := 150      # Décalage de Main vers la droite du centre
-const TIMEBAR_Y := 420.0         # Position Y absolue de la TimeBar
-const MESSAGE_Y_RATIO := 0.37    # Ratio hauteur pour GameMessage
+const P1_MAIN_OFFSET := 150
+const P2_MAIN_OFFSET := 150
+const TIMEBAR_Y := 420.0
+const MESSAGE_Y_RATIO := 0.37
 
 # ============= BOUTON QUITTER =============
 const QUITTER_WIDTH := 64.0
 const QUITTER_HEIGHT := 32.0
-const QUITTER_OFFSET_X := 72.0   # Distance de la droite
-const QUITTER_OFFSET_Y := 8.0    # Distance du haut
-
-# ============= TIMEBAR COLORS =============
-static var TIMEBAR_SPEC: Color = Color(0.85, 0.85, 0.85)
+const QUITTER_OFFSET_X := 0.0
+const QUITTER_OFFSET_Y := 8.0
 
 # ============= MESSAGE UI =============
-const MESSAGE_DISPLAY_DURATION := 2.0  # secondes
-const MESSAGE_FADE_DURATION := 0.3  # secondes
-const MESSAGE_MARGIN_TOP := 20
+const MESSAGE_DISPLAY_DURATION := 2.0
+const MESSAGE_FADE_DURATION := 0.3
+const MESSAGE_MARGIN_TOP := 50
 const MESSAGE_MARGIN_BOTTOM := 20
 const MESSAGE_MARGIN_LEFT := 10
 const MESSAGE_MARGIN_RIGHT := 10
@@ -66,9 +63,7 @@ const CASCADE_TABLE := Vector2(0, 0)
 const CASCADE_DEFAULT := Vector2(0, 0)
 
 # ============= ANIMATION TIMINGS =============
-const SNAP_DURATION := 0.18
-const SNAP_ANIMATION_HAND := 0.15
-const SNAP_ANIMATION_STACK := 0.12
+const SNAP_DURATION := 0.50
 const PREVIEW_CHECK_INTERVAL := 3
 
 # ============= PREVIEW COLORS (SLOT) =============
@@ -76,12 +71,28 @@ const PREVIEW_HIGHLIGHT_COLOR := Color(1, 1, 0.5)
 const PREVIEW_NORMAL_COLOR := Color(1, 1, 1)
 const PREVIEW_CARD_SCALE := Vector2(1.03, 1.03)
 
-# ============= SLOT VISUAL =============
+# ============= HELPER FUNCTIONS =============
 
-static func get_timebar_colors() -> Dictionary:
-	"""Retourne le dictionnaire des couleurs de timebar"""
+static func get_player_layout(player_id: int, positions: Dictionary, slot_spacing: float) -> Dictionary:
+	"""Retourne les positions calculées pour un joueur
+	
+	Args:
+		player_id: 1 pour Player1, 2 pour Player2
+		positions: Dictionnaire avec vw, vh, center_x, left_x, right_x
+		slot_spacing: Espacement entre les slots
+	
+	Returns:
+		Dictionnaire avec root_y, deck_x, main_x, banc_x
+	"""
+	var is_p1 = player_id == 1
+	var center_x = positions["center_x"]
+	var vh = positions["vh"]
+	
 	return {
-		"spec": TIMEBAR_SPEC,
+		"root_y": vh * (PLAYER_BOTTOM_Y_RATIO if is_p1 else PLAYER_TOP_Y_RATIO),
+		"deck_x": positions["left_x"] if is_p1 else positions["right_x"],
+		"main_x": center_x - P1_MAIN_OFFSET if is_p1 else center_x + P2_MAIN_OFFSET,
+		"banc_x": (positions["right_x"] - ((BANC_COUNT - 1) * slot_spacing)) if is_p1 else positions["left_x"],
 	}
 
 static func get_message_config() -> Dictionary:

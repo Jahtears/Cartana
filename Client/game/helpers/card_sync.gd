@@ -38,11 +38,15 @@ static func apply_card_update(game_ctx: Dictionary, data: Dictionary) -> void:
 	var dos: bool = bool(data.get("dos", false))
 	var dos_couleur: String = String(data.get("dos_couleur", ""))
 	var draggable: bool = bool(data.get("draggable", false))
-	var array_order: int = int(data.get("_array_order", -1))
+	var order_from_payload := int(data.get("_array_order", -1))
+	if order_from_payload < 0:
+		order_from_payload = int(data.get("array_order", -1))
+	if order_from_payload < 0:
+		order_from_payload = int(data.get("slot_order", -1))
 
 	card.set_card_data(valeur, couleur, dos, dos_couleur, draggable)
-	if array_order >= 0:
-		card.set_meta("_server_array_order", array_order)
+	if order_from_payload >= 0:
+		card.set_meta("_server_array_order", order_from_payload)
 	else:
 		card.set_meta("_server_array_order", 2147483647)
 

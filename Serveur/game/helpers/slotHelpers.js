@@ -1,5 +1,6 @@
 import { SLOT_TYPES } from "../constants/slots.js";
 import { SlotId } from "../constants/slots.js";
+import { getSlotCount } from "./slotStackHelpers.js";
 
 const SLOT_TYPE_SET = new Set(Object.values(SLOT_TYPES));
 
@@ -94,8 +95,7 @@ function isHandSlot(slotId) {
 
 function getHandSize(game, playerIndex) {
   const handSlot = SlotId.create(playerIndex, SLOT_TYPES.HAND, 1);
-  const hand = getSlotContent(game, handSlot);
-  return Array.isArray(hand) ? hand.length : (hand ? 1 : 0);
+  return getSlotCount(game, handSlot);
 }
 
 function hasCardInSlot(game, slotId, cardId) {
