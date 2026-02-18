@@ -3,7 +3,7 @@ extends Window
 class_name WindowPopup
 
 const Protocol = preload("res://Client/net/Protocol.gd")
-const POPUP_PREFIX := "MSG_POPUP_"
+const POPUP_PREFIX := "POPUP_"
 
 signal action_selected(action_id: String, payload: Dictionary)
 
@@ -62,7 +62,7 @@ func show_invite_request(from_user: String, payload: Dictionary = {}) -> void:
 	invite_payload["flow"] = invite_payload.get("flow", String(Protocol.POPUP_FLOW["INVITE_REQUEST"]))
 	invite_payload["from"] = invite_payload.get("from", from_user)
 	show_confirm(
-		Protocol.popup_text(Protocol.MSG_POPUP_INVITE_RECEIVED, { "from": from_user }),
+		Protocol.popup_text(Protocol.POPUP_INVITE_RECEIVED, { "from": from_user }),
 		"Accepter",
 		"Refuser",
 		invite_payload

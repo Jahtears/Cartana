@@ -1,16 +1,13 @@
 extends Node2D
 
-const HitboxUtil = preload("res://Client/game/helpers/hitbox.gd")
-const GameLayoutConfig = preload("res://Client/game/GameLayoutConfig.gd")
-
 # ============= CONSTANTS =============
-const DRAG_Z = GameLayoutConfig.DRAG_Z
-const MIN_OVERLAP_AREA = GameLayoutConfig.MIN_OVERLAP_AREA
-const DRAG_SCALE = GameLayoutConfig.DRAG_SCALE
-const HOVER_SCALE = GameLayoutConfig.HOVER_SCALE
-const PREVIEW_CHECK_INTERVAL = GameLayoutConfig.PREVIEW_CHECK_INTERVAL
-const PREVIEW_CARD_GLOW_COLOR = GameLayoutConfig.PREVIEW_CARD_GLOW_COLOR
-const PREVIEW_CARD_GLOW_SIZE = GameLayoutConfig.PREVIEW_CARD_GLOW_SIZE
+const DRAG_Z := 3000
+const MIN_OVERLAP_AREA := 200.0
+const DRAG_SCALE := 1.05
+const HOVER_SCALE := 1.08
+const PREVIEW_CHECK_INTERVAL := 3
+const PREVIEW_CARD_GLOW_COLOR := Color(0.35, 0.95, 0.45, 0.45)
+const PREVIEW_CARD_GLOW_SIZE := 6
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
@@ -85,8 +82,10 @@ func _preview_card_under_card() -> void:
 			continue
 		if not is_instance_valid(card):
 			continue
+		if not card.has_method("_get_card_rect_global"):
+			continue
 		
-		var other_rect = card._get_card_rect_global()
+		var other_rect: Rect2 = card.call("_get_card_rect_global")
 		var intersection = _rect_intersection(card_rect, other_rect)
 		var overlap_area = intersection.get_area()
 		
@@ -285,7 +284,7 @@ func _show_back() -> void:
 func _is_topmost_card_at_mouse() -> bool:
 	var mouse_pos = get_global_mouse_position()
 	var cards_group = get_tree().get_nodes_in_group("cards")
-	var topmost = HitboxUtil.pick_topmost_node_at_point(cards_group, mouse_pos)
+	var topmost := _pick_topmost_node_at_point(cards_group, mouse_pos)
 	return topmost == self
 
 # ============= DRAG INPUT =============
@@ -420,7 +419,10 @@ func _preview_slot_under_card(ignore_topmost: bool = false) -> void:
 		if s.has_method("get_cached_rect"):
 			slot_rect = s.call("get_cached_rect")
 		else:
-			slot_rect = HitboxUtil.rect_from_collision_shape_2d(s)
+			if s is Node2D:
+				slot_rect = _rect_from_collision_shape_node(s as Node2D)
+			else:
+				slot_rect = Rect2()
 
 		if slot_rect.size == Vector2.ZERO:
 			continue
@@ -477,6 +479,59 @@ func _rect_intersection(a: Rect2, b: Rect2) -> Rect2:
 		return Rect2()
 
 	return Rect2(Vector2(x1, y1), Vector2(w, h))
+
+func _rect_from_collision_shape_node(node: Node2D) -> Rect2:
+	if node == null:
+		return Rect2()
+
+	var shape_node := node.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if shape_node == null:
+		shape_node = node.find_child("CollisionShape2D", true, false) as CollisionShape2D
+	if shape_node == null:
+		return Rect2()
+
+	var shape := shape_node.shape
+	if shape is RectangleShape2D:
+		var size := (shape as RectangleShape2D).size
+		var scale := shape_node.global_transform.get_scale()
+		var scaled := Vector2(size.x * absf(scale.x), size.y * absf(scale.y))
+		return Rect2(shape_node.global_position - scaled * 0.5, scaled)
+	return Rect2()
+
+func _contains_global_point(node: Node2D, global_point: Vector2) -> bool:
+	var rect := _rect_from_collision_shape_node(node)
+	if rect.size == Vector2.ZERO:
+		return false
+	return rect.has_point(global_point)
+
+func _pick_topmost_node_at_point(candidates: Array, global_point: Vector2) -> Node2D:
+	var best: Node2D = null
+	var best_z := -2147483648
+	var best_order := -2147483648
+
+	for item in candidates:
+		if not (item is Node2D):
+			continue
+		var node := item as Node2D
+		if not is_instance_valid(node):
+			continue
+		if not _contains_global_point(node, global_point):
+			continue
+
+		var node_z := node.z_index
+		var node_order := node.get_index()
+		if best == null:
+			best = node
+			best_z = node_z
+			best_order = node_order
+			continue
+
+		if node_z > best_z or (node_z == best_z and node_order > best_order):
+			best = node
+			best_z = node_z
+			best_order = node_order
+
+	return best
 
 # ============= NETWORK =============
 func get_card_id() -> String:

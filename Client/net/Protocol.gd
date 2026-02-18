@@ -1,49 +1,49 @@
 # Protocol.gd
 extends Node
 
-const GameMessage = preload("res://Client/game/messages/GameMessage.gd")
+const GameMessage = preload("res://Client/game/helpers/GameMessage.gd")
 
-const MSG_POPUP_TECH_ERROR_GENERIC := "MSG_POPUP_TECH_ERROR_GENERIC"
-const MSG_POPUP_TECH_BAD_REQUEST := "MSG_POPUP_TECH_BAD_REQUEST"
-const MSG_POPUP_TECH_NOT_FOUND := "MSG_POPUP_TECH_NOT_FOUND"
-const MSG_POPUP_TECH_FORBIDDEN := "MSG_POPUP_TECH_FORBIDDEN"
-const MSG_POPUP_TECH_BAD_STATE := "MSG_POPUP_TECH_BAD_STATE"
-const MSG_POPUP_TECH_NOT_IMPLEMENTED := "MSG_POPUP_TECH_NOT_IMPLEMENTED"
-const MSG_POPUP_TECH_INTERNAL_ERROR := "MSG_POPUP_TECH_INTERNAL_ERROR"
+const POPUP_TECH_ERROR_GENERIC := "POPUP_TECH_ERROR_GENERIC"
+const POPUP_TECH_BAD_REQUEST := "POPUP_TECH_BAD_REQUEST"
+const POPUP_TECH_NOT_FOUND := "POPUP_TECH_NOT_FOUND"
+const POPUP_TECH_FORBIDDEN := "POPUP_TECH_FORBIDDEN"
+const POPUP_TECH_BAD_STATE := "POPUP_TECH_BAD_STATE"
+const POPUP_TECH_NOT_IMPLEMENTED := "POPUP_TECH_NOT_IMPLEMENTED"
+const POPUP_TECH_INTERNAL_ERROR := "POPUP_TECH_INTERNAL_ERROR"
 
-const MSG_POPUP_AUTH_REQUIRED := "MSG_POPUP_AUTH_REQUIRED"
-const MSG_POPUP_AUTH_BAD_PIN := "MSG_POPUP_AUTH_BAD_PIN"
-const MSG_POPUP_AUTH_ALREADY_CONNECTED := "MSG_POPUP_AUTH_ALREADY_CONNECTED"
-const MSG_POPUP_AUTH_MISSING_CREDENTIALS := "MSG_POPUP_AUTH_MISSING_CREDENTIALS"
-const MSG_POPUP_AUTH_CONNECTION_ERROR := "MSG_POPUP_AUTH_CONNECTION_ERROR"
+const POPUP_AUTH_REQUIRED := "POPUP_AUTH_REQUIRED"
+const POPUP_AUTH_BAD_PIN := "POPUP_AUTH_BAD_PIN"
+const POPUP_AUTH_ALREADY_CONNECTED := "POPUP_AUTH_ALREADY_CONNECTED"
+const POPUP_AUTH_MISSING_CREDENTIALS := "POPUP_AUTH_MISSING_CREDENTIALS"
+const POPUP_AUTH_CONNECTION_ERROR := "POPUP_AUTH_CONNECTION_ERROR"
 
-const MSG_POPUP_INVITE_NOT_FOUND := "MSG_POPUP_INVITE_NOT_FOUND"
-const MSG_POPUP_INVITE_DECLINED := "MSG_POPUP_INVITE_DECLINED"
-const MSG_POPUP_INVITE_RECEIVED := "MSG_POPUP_INVITE_RECEIVED"
-const MSG_POPUP_INVITE_SENT := "MSG_POPUP_INVITE_SENT"
-const MSG_POPUP_INVITE_FAILED := "MSG_POPUP_INVITE_FAILED"
-const MSG_POPUP_INVITE_CANCELLED := "MSG_POPUP_INVITE_CANCELLED"
-const MSG_POPUP_INVITE_TARGET_ALREADY_INVITED := "MSG_POPUP_INVITE_TARGET_ALREADY_INVITED"
-const MSG_POPUP_INVITE_TARGET_ALREADY_INVITING := "MSG_POPUP_INVITE_TARGET_ALREADY_INVITING"
-const MSG_POPUP_INVITE_ACTOR_ALREADY_INVITED := "MSG_POPUP_INVITE_ACTOR_ALREADY_INVITED"
-const MSG_POPUP_INVITE_ACTOR_ALREADY_INVITING := "MSG_POPUP_INVITE_ACTOR_ALREADY_INVITING"
+const POPUP_INVITE_NOT_FOUND := "POPUP_INVITE_NOT_FOUND"
+const POPUP_INVITE_DECLINED := "POPUP_INVITE_DECLINED"
+const POPUP_INVITE_RECEIVED := "POPUP_INVITE_RECEIVED"
+const POPUP_INVITE_SENT := "POPUP_INVITE_SENT"
+const POPUP_INVITE_FAILED := "POPUP_INVITE_FAILED"
+const POPUP_INVITE_CANCELLED := "POPUP_INVITE_CANCELLED"
+const POPUP_INVITE_TARGET_ALREADY_INVITED := "POPUP_INVITE_TARGET_ALREADY_INVITED"
+const POPUP_INVITE_TARGET_ALREADY_INVITING := "POPUP_INVITE_TARGET_ALREADY_INVITING"
+const POPUP_INVITE_ACTOR_ALREADY_INVITED := "POPUP_INVITE_ACTOR_ALREADY_INVITED"
+const POPUP_INVITE_ACTOR_ALREADY_INVITING := "POPUP_INVITE_ACTOR_ALREADY_INVITING"
 
-const MSG_POPUP_GAME_ENDED := "MSG_POPUP_GAME_ENDED"
-const MSG_POPUP_GAME_PAUSED := "MSG_POPUP_GAME_PAUSED"
-const MSG_POPUP_GAME_END_WINNER := "MSG_POPUP_GAME_END_WINNER"
-const MSG_POPUP_GAME_END_VICTORY := "MSG_POPUP_GAME_END_VICTORY"
-const MSG_POPUP_GAME_END_DEFEAT := "MSG_POPUP_GAME_END_DEFEAT"
+const POPUP_GAME_ENDED := "POPUP_GAME_ENDED"
+const POPUP_GAME_PAUSED := "POPUP_GAME_PAUSED"
+const POPUP_GAME_END_WINNER := "POPUP_GAME_END_WINNER"
+const POPUP_GAME_END_VICTORY := "POPUP_GAME_END_VICTORY"
+const POPUP_GAME_END_DEFEAT := "POPUP_GAME_END_DEFEAT"
 
-const MSG_POPUP_UI_ACTION_IMPOSSIBLE := "MSG_POPUP_UI_ACTION_IMPOSSIBLE"
-const MSG_POPUP_LOBBY_GET_PLAYERS_ERROR := "MSG_POPUP_LOBBY_GET_PLAYERS_ERROR"
-const MSG_POPUP_SPECTATE_CONFIRM := "MSG_POPUP_SPECTATE_CONFIRM"
-const MSG_POPUP_LOGOUT_CONFIRM := "MSG_POPUP_LOGOUT_CONFIRM"
-const MSG_POPUP_OPPONENT_DISCONNECTED := "MSG_POPUP_OPPONENT_DISCONNECTED"
-const MSG_POPUP_OPPONENT_REJOINED := "MSG_POPUP_OPPONENT_REJOINED"
-const MSG_POPUP_QUIT_CONFIRM := "MSG_POPUP_QUIT_CONFIRM"
-const MSG_POPUP_OPPONENT_DISCONNECTED_CHOICE := "MSG_POPUP_OPPONENT_DISCONNECTED_CHOICE"
+const POPUP_UI_ACTION_IMPOSSIBLE := "POPUP_UI_ACTION_IMPOSSIBLE"
+const POPUP_LOBBY_GET_PLAYERS_ERROR := "POPUP_LOBBY_GET_PLAYERS_ERROR"
+const POPUP_SPECTATE_CONFIRM := "POPUP_SPECTATE_CONFIRM"
+const POPUP_LOGOUT_CONFIRM := "POPUP_LOGOUT_CONFIRM"
+const POPUP_OPPONENT_DISCONNECTED := "POPUP_OPPONENT_DISCONNECTED"
+const POPUP_OPPONENT_REJOINED := "POPUP_OPPONENT_REJOINED"
+const POPUP_QUIT_CONFIRM := "POPUP_QUIT_CONFIRM"
+const POPUP_OPPONENT_DISCONNECTED_CHOICE := "POPUP_OPPONENT_DISCONNECTED_CHOICE"
 
-const DEFAULT_ERROR_FALLBACK := MSG_POPUP_UI_ACTION_IMPOSSIBLE
+const DEFAULT_ERROR_FALLBACK := POPUP_UI_ACTION_IMPOSSIBLE
 
 const POPUP_FLOW := {
 	"INVITE_REQUEST": "invite_request",
@@ -55,47 +55,47 @@ const POPUP_ACTION := {
 }
 
 const POPUP_TEXT_BY_CODE := {
-	MSG_POPUP_TECH_ERROR_GENERIC: "Erreur",
-	MSG_POPUP_TECH_BAD_REQUEST: "Requete invalide",
-	MSG_POPUP_TECH_NOT_FOUND: "Ressource introuvable",
-	MSG_POPUP_TECH_FORBIDDEN: "Action interdite",
-	MSG_POPUP_TECH_BAD_STATE: "Action impossible dans cet etat",
-	MSG_POPUP_TECH_NOT_IMPLEMENTED: "Action non geree",
-	MSG_POPUP_TECH_INTERNAL_ERROR: "Erreur serveur",
-	MSG_POPUP_AUTH_REQUIRED: "Authentification requise",
-	MSG_POPUP_AUTH_BAD_PIN: "PIN incorrect",
-	MSG_POPUP_AUTH_ALREADY_CONNECTED: "Utilisateur deja connecte",
-	MSG_POPUP_AUTH_MISSING_CREDENTIALS: "Identifiant ou PIN manquant",
-	MSG_POPUP_AUTH_CONNECTION_ERROR: "Erreur de connexion",
-	MSG_POPUP_INVITE_NOT_FOUND: "Invitation introuvable",
-	MSG_POPUP_INVITE_DECLINED: "{actor} a refuse ton invitation",
-	MSG_POPUP_INVITE_RECEIVED: "{from} t'invite a jouer",
-	MSG_POPUP_INVITE_SENT: "Invitation envoyé",
-	MSG_POPUP_INVITE_FAILED: "Invitation impossible",
-	MSG_POPUP_INVITE_CANCELLED: "Invitation annulee: {name} hors ligne",
-	MSG_POPUP_INVITE_TARGET_ALREADY_INVITED: "Le destinataire a deja une invitation en attente",
-	MSG_POPUP_INVITE_TARGET_ALREADY_INVITING: "Le destinataire invite deja quelqu'un",
-	MSG_POPUP_INVITE_ACTOR_ALREADY_INVITED: "Tu as deja une invitation en attente",
-	MSG_POPUP_INVITE_ACTOR_ALREADY_INVITING: "Tu invites deja quelqu'un",
-	MSG_POPUP_GAME_ENDED: "La partie est terminee",
-	MSG_POPUP_GAME_PAUSED: "La partie est en pause",
-	MSG_POPUP_GAME_END_WINNER: "Gagnant: {name}",
-	MSG_POPUP_GAME_END_VICTORY: "Victoire",
-	MSG_POPUP_GAME_END_DEFEAT: "Defaite",
-	MSG_POPUP_UI_ACTION_IMPOSSIBLE: "Action impossible",
-	MSG_POPUP_LOBBY_GET_PLAYERS_ERROR: "Erreur get_players",
-	MSG_POPUP_SPECTATE_CONFIRM: "Regarder cette partie en spectateur ?\n(game_id: {game_id})\nJoueurs: {players}",
-	MSG_POPUP_LOGOUT_CONFIRM: "Se deconnecter et revenir a l'ecran de connexion ?",
-	MSG_POPUP_OPPONENT_DISCONNECTED: "{name} s'est deconnecte",
-	MSG_POPUP_OPPONENT_REJOINED: "{name} a rejoint la partie",
-	MSG_POPUP_QUIT_CONFIRM: "Quitter la partie et revenir au lobby ?",
-	MSG_POPUP_OPPONENT_DISCONNECTED_CHOICE: "{name} s'est deconnecte.\nAttendre ou revenir au lobby ?",
+	POPUP_TECH_ERROR_GENERIC: "Erreur",
+	POPUP_TECH_BAD_REQUEST: "Requete invalide",
+	POPUP_TECH_NOT_FOUND: "Ressource introuvable",
+	POPUP_TECH_FORBIDDEN: "Action interdite",
+	POPUP_TECH_BAD_STATE: "Action impossible dans cet etat",
+	POPUP_TECH_NOT_IMPLEMENTED: "Action non geree",
+	POPUP_TECH_INTERNAL_ERROR: "Erreur serveur",
+	POPUP_AUTH_REQUIRED: "Authentification requise",
+	POPUP_AUTH_BAD_PIN: "PIN incorrect",
+	POPUP_AUTH_ALREADY_CONNECTED: "Utilisateur deja connecte",
+	POPUP_AUTH_MISSING_CREDENTIALS: "Identifiant ou PIN manquant",
+	POPUP_AUTH_CONNECTION_ERROR: "Erreur de connexion",
+	POPUP_INVITE_NOT_FOUND: "Invitation introuvable",
+	POPUP_INVITE_DECLINED: "{actor} a refuse ton invitation",
+	POPUP_INVITE_RECEIVED: "{from} t'invite a jouer",
+	POPUP_INVITE_SENT: "Invitation envoyé",
+	POPUP_INVITE_FAILED: "Invitation impossible",
+	POPUP_INVITE_CANCELLED: "Invitation annulee: {name} hors ligne",
+	POPUP_INVITE_TARGET_ALREADY_INVITED: "Le destinataire a deja une invitation en attente",
+	POPUP_INVITE_TARGET_ALREADY_INVITING: "Le destinataire invite deja quelqu'un",
+	POPUP_INVITE_ACTOR_ALREADY_INVITED: "Tu as deja une invitation en attente",
+	POPUP_INVITE_ACTOR_ALREADY_INVITING: "Tu invites deja quelqu'un",
+	POPUP_GAME_ENDED: "La partie est terminee",
+	POPUP_GAME_PAUSED: "La partie est en pause",
+	POPUP_GAME_END_WINNER: "Gagnant: {name}",
+	POPUP_GAME_END_VICTORY: "Victoire",
+	POPUP_GAME_END_DEFEAT: "Defaite",
+	POPUP_UI_ACTION_IMPOSSIBLE: "Action impossible",
+	POPUP_LOBBY_GET_PLAYERS_ERROR: "Erreur get_players",
+	POPUP_SPECTATE_CONFIRM: "Regarder cette partie en spectateur ?\n(game_id: {game_id})\nJoueurs: {players}",
+	POPUP_LOGOUT_CONFIRM: "Se deconnecter et revenir a l'ecran de connexion ?",
+	POPUP_OPPONENT_DISCONNECTED: "{name} s'est deconnecte",
+	POPUP_OPPONENT_REJOINED: "{name} a rejoint la partie",
+	POPUP_QUIT_CONFIRM: "Quitter la partie et revenir au lobby ?",
+	POPUP_OPPONENT_DISCONNECTED_CHOICE: "{name} s'est deconnecte.\nAttendre ou revenir au lobby ?",
 }
 
 static func normalize_game_message(payload: Dictionary) -> Dictionary:
-	var inline := GameMessage.normalize_inline_message(payload)
-	if not inline.is_empty():
-		return inline
+	var ingame := GameMessage.normalize_ingame_message(payload)
+	if not ingame.is_empty():
+		return ingame
 
 	var params_val = payload.get(
 		"message_params",
@@ -107,10 +107,10 @@ static func normalize_game_message(payload: Dictionary) -> Dictionary:
 		text = String(payload.get("message", "")).strip_edges()
 	var message_code := String(payload.get("message_code", "")).strip_edges()
 
-	if text.begins_with("MSG_POPUP_"):
+	if text.begins_with("POPUP_"):
 		message_code = text
 
-	if message_code.begins_with("MSG_POPUP_") and (text == "" or text == message_code):
+	if message_code.begins_with("POPUP_") and (text == "" or text == message_code):
 		text = popup_text(message_code, params)
 
 	var color := Color.WHITE
@@ -148,24 +148,24 @@ static func normalize_error_message(
 
 	var fallback := String(fallback_message).strip_edges()
 	if message_code == "":
-		if fallback.begins_with("MSG_INLINE_") or fallback.begins_with("MSG_POPUP_"):
+		if fallback.begins_with("INGAME_") or fallback.begins_with("POPUP_"):
 			message_code = fallback
 		else:
-			message_code = MSG_POPUP_UI_ACTION_IMPOSSIBLE
+			message_code = POPUP_UI_ACTION_IMPOSSIBLE
 			if text == "":
 				text = fallback
 
 	if message_code == "":
-		message_code = MSG_POPUP_UI_ACTION_IMPOSSIBLE
+		message_code = POPUP_UI_ACTION_IMPOSSIBLE
 
 	if text == "":
-		if message_code.begins_with("MSG_INLINE_"):
+		if message_code.begins_with("INGAME_"):
 			text = GameMessage.text_for_code(message_code, message_params)
-		elif message_code.begins_with("MSG_POPUP_"):
+		elif message_code.begins_with("POPUP_"):
 			text = popup_text(message_code, message_params)
 
 	if text == "":
-		text = popup_text(MSG_POPUP_UI_ACTION_IMPOSSIBLE)
+		text = popup_text(POPUP_UI_ACTION_IMPOSSIBLE)
 	if text == "":
 		text = "Erreur"
 
@@ -199,7 +199,7 @@ static func invite_cancelled_ui(data: Dictionary) -> Dictionary:
 		name = "Utilisateur"
 
 	return normalize_game_message({
-		"message_code": MSG_POPUP_INVITE_CANCELLED,
+		"message_code": POPUP_INVITE_CANCELLED,
 		"message_params": {
 			"name": name,
 		},
@@ -220,11 +220,11 @@ static func invite_action_request(action_id: String, payload: Dictionary) -> Dic
 		return { "to": from_user, "accepted": false }
 	return {}
 
-static func is_inline_game_message(payload: Dictionary) -> bool:
-	return not GameMessage.normalize_inline_message(payload).is_empty()
+static func is_ingame_game_message(payload: Dictionary) -> bool:
+	return not GameMessage.normalize_ingame_message(payload).is_empty()
 
-static func inline_message_color(payload: Dictionary) -> Color:
-	var normalized := GameMessage.normalize_inline_message(payload)
+static func ingame_message_color(payload: Dictionary) -> Color:
+	var normalized := GameMessage.normalize_ingame_message(payload)
 	if normalized.is_empty():
 		return Color.WHITE
 	var color_val = normalized.get("color", null)
@@ -238,25 +238,25 @@ static func game_end_popup_message(data: Dictionary, username: String, is_specta
 
 	if is_spectator:
 		return {
-			"message_code": MSG_POPUP_GAME_END_WINNER,
-			"text": popup_text(MSG_POPUP_GAME_END_WINNER, { "name": winner_name }),
+			"message_code": POPUP_GAME_END_WINNER,
+			"text": popup_text(POPUP_GAME_END_WINNER, { "name": winner_name }),
 		}
 
 	if winner != "" and winner == username:
 		return {
-			"message_code": MSG_POPUP_GAME_END_VICTORY,
-			"text": popup_text(MSG_POPUP_GAME_END_VICTORY),
+			"message_code": POPUP_GAME_END_VICTORY,
+			"text": popup_text(POPUP_GAME_END_VICTORY),
 		}
 
 	if winner != "":
 		return {
-			"message_code": MSG_POPUP_GAME_END_DEFEAT,
-			"text": popup_text(MSG_POPUP_GAME_END_DEFEAT),
+			"message_code": POPUP_GAME_END_DEFEAT,
+			"text": popup_text(POPUP_GAME_END_DEFEAT),
 		}
 
 	return {
-		"message_code": MSG_POPUP_GAME_END_WINNER,
-		"text": popup_text(MSG_POPUP_GAME_END_WINNER, { "name": winner_name }),
+		"message_code": POPUP_GAME_END_WINNER,
+		"text": popup_text(POPUP_GAME_END_WINNER, { "name": winner_name }),
 	}
 
 static func _format_template(template: String, params: Dictionary) -> String:

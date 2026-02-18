@@ -2,36 +2,42 @@
 extends RefCounted
 class_name SlotIdHelper
 
+const PART_SEPARATOR := ":"
+const PART_COUNT := 3
+const PART_INDEX_PLAYER := 0
+const PART_INDEX_TYPE := 1
+const PART_INDEX_SLOT := 2
+
 static func normalize_slot_id(raw: String) -> String:
 	var s := String(raw)
 	if s == "":
 		return s
-	var parts := s.split(":")
-	if parts.size() != 3:
+	var parts := s.split(PART_SEPARATOR)
+	if parts.size() != PART_COUNT:
 		return s
 
-	var p := String(parts[0])
-	var t := String(parts[1])
-	var idx := String(parts[2])
+	var p := String(parts[PART_INDEX_PLAYER])
+	var t := String(parts[PART_INDEX_TYPE])
+	var idx := String(parts[PART_INDEX_SLOT])
 
 	if not p.is_valid_int() or not idx.is_valid_int():
 		return s
 
-	return "%d:%s:%d" % [int(p), t, int(idx)]
+	return "%d%s%s%s%d" % [int(p), PART_SEPARATOR, t, PART_SEPARATOR, int(idx)]
 
 static func parse_slot_id(raw: String) -> Dictionary:
 	var s := normalize_slot_id(raw)
-	if s.find(":") == -1:
+	if s.find(PART_SEPARATOR) == -1:
 		return {}
-	var parts := s.split(":")
-	if parts.size() != 3:
+	var parts := s.split(PART_SEPARATOR)
+	if parts.size() != PART_COUNT:
 		return {}
-	if not parts[0].is_valid_int() or not parts[2].is_valid_int():
+	if not parts[PART_INDEX_PLAYER].is_valid_int() or not parts[PART_INDEX_SLOT].is_valid_int():
 		return {}
 	return {
-		"player": int(parts[0]),
-		"type": String(parts[1]),
-		"index": int(parts[2]),
+		"player": int(parts[PART_INDEX_PLAYER]),
+		"type": String(parts[PART_INDEX_TYPE]),
+		"index": int(parts[PART_INDEX_SLOT]),
 		"raw": s,
 	}
 

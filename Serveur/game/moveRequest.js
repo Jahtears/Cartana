@@ -5,7 +5,7 @@ import { resBadRequest, resBadState, resError, resNotFound } from "../net/transp
 import { orchestrateMove, MOVE_RESULT_CODE } from "./moveOrchestrator.js";
 import { ensureGameMeta } from "./meta.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
-import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
+import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 import { POPUP_MESSAGE } from "../shared/popupMessages.js";
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
@@ -41,7 +41,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   if (typeof processTurnTimeout === "function") {
     const didExpire = processTurnTimeout(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
-      return resError(sendRes, ws, req, INLINE_MESSAGE.TURN_TIMEOUT, { game_id });
+      return resError(sendRes, ws, req, INGAME_MESSAGE.TURN_TIMEOUT, { game_id });
     }
   }
 
@@ -65,10 +65,10 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   });
 
   if (!from_slot_id || !to_slot_id) {
-    resBadRequest(sendRes, ws, req, INLINE_MESSAGE.MOVE_INVALID_SLOT, {
+    resBadRequest(sendRes, ws, req, INGAME_MESSAGE.MOVE_INVALID_SLOT, {
       from_slot_id: raw_from,
       to_slot_id: raw_to,
-      message_code: INLINE_MESSAGE.MOVE_INVALID_SLOT,
+      message_code: INGAME_MESSAGE.MOVE_INVALID_SLOT,
     });
     return true;
   }
@@ -122,7 +122,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
       return resBadRequest(sendRes, ws, req, orchResult.reason, details);
     }
 
-    return resBadState(sendRes, ws, req, orchResult.reason || INLINE_MESSAGE.MOVE_REJECTED, details);
+    return resBadState(sendRes, ws, req, orchResult.reason || INGAME_MESSAGE.MOVE_REJECTED, details);
   }
 
   // ✅ GAME END: emit end then broadcast

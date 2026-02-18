@@ -46,41 +46,6 @@ color = Color(0.039215688, 0.47843137, 0.16470589, 1)
 
 [node name="Table" type="Node2D" parent="Board" unique_id=1829673621]
 
-[node name="UIContainer" type="MarginContainer" parent="." unique_id=1132234811]
-z_index = 1
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="MessageBox" type="VBoxContainer" parent="UIContainer" unique_id=1132234812]
-layout_mode = 2
-mouse_filter = 2
-
-[node name="CenterContainer" type="CenterContainer" parent="UIContainer/MessageBox" unique_id=857968040]
-layout_mode = 2
-mouse_filter = 2
-use_top_left = true
-
-[node name="GameMessage" type="RichTextLabel" parent="UIContainer/MessageBox/CenterContainer" unique_id=440980212]
-layout_mode = 2
-mouse_filter = 2
-bbcode_enabled = true
-fit_content = true
-autowrap_mode = 0
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="Timer" type="Timer" parent="UIContainer/MessageBox" unique_id=2053246925]
-
-[node name="TimeBar" type="ProgressBar" parent="." unique_id=1818865610]
-layout_mode = 0
-offset_right = 4.0
-offset_bottom = 27.0
-
 [node name="Quitter" type="Button" parent="." unique_id=881340491]
 z_index = 2
 layout_mode = 0

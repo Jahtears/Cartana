@@ -16,6 +16,6 @@ export {
   TOP_ONLY_VISIBLE_SLOT_TYPES,
 } from "./slotView.js";
 export {
-  INLINE_MESSAGE,
-  INLINE_MESSAGE_SET,
-} from "./inlineMessages.js";
+  INGAME_MESSAGE,
+  INGAME_MESSAGE_SET,
+} from "./ingameMessages.js";

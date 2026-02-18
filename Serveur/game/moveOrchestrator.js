@@ -4,7 +4,7 @@
 import { SLOT_TYPES, SlotId } from "./constants/slots.js";
 import { DEFAULT_HAND_SIZE } from "./constants/turnFlow.js";
 import { isTableSlot } from "./helpers/slotHelpers.js";
-import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
+import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 
 export const MOVE_RESULT_CODE = Object.freeze({
   NOT_FOUND: "NOT_FOUND",
@@ -64,7 +64,7 @@ export function orchestrateMove(params) {
   if (!card) {
     return {
       valid: false,
-      reason: INLINE_MESSAGE.RULE_CARD_NOT_FOUND,
+      reason: INGAME_MESSAGE.RULE_CARD_NOT_FOUND,
       code: MOVE_RESULT_CODE.NOT_FOUND,
     };
   }
@@ -89,7 +89,7 @@ export function orchestrateMove(params) {
   if (!moveResult) {
     return {
       valid: false,
-      reason: INLINE_MESSAGE.MOVE_REJECTED,
+      reason: INGAME_MESSAGE.MOVE_REJECTED,
       code: MOVE_RESULT_CODE.MOVE_DENIED,
     };
   }

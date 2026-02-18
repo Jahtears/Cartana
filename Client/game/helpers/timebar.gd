@@ -2,6 +2,51 @@
 extends RefCounted
 class_name TimebarUtil
 
+const NODE_NAME := "TimeBar"
+
+const SIZE := Vector2(420.0, 10.0)
+const SHOW_PERCENTAGE := false
+const CENTER_OFFSET_P1_BANC := Vector2(-30.0, -100.0)
+
+static func create_state() -> Dictionary:
+	return {
+		"bar": null,
+		"turn_current": "",
+		"turn_ends_at_ms": 0,
+		"turn_duration_ms": 0,
+		"turn_paused": false,
+		"turn_remaining_ms": 0,
+		"timebar_mode": -1,
+		"timebar_bg_sb": null,
+		"timebar_fill_sb": null,
+		"timebar_last_color": Color(-1, -1, -1, -1),
+	}
+
+static func ensure_ui(state: Dictionary, root: Control) -> void:
+	if root == null:
+		return
+
+	var bar := _get_bar(state)
+	if bar != null:
+		return
+
+	bar = ProgressBar.new()
+	bar.name = NODE_NAME
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(bar)
+	state["bar"] = bar
+
+static func apply_layout(state: Dictionary, anchor_position: Vector2) -> void:
+	var time_bar := _get_bar(state)
+	if time_bar == null:
+		return
+
+	time_bar.show_percentage = SHOW_PERCENTAGE
+	time_bar.custom_minimum_size = Vector2.ZERO
+	time_bar.custom_minimum_size = SIZE
+	time_bar.size = SIZE
+	time_bar.position = anchor_position + CENTER_OFFSET_P1_BANC
+
 static func set_turn_timer(state: Dictionary, turn: Dictionary, sync_server_clock: Callable) -> void:
 	state["turn_current"] = String(turn.get("current", ""))
 	state["turn_ends_at_ms"] = int(turn.get("endsAt", 0))
@@ -27,7 +72,8 @@ static func update_timebar_mode(state: Dictionary, is_spectator: bool, username:
 	else:
 		state["timebar_mode"] = 1
 
-static func update_timebar(state: Dictionary, time_bar: ProgressBar, server_now_ms: Callable) -> void:
+static func update_timebar(state: Dictionary, server_now_ms: Callable) -> void:
+	var time_bar := _get_bar(state)
 	if time_bar == null:
 		return
 
@@ -63,22 +109,12 @@ static func update_timebar(state: Dictionary, time_bar: ProgressBar, server_now_
 
 static func _ensure_timebar_style_overrides(state: Dictionary, time_bar: ProgressBar) -> void:
 	if state.get("timebar_bg_sb", null) == null:
-		var background := StyleBoxFlat.new()
-		background.bg_color = Color(0.02, 0.16, 0.09, 0.55)
-		background.corner_radius_top_left = 6
-		background.corner_radius_top_right = 6
-		background.corner_radius_bottom_right = 6
-		background.corner_radius_bottom_left = 6
+		var background := _new_rounded_style(Color(0.02, 0.16, 0.09, 0.55))
 		state["timebar_bg_sb"] = background
 		time_bar.add_theme_stylebox_override("background", background)
 
 	if state.get("timebar_fill_sb", null) == null:
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = Color(0.22, 0.95, 0.28, 1.0)
-		fill.corner_radius_top_left = 6
-		fill.corner_radius_top_right = 6
-		fill.corner_radius_bottom_right = 6
-		fill.corner_radius_bottom_left = 6
+		var fill := _new_rounded_style(Color(0.22, 0.95, 0.28, 1.0))
 		state["timebar_fill_sb"] = fill
 		time_bar.add_theme_stylebox_override("fill", fill)
 
@@ -110,6 +146,9 @@ static func _update_timebar_fill_by_ratio(state: Dictionary, time_bar: ProgressB
 	else:
 		time_bar.self_modulate = c
 
+static func cleanup(state: Dictionary) -> void:
+	state["bar"] = null
+
 static func _timebar_gradient(ratio: float) -> Color:
 	ratio = clampf(ratio, 0.0, 1.0)
 
@@ -138,3 +177,18 @@ static func _hsv_lerp(a: Color, b: Color, t: float) -> Color:
 	var v := lerpf(a.v, b.v, t)
 	var alpha := lerpf(a.a, b.a, t)
 	return Color.from_hsv(h, s, v, alpha)
+
+static func _new_rounded_style(bg_color: Color, radius: int = 10) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg_color
+	style.corner_radius_top_left = radius
+	style.corner_radius_top_right = radius
+	style.corner_radius_bottom_right = radius
+	style.corner_radius_bottom_left = radius
+	return style
+
+static func _get_bar(state: Dictionary) -> ProgressBar:
+	var bar := state.get("bar", null) as ProgressBar
+	if bar != null and is_instance_valid(bar):
+		return bar
+	return null

@@ -48,19 +48,19 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 				update_games_list(data.get("games", []))
 				update_players_list(data.get("players", []))
 			else:
-				_show_error_popup(error, Protocol.MSG_POPUP_LOBBY_GET_PLAYERS_ERROR)
+				_show_error_popup(error, Protocol.POPUP_LOBBY_GET_PLAYERS_ERROR)
 
 		REQ_JOIN_GAME, REQ_SPECTATE_GAME:
 			if not ok:
-				_show_error_popup(error, Protocol.MSG_POPUP_UI_ACTION_IMPOSSIBLE)
+				_show_error_popup(error, Protocol.POPUP_UI_ACTION_IMPOSSIBLE)
 
 		REQ_INVITE:
 			if ok:
 				PopupUi.show_ui_message({
-					"message_code": Protocol.MSG_POPUP_INVITE_SENT,
+					"message_code": Protocol.POPUP_INVITE_SENT,
 				})
 			else:
-				_show_error_popup(error, Protocol.MSG_POPUP_INVITE_FAILED)
+				_show_error_popup(error, Protocol.POPUP_INVITE_FAILED)
 
 # --------------------
 # EVT (push serveur)
@@ -105,7 +105,7 @@ func _on_network_disconnected(_code: int, reason: String) -> void:
 	if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
 		return
 	PopupUi.show_ui_message({
-		"message_code": Protocol.MSG_POPUP_AUTH_CONNECTION_ERROR,
+		"message_code": Protocol.POPUP_AUTH_CONNECTION_ERROR,
 	})
 
 func _handle_invite_cancelled(data: Dictionary) -> void:
@@ -198,7 +198,7 @@ func _on_game_clicked(game_id: String, players: Array) -> void:
 
 	PopupUi.show_confirm(
 		Protocol.popup_text(
-			Protocol.MSG_POPUP_SPECTATE_CONFIRM,
+			Protocol.POPUP_SPECTATE_CONFIRM,
 			{
 				"game_id": game_id,
 				"players": str(players),
@@ -226,7 +226,7 @@ func _do_spectate_game(game_id: String) -> void:
 # --------------------
 func _on_deconnexion_pressed() -> void:
 	PopupUi.show_confirm(
-		Protocol.popup_text(Protocol.MSG_POPUP_LOGOUT_CONFIRM),
+		Protocol.popup_text(Protocol.POPUP_LOGOUT_CONFIRM),
 		BUTTON_YES,
 		BUTTON_NO,
 		{"flow": FLOW_LOGOUT}

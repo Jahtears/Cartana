@@ -9,14 +9,15 @@ var card_scene: PackedScene = preload("res://Client/Scenes/Carte.tscn")
 # ============= CONFIG & HELPERS =============
 const GameLayoutConfig = preload("res://Client/game/GameLayoutConfig.gd")
 const Protocol = preload("res://Client/net/Protocol.gd")
-const GameMessage = preload("res://Client/game/messages/GameMessage.gd")
+const GameMessage = preload("res://Client/game/helpers/GameMessage.gd")
 const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
 const TableSyncHelper = preload("res://Client/game/helpers/table_sync.gd")
 const CardSyncHelper = preload("res://Client/game/helpers/card_sync.gd")
-const TimebarUtil = preload("res://Client/game/helpers/timebar.gd")
+const TimebarUtil = preload("res://Client/game/helpers/TimeBar.gd")
+const DeckCountUtil = preload("res://Client/game/helpers/DeckCount.gd")
 
 # ============= CONSTANTS =============
-const POPUP_PREFIX := "MSG_POPUP_"
+const POPUP_PREFIX := "POPUP_"
 const FLOW_INVITE_REQUEST_FALLBACK := "invite_request"
 const REQ_JOIN_GAME := "join_game"
 const REQ_SPECTATE_GAME := "spectate_game"
@@ -51,9 +52,7 @@ var _leave_sent := false
 var _disconnect_prompt_seq := 0
 var _opponent_disconnected := false
 var _message_tween: Tween = null
-var _deck_count_badges: Dictionary = {}
-var _deck_count_labels: Dictionary = {}
-var _deck_count_pulse_tweens: Dictionary = {}
+var _deck_count_state: Dictionary = DeckCountUtil.create_state()
 
 # ============= LAYOUT STATE =============
 var _slot_spacing: float = GameLayoutConfig.DEFAULT_SLOT_SPACING
@@ -64,30 +63,20 @@ var _positions_cache: Dictionary = {}
 var START_POS: Vector2 = GameLayoutConfig.START_POS
 
 # ============= NODES =============
-@onready var time_bar: ProgressBar = $TimeBar
 @onready var player1_root: Node2D = $Board/Player1
 @onready var player2_root: Node2D = $Board/Player2
+@onready var p1_main_anchor: Node2D = $Board/Player1/Main
+@onready var p1_banc_anchor: Node2D = $Board/Player1/Banc
 @onready var pioche_root: Node2D = $Board/Pioche
 @onready var table_root: Node2D = $Board/Table
-@onready var game_message_label: RichTextLabel = $UIContainer/MessageBox/CenterContainer/GameMessage
-@onready var game_message_timer: Timer = $UIContainer/MessageBox/Timer
 @onready var quitter_button: Button = $Quitter
 
 # ============= CARD CONTEXT =============
 var _card_ctx: Dictionary = {}
 
 # ============= TIMEBAR STATE =============
-var _timebar_state: Dictionary = {
-	"turn_current": "",
-	"turn_ends_at_ms": 0,
-	"turn_duration_ms": 0,
-	"turn_paused": false,
-	"turn_remaining_ms": 0,
-	"timebar_mode": -1,
-	"timebar_bg_sb": null,
-	"timebar_fill_sb": null,
-	"timebar_last_color": Color(-1, -1, -1, -1),
-}
+var _timebar_state: Dictionary = TimebarUtil.create_state()
+var _game_message_state: Dictionary = GameMessage.create_ui_state()
 
 # ============= LIFECYCLE =============
 
@@ -122,7 +111,7 @@ func _ready() -> void:
 
 	await get_tree().process_frame
 	slots_ready = true
-	TimebarUtil.update_timebar(_timebar_state, time_bar, Callable(NetworkManager, "server_now_ms"))
+	TimebarUtil.update_timebar(_timebar_state, Callable(NetworkManager, "server_now_ms"))
 
 	for event in pending_events:
 		_on_evt(event.get("type", ""), event.get("data", {}))
@@ -199,51 +188,23 @@ func _apply_positions(positions: Dictionary) -> void:
 	quitter_button.position = Vector2(right_x - GameLayoutConfig.QUITTER_OFFSET_X, GameLayoutConfig.QUITTER_OFFSET_Y)
 
 func _apply_timebar_layout() -> void:
-	var timebar_size := GameLayoutConfig.TIMEBAR_SIZE
-	time_bar.custom_minimum_size = timebar_size
-	time_bar.size = timebar_size
-	time_bar.show_percentage = GameLayoutConfig.TIMEBAR_SHOW_PERCENTAGE
-
-	var p1_banc := player1_root.get_node_or_null("Banc") as Node2D
-	if p1_banc == null:
-		return
-	time_bar.position = p1_banc.global_position + GameLayoutConfig.TIMEBAR_CENTER_OFFSET_P1_BANC - timebar_size * 0.5
+	TimebarUtil.apply_layout(_timebar_state, p1_banc_anchor.global_position)
 
 func _apply_game_message_layout() -> void:
-	var p1_hand := player1_root.get_node_or_null("Main") as Node2D
-	if p1_hand == null:
-		return
-	$UIContainer.position = p1_hand.global_position + GameLayoutConfig.MESSAGE_CENTER_OFFSET_P1_HAND
+	GameMessage.apply_layout(_game_message_state, p1_main_anchor.global_position)
 
 func _apply_player_linked_ui_layout() -> void:
 	_apply_timebar_layout()
 	_apply_game_message_layout()
-	_update_deck_count_ui_positions()
+	DeckCountUtil.update_positions(_deck_count_state, self, player1_root, player2_root)
 
 func _init_ui() -> void:
 	"""Initialise l'UI"""
-	game_message_label.visible = false
-	game_message_label.clear()
-	game_message_label.bbcode_enabled = true
-	game_message_label.fit_content = true
-	game_message_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	game_message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	game_message_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	
-	var message_container = $UIContainer/MessageBox/CenterContainer
-	var msg_cfg = GameLayoutConfig.get_message_config()
-	message_container.add_theme_constant_override("margin_top", msg_cfg["margin_top"])
-	message_container.add_theme_constant_override("margin_bottom", msg_cfg["margin_bottom"])
-	message_container.add_theme_constant_override("margin_left", msg_cfg["margin_left"])
-	message_container.add_theme_constant_override("margin_right", msg_cfg["margin_right"])
-	
-	game_message_timer.wait_time = msg_cfg["display_duration"]
-	game_message_timer.one_shot = true
-	if not game_message_timer.timeout.is_connected(_on_message_timeout):
-		game_message_timer.timeout.connect(_on_message_timeout)
+	GameMessage.ensure_ui(_game_message_state, self, Callable(self, "_on_message_timeout"))
 
-	_ensure_deck_count_ui()
-	_reset_deck_count_ui()
+	TimebarUtil.ensure_ui(_timebar_state, self)
+	DeckCountUtil.ensure_ui(_deck_count_state, self)
+	DeckCountUtil.reset_counts(_deck_count_state)
 	_apply_player_linked_ui_layout()
 
 # ============= SETUP JOUEURS ET SLOTS (SIMPLIFIÉ) =============
@@ -319,140 +280,6 @@ func _update_row_positions(player_id: int, slot_type: String, count: int) -> voi
 			slot.position = START_POS + Vector2(i * _slot_spacing, 0)
 			if slot.has_method("invalidate_rect_cache"):
 				slot.call("invalidate_rect_cache")
-
-# ============= DECK COUNT UI =============
-
-func _ensure_deck_count_ui() -> void:
-	for player_id in [1, 2]:
-		if not _deck_count_badges.has(player_id):
-			_create_deck_count_badge(player_id)
-
-func _create_deck_count_badge(player_id: int) -> void:
-	var badge := PanelContainer.new()
-	badge.name = "DeckCountBadgeP%d" % player_id
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.z_index = 3
-	badge.custom_minimum_size = GameLayoutConfig.DECK_COUNT_BADGE_SIZE
-	badge.size = GameLayoutConfig.DECK_COUNT_BADGE_SIZE
-
-	var style := StyleBoxFlat.new()
-	style.bg_color = GameLayoutConfig.DECK_COUNT_BADGE_BG_COLOR
-	style.border_color = GameLayoutConfig.DECK_COUNT_BADGE_BORDER_COLOR
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_right = 8
-	style.corner_radius_bottom_left = 8
-	badge.add_theme_stylebox_override("panel", style)
-
-	var label := Label.new()
-	label.name = "Value"
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", GameLayoutConfig.DECK_COUNT_FONT_SIZE)
-	label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_NORMAL)
-	label.add_theme_constant_override("outline_size", 2)
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.75))
-	badge.add_child(label)
-
-	add_child(badge)
-	_deck_count_badges[player_id] = badge
-	_deck_count_labels[player_id] = label
-
-func _update_deck_count_ui_positions() -> void:
-	_ensure_deck_count_ui()
-
-	var p1_deck := player1_root.get_node_or_null("Deck") as Node2D
-	var p2_deck := player2_root.get_node_or_null("Deck") as Node2D
-
-	_position_deck_count_badge(1, p1_deck, GameLayoutConfig.DECK_COUNT_CENTER_OFFSET_P1)
-	_position_deck_count_badge(2, p2_deck, GameLayoutConfig.DECK_COUNT_CENTER_OFFSET_P2)
-
-func _position_deck_count_badge(player_id: int, deck_node: Node2D, center_offset: Vector2) -> void:
-	var badge := _deck_count_badges.get(player_id) as Control
-	if badge == null or deck_node == null:
-		return
-
-	var size := GameLayoutConfig.DECK_COUNT_BADGE_SIZE
-	badge.size = size
-	badge.position = deck_node.global_position + center_offset - size * 0.5
-
-func _reset_deck_count_ui() -> void:
-	for player_id in [1, 2]:
-		_set_deck_count(player_id, -1)
-
-func _update_deck_count_from_slot(slot_id: String, count: int) -> void:
-	var player_id := _extract_deck_player_id(slot_id)
-	if player_id <= 0:
-		return
-	_set_deck_count(player_id, count)
-
-func _extract_deck_player_id(slot_id: String) -> int:
-	var parsed := SlotIdHelper.parse_slot_id(slot_id)
-	if String(parsed.get("type", "")) != String(GameLayoutConfig.DECK_COUNT_SOURCE_SLOT_TYPE):
-		return 0
-	var player_id := int(parsed.get("player", 0))
-	return player_id if player_id in [1, 2] else 0
-
-func _set_deck_count(player_id: int, count: int) -> void:
-	var label := _deck_count_labels.get(player_id) as Label
-	if label == null:
-		return
-
-	if count < 0:
-		label.text = "--/%d" % GameLayoutConfig.DECK_TOTAL_CARDS
-		label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_UNKNOWN)
-		_stop_deck_count_pulse(player_id)
-		return
-
-	var current := maxi(0, count)
-	label.text = "%d/%d" % [current, GameLayoutConfig.DECK_TOTAL_CARDS]
-
-	if current <= 0:
-		label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_EMPTY)
-	elif current <= GameLayoutConfig.DECK_COUNT_WARN_THRESHOLD:
-		label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_WARN)
-	else:
-		label.add_theme_color_override("font_color", GameLayoutConfig.DECK_COUNT_FONT_COLOR_NORMAL)
-
-	if current > 0 and current <= GameLayoutConfig.DECK_COUNT_WARN_THRESHOLD:
-		_start_deck_count_pulse(player_id)
-	else:
-		_stop_deck_count_pulse(player_id)
-
-func _start_deck_count_pulse(player_id: int) -> void:
-	var badge := _deck_count_badges.get(player_id) as Control
-	if badge == null:
-		return
-
-	if _deck_count_pulse_tweens.has(player_id):
-		var existing := _deck_count_pulse_tweens[player_id] as Tween
-		if existing != null and is_instance_valid(existing):
-			return
-
-	_stop_deck_count_pulse(player_id)
-
-	var tween := create_tween()
-	tween.set_loops()
-	tween.tween_property(badge, "scale", Vector2(1.04, 1.04), 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(badge, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_deck_count_pulse_tweens[player_id] = tween
-
-func _stop_deck_count_pulse(player_id: int) -> void:
-	if _deck_count_pulse_tweens.has(player_id):
-		var tween := _deck_count_pulse_tweens[player_id] as Tween
-		if tween != null and is_instance_valid(tween):
-			tween.kill()
-		_deck_count_pulse_tweens.erase(player_id)
-
-	var badge := _deck_count_badges.get(player_id) as Control
-	if badge != null:
-		badge.scale = Vector2.ONE
 
 # ============= EVENTS & RESPONSES (ORIGINAL COMPLET) =============
 
@@ -553,7 +380,7 @@ func _handle_opponent_disconnected(data: Dictionary) -> void:
 	var who := String(data.get("username", ""))
 	_opponent_disconnected = true
 	PopupUi.show_ui_message({
-		"message_code": Protocol.MSG_POPUP_OPPONENT_DISCONNECTED,
+		"message_code": Protocol.POPUP_OPPONENT_DISCONNECTED,
 		"message_params": { "name": who },
 	})
 	_schedule_disconnect_choice(who)
@@ -564,7 +391,7 @@ func _handle_opponent_rejoined(data: Dictionary) -> void:
 	_disconnect_prompt_seq += 1
 	PopupUi.hide()
 	PopupUi.show_ui_message({
-		"message_code": Protocol.MSG_POPUP_OPPONENT_REJOINED,
+		"message_code": Protocol.POPUP_OPPONENT_REJOINED,
 		"message_params": { "name": who },
 	})
 
@@ -587,10 +414,10 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 
 	if ok:
 		_show_game_feedback({
-			"message_code": GameMessage.MSG_INLINE_MOVE_OK,
+			"message_code": GameMessage.INGAME_MOVE_OK,
 		})
 	else:
-		var ui := Protocol.normalize_error_message(error, GameMessage.MSG_INLINE_MOVE_DENIED)
+		var ui := Protocol.normalize_error_message(error, GameMessage.INGAME_MOVE_DENIED)
 		var details := error.get("details", {}) as Dictionary
 		_show_game_feedback(ui)
 
@@ -604,7 +431,7 @@ func _on_network_disconnected(_code: int, reason: String) -> void:
 	if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
 		return
 	PopupUi.show_ui_message({
-		"message_code": Protocol.MSG_POPUP_AUTH_CONNECTION_ERROR,
+		"message_code": Protocol.POPUP_AUTH_CONNECTION_ERROR,
 	})
 
 func _request_game_sync() -> void:
@@ -617,13 +444,41 @@ func _request_game_sync() -> void:
 	else:
 		NetworkManager.request(REQ_JOIN_GAME, {"game_id": game_id})
 
+func _resolve_slot_for_update(slot_id: String, require_allowed_table: bool) -> Variant:
+	var slot :Variant= slots_by_id.get(slot_id)
+	if slot == null and SlotIdHelper.is_table_slot_id(slot_id):
+		if require_allowed_table and not allowed_table_slots.has(slot_id):
+			return null
+		slot = slots_by_id.get(slot_id)
+	return slot
+
+func _apply_slot_cards_update(slot_id: String, slot, arr: Array, count_for_slot: int, animate_on_finalize: bool, clear_slot_first: bool) -> void:
+	if clear_slot_first and slot != null and slot.has_method("clear_slot"):
+		slot.clear_slot()
+
+	var normalized_count := maxi(0, count_for_slot)
+	if slot != null and slot.has_method("set_server_count"):
+		slot.call("set_server_count", normalized_count)
+	DeckCountUtil.update_from_slot(_deck_count_state, slot_id, normalized_count)
+	if slot != null and slot.has_method("begin_server_sync"):
+		slot.call("begin_server_sync", animate_on_finalize)
+
+	for i in range(arr.size()):
+		var payload = arr[i]
+		if payload is Dictionary:
+			payload["_array_order"] = i
+			CardSyncHelper.apply_card_update(_card_ctx, payload)
+
+	if slot != null and slot.has_method("finalize_server_sync"):
+		slot.call("finalize_server_sync")
+
 # ============= SNAPSHOT =============
 
 func _apply_state_snapshot(data: Dictionary) -> void:
 	for s in slots_by_id.values():
 		if s and s.has_method("clear_slot"):
 			s.clear_slot()
-	_reset_deck_count_ui()
+	DeckCountUtil.reset_counts(_deck_count_state)
 
 	TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, data.get("table", []), _table_spacing, START_POS)
 
@@ -632,28 +487,13 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 	var slot_counts: Dictionary = slot_counts_val if slot_counts_val is Dictionary else {}
 	for k in slots_dict.keys():
 		var slot_id := SlotIdHelper.normalize_slot_id(String(k))
-		var slot :Variant= slots_by_id.get(slot_id)
-
-		if slot == null and SlotIdHelper.is_table_slot_id(slot_id):
-			slot = slots_by_id.get(slot_id)
+		var slot = _resolve_slot_for_update(slot_id, false)
 
 		var arr: Array = slots_dict.get(k, [])
 		var count_for_slot := arr.size()
 		if slot_counts.has(k):
 			count_for_slot = maxi(0, int(slot_counts.get(k, count_for_slot)))
-		if slot != null and slot.has_method("set_server_count"):
-			slot.call("set_server_count", count_for_slot)
-		_update_deck_count_from_slot(slot_id, count_for_slot)
-		if slot != null and slot.has_method("begin_server_sync"):
-			slot.call("begin_server_sync", false)
-		
-		for i in range(arr.size()):
-			var payload = arr[i]
-			if payload is Dictionary:
-				payload["_array_order"] = i
-				CardSyncHelper.apply_card_update(_card_ctx, payload)
-		if slot != null and slot.has_method("finalize_server_sync"):
-			slot.call("finalize_server_sync")
+		_apply_slot_cards_update(slot_id, slot, arr, count_for_slot, false, false)
 
 	var turn_val = data.get("turn", null)
 	if turn_val is Dictionary:
@@ -708,33 +548,15 @@ func _on_slot_state(data: Dictionary) -> void:
 	if slot_id == "":
 		return
 
-	var slot :Variant= slots_by_id.get(slot_id)
-
-	if slot == null and SlotIdHelper.is_table_slot_id(slot_id):
-		if not allowed_table_slots.has(slot_id):
-			return
-		slot = slots_by_id.get(slot_id)
-
-	if slot and slot.has_method("clear_slot"):
-		slot.clear_slot()
+	var slot = _resolve_slot_for_update(slot_id, true)
+	if slot == null and SlotIdHelper.is_table_slot_id(slot_id) and not allowed_table_slots.has(slot_id):
+		return
 
 	var arr: Array = data.get("cards", [])
 	var count_for_slot := arr.size()
 	if data.has("count"):
 		count_for_slot = maxi(0, int(data.get("count", count_for_slot)))
-	if slot != null and slot.has_method("set_server_count"):
-		slot.call("set_server_count", count_for_slot)
-	_update_deck_count_from_slot(slot_id, count_for_slot)
-	if slot != null and slot.has_method("begin_server_sync"):
-		slot.call("begin_server_sync", true)
-	
-	for i in range(arr.size()):
-		var payload = arr[i]
-		if payload is Dictionary:
-			payload["_array_order"] = i
-			CardSyncHelper.apply_card_update(_card_ctx, payload)
-	if slot != null and slot.has_method("finalize_server_sync"):
-		slot.call("finalize_server_sync")
+	_apply_slot_cards_update(slot_id, slot, arr, count_for_slot, true, true)
 
 # ============= INVALID MOVE =============
 
@@ -756,7 +578,7 @@ func _reset_board_state() -> void:
 	for s in slots_by_id.values():
 		if s and s.has_method("clear_slot"):
 			s.clear_slot()
-	_reset_deck_count_ui()
+	DeckCountUtil.reset_counts(_deck_count_state)
 
 	TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, ["0:TABLE:1"], _table_spacing, START_POS)
 
@@ -776,21 +598,23 @@ func _show_game_feedback(ui_message: Dictionary) -> void:
 	var normalized := Protocol.normalize_game_message(ui_message)
 	var message_code := String(normalized.get("message_code", "")).strip_edges()
 	
-	var inline_msg := GameMessage.normalize_inline_message(normalized)
-	if inline_msg.is_empty():
+	var ingame_msg := GameMessage.normalize_ingame_message(normalized)
+	if ingame_msg.is_empty():
 		if message_code.begins_with(POPUP_PREFIX):
 			PopupUi.show_ui_message(normalized)
 		return
 	
-	_display_inline_message(normalized)
+	_display_ingame_message(normalized)
 
-func _display_inline_message(ui_message: Dictionary) -> void:
+func _display_ingame_message(ui_message: Dictionary) -> void:
 	"""Affiche et anime le message"""
 	if _message_tween and is_instance_valid(_message_tween):
 		_message_tween.kill()
 	
-	GameMessage.show_inline_message(ui_message, game_message_label, game_message_timer)
-	game_message_label.modulate.a = 1.0
+	GameMessage.show_ingame_message(ui_message, _game_message_state)
+	var label := GameMessage.get_label(_game_message_state)
+	if label != null:
+		label.modulate.a = 1.0
 
 func _on_message_timeout() -> void:
 	"""Appelé quand le timer du message expire"""
@@ -798,35 +622,35 @@ func _on_message_timeout() -> void:
 
 func _hide_message_with_fade() -> void:
 	"""Cache le message avec un fadeout"""
-	if not game_message_label.visible:
+	var label := GameMessage.get_label(_game_message_state)
+	if label == null or not label.visible:
 		return
 	
 	if _message_tween and is_instance_valid(_message_tween):
 		_message_tween.kill()
 	
 	_message_tween = create_tween()
-	_message_tween.tween_property(game_message_label, "modulate:a", 0.0, GameLayoutConfig.MESSAGE_FADE_DURATION)
+	_message_tween.tween_property(label, "modulate:a", 0.0, GameMessage.get_fade_duration())
 	await _message_tween.finished
 	
-	game_message_label.visible = false
-	game_message_label.modulate.a = 1.0
+	label.visible = false
+	label.modulate.a = 1.0
 
 # ============= TIMEBAR =============
 
 func _process(_delta: float) -> void:
-	if time_bar.visible:
-		TimebarUtil.update_timebar(_timebar_state, time_bar, Callable(NetworkManager, "server_now_ms"))
+	TimebarUtil.update_timebar(_timebar_state, Callable(NetworkManager, "server_now_ms"))
 
 func _set_turn_timer(turn: Dictionary) -> void:
 	TimebarUtil.set_turn_timer(_timebar_state, turn, Callable(NetworkManager, "sync_server_clock"))
 	TimebarUtil.update_timebar_mode(_timebar_state, bool(Global.is_spectator), String(Global.username))
-	TimebarUtil.update_timebar(_timebar_state, time_bar, Callable(NetworkManager, "server_now_ms"))
+	TimebarUtil.update_timebar(_timebar_state, Callable(NetworkManager, "server_now_ms"))
 
 # ============= QUITTER =============
 
 func _on_quitter_pressed() -> void:
 	PopupUi.show_confirm(
-		Protocol.popup_text(Protocol.MSG_POPUP_QUIT_CONFIRM),
+		Protocol.popup_text(Protocol.POPUP_QUIT_CONFIRM),
 		LABEL_CANCEL,
 		LABEL_QUIT,
 		{
@@ -857,7 +681,7 @@ func _schedule_disconnect_choice(who: String) -> void:
 			return
 		_show_pause_choice(
 			Protocol.popup_text(
-				Protocol.MSG_POPUP_OPPONENT_DISCONNECTED_CHOICE,
+				Protocol.POPUP_OPPONENT_DISCONNECTED_CHOICE,
 				{ "name": who }
 			)
 		)
@@ -920,6 +744,10 @@ func _exit_tree() -> void:
 		NetworkManager.disconnected.disconnect(_on_network_disconnected)
 	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)
+
+	GameMessage.cleanup(_game_message_state)
+	TimebarUtil.cleanup(_timebar_state)
+	DeckCountUtil.cleanup(_deck_count_state)
 	
 	if _message_tween and is_instance_valid(_message_tween):
 		_message_tween.kill()

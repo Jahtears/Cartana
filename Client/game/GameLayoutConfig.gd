@@ -23,45 +23,12 @@ const START_POS := Vector2.ZERO
 # ============= LAYOUT DYNAMIQUE - POSITIONS DES JOUEURS =============
 const P1_MAIN_OFFSET := 150
 const P2_MAIN_OFFSET := 150
-const TIMEBAR_SIZE := Vector2(420.0, 10.0)
-const TIMEBAR_SHOW_PERCENTAGE := false
-const TIMEBAR_CENTER_OFFSET_P1_BANC := Vector2(180.0, -100.0)
-const MESSAGE_CENTER_OFFSET_P1_HAND := Vector2(0.0, -110.0)
 
 # ============= BOUTON QUITTER =============
 const QUITTER_WIDTH := 64.0
 const QUITTER_HEIGHT := 32.0
 const QUITTER_OFFSET_X := 0.0
 const QUITTER_OFFSET_Y := 8.0
-
-# ============= MESSAGE UI =============
-const MESSAGE_DISPLAY_DURATION := 2.0
-const MESSAGE_FADE_DURATION := 0.3
-const MESSAGE_MARGIN_TOP := 0
-const MESSAGE_MARGIN_BOTTOM := 0
-const MESSAGE_MARGIN_LEFT := 10
-const MESSAGE_MARGIN_RIGHT := 10
-
-# ============= CARD VISUAL =============
-const DRAG_Z := 3000
-const DRAG_SCALE := 1.05
-const HOVER_SCALE := 1.08
-const MIN_OVERLAP_AREA := 200.0
-const PREVIEW_CARD_GLOW_COLOR := Color(0.35, 0.95, 0.45, 0.45)
-const PREVIEW_CARD_GLOW_SIZE := 6
-const DECK_TOTAL_CARDS := 26
-const DECK_COUNT_SOURCE_SLOT_TYPE := "DECK"
-const DECK_COUNT_WARN_THRESHOLD := 5
-const DECK_COUNT_BADGE_SIZE := Vector2(82, 28)
-const DECK_COUNT_CENTER_OFFSET_P1 := Vector2(0, -86)
-const DECK_COUNT_CENTER_OFFSET_P2 := Vector2(0, 86)
-const DECK_COUNT_BADGE_BG_COLOR := Color(0.03, 0.06, 0.08, 0.5)
-const DECK_COUNT_BADGE_BORDER_COLOR := Color(1, 1, 1, 0.14)
-const DECK_COUNT_FONT_SIZE := 14
-const DECK_COUNT_FONT_COLOR_NORMAL := Color(0.92, 0.97, 1.0, 1.0)
-const DECK_COUNT_FONT_COLOR_WARN := Color(1.0, 0.82, 0.45, 1.0)
-const DECK_COUNT_FONT_COLOR_EMPTY := Color(1.0, 0.48, 0.45, 1.0)
-const DECK_COUNT_FONT_COLOR_UNKNOWN := Color(0.72, 0.78, 0.85, 1.0)
 
 # ============= HAND FAN (LAYOUT) =============
 const HAND_FAN_X_STEP := 60.0
@@ -76,7 +43,6 @@ const CASCADE_DEFAULT := Vector2(0, 0)
 
 # ============= ANIMATION TIMINGS =============
 const SNAP_DURATION := 0.50
-const PREVIEW_CHECK_INTERVAL := 3
 
 # ============= PREVIEW COLORS (SLOT) =============
 const PREVIEW_HIGHLIGHT_COLOR := Color(1, 1, 0.5)
@@ -104,15 +70,4 @@ static func get_player_layout(player_id: int, positions: Dictionary, slot_spacin
 		"deck_x": positions["left_x"] if is_p1 else positions["right_x"],
 		"main_x": center_x - P1_MAIN_OFFSET if is_p1 else center_x + P2_MAIN_OFFSET,
 		"banc_x": (positions["right_x"] - ((BANC_COUNT - 1) * slot_spacing)) if is_p1 else positions["left_x"],
-	}
-
-static func get_message_config() -> Dictionary:
-	"""Retourne la config du système de messages"""
-	return {
-		"display_duration": MESSAGE_DISPLAY_DURATION,
-		"fade_duration": MESSAGE_FADE_DURATION,
-		"margin_top": MESSAGE_MARGIN_TOP,
-		"margin_bottom": MESSAGE_MARGIN_BOTTOM,
-		"margin_left": MESSAGE_MARGIN_LEFT,
-		"margin_right": MESSAGE_MARGIN_RIGHT,
 	}

@@ -16,6 +16,9 @@ var _rect_cache_dirty: bool = true
 var _server_sync_active: bool = false
 var _server_sync_animate_on_finalize: bool = false
 
+@onready var _background: CanvasItem = get_node_or_null("Background") as CanvasItem
+@onready var _collision_shape: CollisionShape2D = get_node_or_null("CollisionShape2D") as CollisionShape2D
+
 # ============= LIFECYCLE =============
 
 func _ready() -> void:
@@ -58,7 +61,7 @@ func _set_preview(active: bool) -> void:
 	if preview_active == active:
 		return
 	preview_active = active
-	$Background.modulate = GameLayoutConfig.PREVIEW_HIGHLIGHT_COLOR if active else GameLayoutConfig.PREVIEW_NORMAL_COLOR
+	_apply_preview_visual(active)
 
 # ============= SNAP (PLACEMENT) =============
 
@@ -81,10 +84,7 @@ func snap_card(card: Node2D, animate: bool = true) -> void:
 	stacked_cards.append(card)
 	_sort_stacked_cards_by_server_order()
 
-	if card.has_meta("_snap_tween"):
-		var old_t := card.get_meta("_snap_tween") as Tween
-		if old_t != null and is_instance_valid(old_t):
-			old_t.kill()
+	_kill_card_snap_tween(card)
 
 	var should_defer_layout := _server_sync_active and _is_hand_slot_type()
 	if not should_defer_layout:
@@ -125,10 +125,7 @@ func clear_slot() -> void:
 		if not is_instance_valid(c):
 			continue
 
-		if c.has_meta("_snap_tween"):
-			var old_t := c.get_meta("_snap_tween") as Tween
-			if old_t and is_instance_valid(old_t):
-				old_t.kill()
+		_kill_card_snap_tween(c)
 
 		c.slot = null
 		c.set_meta("last_slot_id", get_slot_id())
@@ -226,10 +223,7 @@ func _snap_card_position(card: Node2D, target_pos: Vector2, target_rot: float, a
 		card.scale = Vector2.ONE
 		return
 
-	if card.has_meta("_snap_tween"):
-		var old_t := card.get_meta("_snap_tween") as Tween
-		if old_t != null and is_instance_valid(old_t):
-			old_t.kill()
+	_kill_card_snap_tween(card)
 
 	var tween_duration := maxf(0.01, snap_duration)
 	var tween := create_tween()
@@ -248,18 +242,17 @@ func _update_cached_rect() -> void:
 		_cached_rect = Rect2()
 		return
 
-	var shape_node := $CollisionShape2D as CollisionShape2D
-	if shape_node == null:
+	if _collision_shape == null:
 		_cached_rect = Rect2()
 		return
 
-	var shape := shape_node.shape
+	var shape := _collision_shape.shape
 	if shape is RectangleShape2D:
 		var rect_shape := shape as RectangleShape2D
 		var size: Vector2 = rect_shape.size
-		var scale: Vector2 = shape_node.global_transform.get_scale()
+		var scale: Vector2 = _collision_shape.global_transform.get_scale()
 		var scaled: Vector2 = Vector2(size.x * absf(scale.x), size.y * absf(scale.y))
-		_cached_rect = Rect2(shape_node.global_position - scaled * 0.5, scaled)
+		_cached_rect = Rect2(_collision_shape.global_position - scaled * 0.5, scaled)
 	else:
 		_cached_rect = Rect2()
 
@@ -275,12 +268,10 @@ func _is_hand_slot_type() -> bool:
 func _apply_slot_type_mode() -> void:
 	var is_hand := _is_hand_slot_type()
 
-	if has_node("Background"):
-		$Background.visible = not is_hand
+	_set_background_visible(not is_hand)
 
-	var shape_node := $CollisionShape2D as CollisionShape2D
-	if shape_node != null:
-		shape_node.disabled = is_hand
+	if _collision_shape != null:
+		_collision_shape.disabled = is_hand
 
 	_rect_cache_dirty = true
 
@@ -295,16 +286,31 @@ func _kill_snap_tweens() -> void:
 	for c in stacked_cards:
 		if c == null or !is_instance_valid(c):
 			continue
-		if c.has_meta("_snap_tween"):
-			var old_t := c.get_meta("_snap_tween") as Tween
-			if old_t != null and is_instance_valid(old_t):
-				old_t.kill()
+		_kill_card_snap_tween(c)
 
 func _reset_background() -> void:
 	if _is_hand_slot_type():
-		if has_node("Background"):
-			$Background.visible = false
+		_set_background_visible(false)
 	else:
-		if has_node("Background"):
-			$Background.visible = true
-		$Background.modulate = GameLayoutConfig.PREVIEW_NORMAL_COLOR
+		_set_background_visible(true)
+		_set_background_modulate(GameLayoutConfig.PREVIEW_NORMAL_COLOR)
+
+func _apply_preview_visual(active: bool) -> void:
+	_set_background_modulate(GameLayoutConfig.PREVIEW_HIGHLIGHT_COLOR if active else GameLayoutConfig.PREVIEW_NORMAL_COLOR)
+
+func _set_background_visible(is_visible: bool) -> void:
+	if _background != null:
+		_background.visible = is_visible
+
+func _set_background_modulate(color: Color) -> void:
+	if _background != null:
+		_background.modulate = color
+
+func _kill_card_snap_tween(card: Node) -> void:
+	if card == null or not is_instance_valid(card):
+		return
+	if not card.has_meta("_snap_tween"):
+		return
+	var old_t := card.get_meta("_snap_tween") as Tween
+	if old_t != null and is_instance_valid(old_t):
+		old_t.kill()

@@ -28,14 +28,14 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 		Global.username = u
 		get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
 	else:
-		var ui := Protocol.normalize_error_message(error, Protocol.MSG_POPUP_AUTH_CONNECTION_ERROR)
+		var ui := Protocol.normalize_error_message(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
 		PopupUi.show_ui_message(ui)
 
 func _on_network_disconnected(_code: int, reason: String) -> void:
 	if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
 		return
 	PopupUi.show_ui_message({
-		"message_code": Protocol.MSG_POPUP_AUTH_CONNECTION_ERROR,
+		"message_code": Protocol.POPUP_AUTH_CONNECTION_ERROR,
 	})
 
 func _show_message_code(message_code: String, params: Dictionary = {}) -> void:
@@ -56,7 +56,7 @@ func _on_login_button_pressed() -> void:
 	var pin: String = $CenterContainer/VBoxContainer/Pin_input.text.strip_edges()
 
 	if username == "" or pin == "":
-		_show_message_code(Protocol.MSG_POPUP_AUTH_MISSING_CREDENTIALS)
+		_show_message_code(Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
 		return
 
 	_last_username = username
