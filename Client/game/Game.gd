@@ -21,22 +21,20 @@ const POPUP_PREFIX := "POPUP_"
 const FLOW_INVITE_REQUEST_FALLBACK := "invite_request"
 const REQ_JOIN_GAME := "join_game"
 const REQ_SPECTATE_GAME := "spectate_game"
+const REQ_INVITE := "invite"
 const REQ_INVITE_RESPONSE := "invite_response"
 const REQ_ACK_GAME_END := "ack_game_end"
 const REQ_LEAVE_GAME := "leave_game"
 
 const ACTION_GAME_END_LEAVE := "game_end_leave"
-const ACTION_GAME_END_STAY := "game_end_stay"
+const ACTION_GAME_END_REVANGE := "game_end_revange"
 const ACTION_QUIT_CANCEL := "quit_cancel"
 const ACTION_QUIT_CONFIRM := "quit_confirm"
 const ACTION_PAUSE_WAIT := "pause_wait"
 const ACTION_PAUSE_LEAVE := "pause_leave"
+const ACTION_NETWORK_RETRY := "network_retry"
 
-const LABEL_BACK_TO_LOBBY := "Retour lobby"
-const LABEL_STAY := "Rester"
-const LABEL_CANCEL := "Annuler"
 const LABEL_QUIT := "Quitter"
-const LABEL_WAIT := "Attendre"
 
 # ============= STATE =============
 var slots_ready: bool = false
@@ -51,6 +49,7 @@ var _game_end_prompted := false
 var _leave_sent := false
 var _disconnect_prompt_seq := 0
 var _opponent_disconnected := false
+var _network_disconnected := false
 var _message_tween: Tween = null
 var _deck_count_state: Dictionary = DeckCountUtil.create_state()
 
@@ -96,15 +95,21 @@ func _ready() -> void:
 		NetworkManager.evt.connect(_on_evt)
 	if not NetworkManager.response.is_connected(_on_response):
 		NetworkManager.response.connect(_on_response)
-	if not NetworkManager.disconnected.is_connected(_on_network_disconnected):
-		NetworkManager.disconnected.connect(_on_network_disconnected)
+	if not NetworkManager.connection_lost.is_connected(_on_connection_lost):
+		NetworkManager.connection_lost.connect(_on_connection_lost)
+	if not NetworkManager.connection_restored.is_connected(_on_connection_restored):
+		NetworkManager.connection_restored.connect(_on_connection_restored)
+	if not NetworkManager.reconnect_failed.is_connected(_on_reconnect_failed):
+		NetworkManager.reconnect_failed.connect(_on_reconnect_failed)
+	if not NetworkManager.server_closed.is_connected(_on_server_closed):
+		NetworkManager.server_closed.connect(_on_server_closed)
 	if not PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.connect(_on_popup_action)
 	
 	if not quitter_button.pressed.is_connected(_on_quitter_pressed):
 		quitter_button.pressed.connect(_on_quitter_pressed)
 	
-	PopupUi.hide()
+	PopupUi.hide_and_reset()
 
 	if String(Global.current_game_id) != "":
 		_request_game_sync()
@@ -317,21 +322,26 @@ func _on_evt(type: String, data: Dictionary) -> void:
 func _handle_invite_request(data: Dictionary) -> void:
 	var from_user := String(data.get("from", ""))
 	if from_user != "":
-		PopupUi.show_invite_request(from_user, {
-			"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST_FALLBACK),
-			"from": from_user
-		})
+		PopupUi.show_confirm_code(
+			Protocol.POPUP_INVITE_RECEIVED,
+			{"from": from_user},
+			{
+				"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST_FALLBACK),
+				"from": from_user
+			},
+			{"yes_label_key": "accept", "no_label_key": "refuse"}
+		)
 
 func _handle_invite_response(data: Dictionary) -> void:
 	var ui := Protocol.normalize_invite_response_ui(data)
 	if String(ui.get("text", "")) != "":
-		PopupUi.show_ui_message(ui)
+		_show_popup_normalized(ui)
 
 func _handle_invite_cancelled(data: Dictionary) -> void:
 	var ui := Protocol.invite_cancelled_ui(data)
 	if String(ui.get("text", "")).strip_edges() == "":
 		return
-	PopupUi.show_ui_message(ui)
+	_show_popup_normalized(ui)
 
 func _handle_start_game(data: Dictionary) -> void:
 	Global.current_game_id = String(data.get("game_id", ""))
@@ -346,8 +356,9 @@ func _handle_start_game(data: Dictionary) -> void:
 	_game_end_prompted = false
 	_leave_sent = false
 	_opponent_disconnected = false
+	_network_disconnected = false
 	_disconnect_prompt_seq += 1
-	PopupUi.hide()
+	PopupUi.hide_and_reset()
 
 	if Global.current_game_id != "":
 		_request_game_sync()
@@ -379,21 +390,15 @@ func _handle_game_end(data: Dictionary) -> void:
 func _handle_opponent_disconnected(data: Dictionary) -> void:
 	var who := String(data.get("username", ""))
 	_opponent_disconnected = true
-	PopupUi.show_ui_message({
-		"message_code": Protocol.POPUP_OPPONENT_DISCONNECTED,
-		"message_params": { "name": who },
-	})
+	_show_popup_code(Protocol.POPUP_OPPONENT_DISCONNECTED, {"name": who})
 	_schedule_disconnect_choice(who)
 
 func _handle_opponent_rejoined(data: Dictionary) -> void:
 	var who := String(data.get("username", ""))
 	_opponent_disconnected = false
 	_disconnect_prompt_seq += 1
-	PopupUi.hide()
-	PopupUi.show_ui_message({
-		"message_code": Protocol.POPUP_OPPONENT_REJOINED,
-		"message_params": { "name": who },
-	})
+	PopupUi.hide_and_reset()
+	_show_popup_code(Protocol.POPUP_OPPONENT_REJOINED, {"name": who})
 
 # ============= RESPONSES =============
 
@@ -401,6 +406,12 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 	if type == "login":
 		if ok and String(Global.current_game_id) != "":
 			_request_game_sync()
+		return
+	if type == REQ_INVITE:
+		if ok:
+			_show_popup_code(Protocol.POPUP_INVITE_SENT)
+		else:
+			_show_popup_normalized(Protocol.normalize_popup_error(error, Protocol.POPUP_INVITE_FAILED))
 		return
 
 	if type != "move_request":
@@ -417,8 +428,9 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 			"message_code": GameMessage.INGAME_MOVE_OK,
 		})
 	else:
-		var ui := Protocol.normalize_error_message(error, GameMessage.INGAME_MOVE_DENIED)
-		var details := error.get("details", {}) as Dictionary
+		var ui := _normalize_move_error(error, GameMessage.INGAME_MOVE_DENIED)
+		var details_val = error.get("details", {})
+		var details: Dictionary = details_val if details_val is Dictionary else {}
 		_show_game_feedback(ui)
 
 		if details.has("card_id") and details.has("from_slot_id"):
@@ -427,12 +439,77 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 				"from_slot_id": String(details.get("from_slot_id", ""))
 			})
 
-func _on_network_disconnected(_code: int, reason: String) -> void:
-	if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
+func _on_connection_lost() -> void:
+	_network_disconnected = true
+	_show_popup_code(Protocol.POPUP_PLAYER_DISCONNECTED)
+
+func _on_connection_restored() -> void:
+	if not _network_disconnected:
 		return
-	PopupUi.show_ui_message({
-		"message_code": Protocol.POPUP_AUTH_CONNECTION_ERROR,
+	_network_disconnected = false
+	_show_popup_code(Protocol.POPUP_PLAYER_RECONNECTED)
+
+func _on_reconnect_failed() -> void:
+	if not _network_disconnected:
+		return
+	_show_popup_code(
+		Protocol.POPUP_PLAYER_RECONNECT_FAIL,
+		{},
+		{"ok_action_id": ACTION_NETWORK_RETRY},
+		{"ok_label_key": "retry"}
+	)
+
+func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
+	_network_disconnected = false
+	_show_popup_code(Protocol.POPUP_TECH_INTERNAL_ERROR)
+
+func _show_popup_code(message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
+	PopupUi.show_info_code(message_code, params, payload, options)
+
+func _show_popup_normalized(normalized: Dictionary, payload: Dictionary = {}) -> void:
+	var message_code := String(normalized.get("message_code", "")).strip_edges()
+	if message_code == "":
+		return
+	var params_val = normalized.get("message_params", {})
+	var params: Dictionary = params_val if params_val is Dictionary else {}
+	var options: Dictionary = {}
+	var text_override := String(normalized.get("text_override", "")).strip_edges()
+	if text_override != "":
+		options["text_override"] = text_override
+	_show_popup_code(message_code, params, payload, options)
+
+func _normalize_move_error(error: Dictionary, fallback_message_code: String) -> Dictionary:
+	var message_code := String(error.get("message_code", "")).strip_edges()
+	var text := String(error.get("text", "")).strip_edges()
+	var message_params := _merge_error_message_params(error)
+
+	var normalized := Protocol.normalize_ingame_message({
+		"message_code": message_code,
+		"text": text,
+		"message_params": message_params,
 	})
+	if not normalized.is_empty():
+		return normalized
+
+	return Protocol.normalize_ingame_message({
+		"message_code": fallback_message_code,
+		"message_params": message_params,
+	})
+
+func _merge_error_message_params(error: Dictionary) -> Dictionary:
+	var details_val = error.get("details", {})
+	var details: Dictionary = details_val if details_val is Dictionary else {}
+	var top_params_val = error.get("message_params", {})
+	var top_params: Dictionary = top_params_val if top_params_val is Dictionary else {}
+	var details_params_val = details.get("message_params", {})
+	var details_params: Dictionary = details_params_val if details_params_val is Dictionary else {}
+
+	var out: Dictionary = {}
+	for key in details_params.keys():
+		out[key] = details_params[key]
+	for key in top_params.keys():
+		out[key] = top_params[key]
+	return out
 
 func _request_game_sync() -> void:
 	var game_id := String(Global.current_game_id)
@@ -516,17 +593,27 @@ func _on_game_end(data: Dictionary) -> void:
 		return
 	_game_end_prompted = true
 	var popup_msg := Protocol.game_end_popup_message(data, String(Global.username), bool(Global.is_spectator))
-	var msg := String(popup_msg.get("text", ""))
+	if bool(Global.is_spectator):
+		PopupUi.show_info_code(
+			String(popup_msg.get("message_code", "")),
+			popup_msg.get("message_params", {}) as Dictionary,
+			{
+				"ok_action_id": ACTION_GAME_END_LEAVE,
+				"game_id": String(Global.current_game_id),
+			},
+			{"ok_label_key": "back_lobby"}
+		)
+		return
 
-	PopupUi.show_confirm(
-		msg,
-		LABEL_BACK_TO_LOBBY,
-		LABEL_STAY,
+	PopupUi.show_confirm_code(
+		String(popup_msg.get("message_code", "")),
+		popup_msg.get("message_params", {}) as Dictionary,
 		{
 			"yes_action_id": ACTION_GAME_END_LEAVE,
-			"no_action_id": ACTION_GAME_END_STAY,
+			"no_action_id": ACTION_GAME_END_REVANGE,
 			"game_id": String(Global.current_game_id),
-		}
+		},
+		{"yes_label_key": "back_lobby", "no_label_key": "revange"}
 	)
 
 func _ack_end_and_go_lobby() -> void:
@@ -540,6 +627,43 @@ func _ack_end_and_go_lobby() -> void:
 	Global.result = {}
 
 	await _go_to_lobby_safe()
+
+func _resolve_revenge_target_username() -> String:
+	var self_name := String(Global.username).strip_edges()
+	for player in Global.players_in_game:
+		if player is String:
+			var player_name := String(player).strip_edges()
+			if player_name != "" and player_name != self_name:
+				return player_name
+		elif player is Dictionary:
+			var player_dict := player as Dictionary
+			var dict_name := String(player_dict.get("username", "")).strip_edges()
+			if dict_name != "" and dict_name != self_name:
+				return dict_name
+	return ""
+
+func _ack_end_invite_revenge_in_game() -> void:
+	var gid := String(Global.current_game_id)
+	var opponent_name := _resolve_revenge_target_username()
+	if gid != "":
+		var ack_res := await NetworkManager.request_async(REQ_ACK_GAME_END, {"game_id": gid}, 6.0)
+		if not bool(ack_res.get("ok", false)):
+			var err_val = ack_res.get("error", {})
+			var err: Dictionary = err_val if err_val is Dictionary else {}
+			_show_popup_normalized(Protocol.normalize_popup_error(err, Protocol.POPUP_UI_ACTION_IMPOSSIBLE))
+			return
+
+	if opponent_name == "":
+		_show_popup_code(Protocol.POPUP_INVITE_FAILED)
+		return
+
+	Global.current_game_id = ""
+	Global.players_in_game = []
+	Global.is_spectator = false
+	Global.result = {}
+	_reset_board_state()
+
+	NetworkManager.request(REQ_INVITE, {"to": opponent_name})
 
 # ============= SLOT STATE =============
 
@@ -601,7 +725,7 @@ func _show_game_feedback(ui_message: Dictionary) -> void:
 	var ingame_msg := GameMessage.normalize_ingame_message(normalized)
 	if ingame_msg.is_empty():
 		if message_code.begins_with(POPUP_PREFIX):
-			PopupUi.show_ui_message(normalized)
+			_show_popup_normalized(normalized)
 		return
 	
 	_display_ingame_message(normalized)
@@ -649,25 +773,25 @@ func _set_turn_timer(turn: Dictionary) -> void:
 # ============= QUITTER =============
 
 func _on_quitter_pressed() -> void:
-	PopupUi.show_confirm(
-		Protocol.popup_text(Protocol.POPUP_QUIT_CONFIRM),
-		LABEL_CANCEL,
-		LABEL_QUIT,
+	PopupUi.show_confirm_code(
+		Protocol.POPUP_QUIT_CONFIRM,
+		{},
 		{
 			"yes_action_id": ACTION_QUIT_CANCEL,
 			"no_action_id": ACTION_QUIT_CONFIRM,
-		}
+		},
+		{"yes_label_key": "cancel", "no_label_key": "quit"}
 	)
 
-func _show_pause_choice(msg: String) -> void:
-	PopupUi.show_confirm(
-		msg,
-		LABEL_WAIT,
-		LABEL_BACK_TO_LOBBY,
+func _show_pause_choice(who: String) -> void:
+	PopupUi.show_confirm_code(
+		Protocol.POPUP_OPPONENT_DISCONNECTED_CHOICE,
+		{"name": who},
 		{
 			"yes_action_id": ACTION_PAUSE_WAIT,
 			"no_action_id": ACTION_PAUSE_LEAVE,
-		}
+		},
+		{"yes_label_key": "wait", "no_label_key": "back_lobby"}
 	)
 
 func _schedule_disconnect_choice(who: String) -> void:
@@ -679,15 +803,14 @@ func _schedule_disconnect_choice(who: String) -> void:
 			return
 		if not _opponent_disconnected:
 			return
-		_show_pause_choice(
-			Protocol.popup_text(
-				Protocol.POPUP_OPPONENT_DISCONNECTED_CHOICE,
-				{ "name": who }
-			)
-		)
+		_show_pause_choice(who)
 	)
 
 func _on_popup_action(action_id: String, payload: Dictionary) -> void:
+	if action_id == ACTION_NETWORK_RETRY:
+		NetworkManager.retry_now()
+		return
+
 	var invite_req := Protocol.invite_action_request(action_id, payload)
 	if not invite_req.is_empty():
 		NetworkManager.request(REQ_INVITE_RESPONSE, invite_req)
@@ -698,6 +821,8 @@ func _on_popup_action(action_id: String, payload: Dictionary) -> void:
 			await _leave_current_and_go_lobby()
 		ACTION_GAME_END_LEAVE:
 			await _ack_end_and_go_lobby()
+		ACTION_GAME_END_REVANGE:
+			await _ack_end_invite_revenge_in_game()
 		_:
 			pass
 
@@ -740,8 +865,14 @@ func _exit_tree() -> void:
 		NetworkManager.evt.disconnect(_on_evt)
 	if NetworkManager.response.is_connected(_on_response):
 		NetworkManager.response.disconnect(_on_response)
-	if NetworkManager.disconnected.is_connected(_on_network_disconnected):
-		NetworkManager.disconnected.disconnect(_on_network_disconnected)
+	if NetworkManager.connection_lost.is_connected(_on_connection_lost):
+		NetworkManager.connection_lost.disconnect(_on_connection_lost)
+	if NetworkManager.connection_restored.is_connected(_on_connection_restored):
+		NetworkManager.connection_restored.disconnect(_on_connection_restored)
+	if NetworkManager.reconnect_failed.is_connected(_on_reconnect_failed):
+		NetworkManager.reconnect_failed.disconnect(_on_reconnect_failed)
+	if NetworkManager.server_closed.is_connected(_on_server_closed):
+		NetworkManager.server_closed.disconnect(_on_server_closed)
 	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)
 

@@ -8,6 +8,8 @@ initial_position = 1
 size = Vector2i(320, 180)
 visible = false
 exclusive = true
+title = "Information"
+unresizable = true
 script = ExtResource("1_2sagy")
 
 [node name="MarginContainer" type="MarginContainer" parent="." unique_id=1887576099]
@@ -23,7 +25,7 @@ theme_override_constants/margin_bottom = 20
 [node name="VBox" type="VBoxContainer" parent="MarginContainer" unique_id=1855685235]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="MarginContainer/VBox" unique_id=1395576156]
+[node name="MessageLabel" type="Label" parent="MarginContainer/VBox" unique_id=1395576156]
 custom_minimum_size = Vector2(260, 40)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -37,21 +39,22 @@ layout_mode = 2
 size_flags_vertical = 10
 alignment = 1
 
-[node name="ButtonAccept" type="Button" parent="MarginContainer/VBox/Buttons" unique_id=2002763203]
+[node name="ConfirmYesButton" type="Button" parent="MarginContainer/VBox/Buttons" unique_id=2002763203]
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 text = "Accepter"
 
-[node name="ButtonOK" type="Button" parent="MarginContainer/VBox/Buttons" unique_id=1628790574]
+[node name="InfoOkButton" type="Button" parent="MarginContainer/VBox/Buttons" unique_id=1628790574]
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 text = "OK"
 
-[node name="ButtonRefuse" type="Button" parent="MarginContainer/VBox/Buttons" unique_id=1112250356]
+[node name="ConfirmNoButton" type="Button" parent="MarginContainer/VBox/Buttons" unique_id=1112250356]
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 text = "Refuser"
 
-[connection signal="pressed" from="MarginContainer/VBox/Buttons/ButtonAccept" to="." method="_on_button_accept_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/Buttons/ButtonOK" to="." method="_on_button_ok_pressed"]
-[connection signal="pressed" from="MarginContainer/VBox/Buttons/ButtonRefuse" to="." method="_on_button_refuse_pressed"]
+[connection signal="pressed" from="MarginContainer/VBox/Buttons/ConfirmYesButton" to="." method="_on_button_accept_pressed"]
+[connection signal="pressed" from="MarginContainer/VBox/Buttons/InfoOkButton" to="." method="_on_button_ok_pressed"]
+[connection signal="pressed" from="MarginContainer/VBox/Buttons/ConfirmNoButton" to="." method="_on_button_refuse_pressed"]
+[connection signal="close_requested" from="." to="." method="_on_close_requested"]

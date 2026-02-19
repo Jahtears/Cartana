@@ -1,4 +1,5 @@
 import { ensureGameMeta, ensureGameResult } from "../../game/meta.js";
+import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
 import {
   mapSlotForClient,
   isOwnerForSlot,
@@ -19,6 +20,7 @@ import {
 import { getCardById } from "../../game/helpers/cardHelpers.js";
 import { getSlotCount } from "../../game/helpers/slotStackHelpers.js";
 import { buildTurnPayload } from "../../game/helpers/turnPayloadHelpers.js";
+import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 /* =========================
    HELPERS FOR SLOT STATE
@@ -60,13 +62,36 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
   return { slot_id: clientSlot, cards, count };
 }
 
+function gameEndPopupCode(reason) {
+  const raw = String(reason ?? "").trim().toLowerCase();
+  if (raw === GAME_END_REASONS.ABANDON) return POPUP_MESSAGE.GAME_END_ABANDON;
+  if (raw === GAME_END_REASONS.DECK_EMPTY) return POPUP_MESSAGE.GAME_END_DECK_EMPTY;
+  if (raw === GAME_END_REASONS.PILE_EMPTY) return POPUP_MESSAGE.GAME_END_PILE_EMPTY;
+  return POPUP_MESSAGE.GAME_ENDED;
+}
+
 function publicGameEndResult(result) {
-  if (!result || typeof result !== "object") return { winner: null };
+  if (!result || typeof result !== "object") {
+    return {
+      winner: null,
+      reason: GAME_END_REASONS.ABANDON,
+      message_code: POPUP_MESSAGE.GAME_END_ABANDON,
+      message_params: { name: "-" },
+    };
+  }
+
   const winner =
     typeof result.winner === "string" && result.winner.trim()
       ? result.winner
       : null;
-  return { winner };
+  const reason = String(result.reason ?? "").trim().toLowerCase() || GAME_END_REASONS.ABANDON;
+
+  return {
+    winner,
+    reason,
+    message_code: gameEndPopupCode(reason),
+    message_params: { name: winner || "-" },
+  };
 }
 
 function buildStateSnapshotForUser(game, username, view, { result = null, forceDisableDrag = false } = {}) {

@@ -20,6 +20,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     endTurnAfterBenchPlay,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
+    haseLoseByEmptyPileSlot,
     getTableSlots,
     processTurnTimeout,
     withGameUpdate,
@@ -90,6 +91,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     isBenchSlot,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
+    haseLoseByEmptyPileSlot,
     getTableSlots,
     endTurnAfterBenchPlay,
     withGameUpdate,
@@ -126,10 +128,10 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   }
 
   // ✅ GAME END: emit end then broadcast
-  if (orchResult.winner) {
+  if (orchResult.winner || orchResult.game_end_reason) {
     emitGameEndThenSnapshot(ctx, game_id, {
       winner: orchResult.winner,
-      reason: GAME_END_REASONS.DECK_EMPTY,
+      reason: orchResult.game_end_reason || GAME_END_REASONS.DECK_EMPTY,
       by: actor,
       at: Date.now(),
     });

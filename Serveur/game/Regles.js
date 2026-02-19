@@ -32,6 +32,16 @@ function hasWonByEmptyDeckSlot(game, player) {
   return Array.isArray(deckStack) ? deckStack.length === 0 : !deckStack;
 }
 
+function haseLoseByEmptyPileSlot(game, player) {
+  if (!game) return false;
+  if (player && !game.players.includes(player)) return false;
+
+  const pileSlot = SlotId.create(0, SLOT_TYPES.PILE, 1);
+  const pileStack = getSlotContent(game, pileSlot);
+
+  return Array.isArray(pileStack) ? pileStack.length === 0 : !pileStack;
+}
+
 function ruleCardMustBeInFromSlot(game, player, card, fromSlotId, toSlotId) {
   if (!card || !card.id) return { valid: false, reason: INGAME_MESSAGE.RULE_CARD_UNKNOWN };
   if (!hasCardInSlot(game, fromSlotId, card.id)) {
@@ -221,4 +231,5 @@ export {
   isBenchSlot,
   refillHandIfEmpty,
   hasWonByEmptyDeckSlot,
+  haseLoseByEmptyPileSlot,
 };

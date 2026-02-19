@@ -1,6 +1,6 @@
 // handlers/invite.js v1.0
 import { ensureGameMeta } from "../../game/meta.js";
-import { requireParam, rejectIfBusyOrRes } from "../../net/guards.js";
+import { requireParam } from "../../net/guards.js";
 import { resError } from "../../net/transport.js";
 import { emitPopupMessage } from "../../shared/uiMessage.js";
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
@@ -17,8 +17,6 @@ export function handleInvite(ctx, ws, req, data, actor) {
   const to = requireParam(sendRes, ws, req, data, "to");
   if (!to) return true;
 
-  if (rejectIfBusyOrRes(ctx, ws, req, actor, POPUP_MESSAGE.TECH_BAD_STATE)) return true;
-  if (rejectIfBusyOrRes(ctx, ws, req, to, POPUP_MESSAGE.TECH_BAD_STATE)) return true;
 
   // destinataire a déjà une invite reçue
   if (pendingInviteTo.has(to)) {

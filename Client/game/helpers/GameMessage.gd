@@ -1,6 +1,8 @@
 extends RefCounted
 class_name GameMessage
 
+const LanguageManager = preload("res://Client/Lang/LanguageManager.gd")
+
 const INGAME_PREFIX := "INGAME_"
 
 const INGAME_MOVE_OK := "INGAME_MOVE_OK"
@@ -26,32 +28,6 @@ const INGAME_RULE_OPPONENT_SLOT_FORBIDDEN := "INGAME_RULE_OPPONENT_SLOT_FORBIDDE
 const INGAME_TURN_START_FIRST := "INGAME_TURN_START_FIRST"
 const INGAME_TURN_START := "INGAME_TURN_START"
 const INGAME_TURN_TIMEOUT := "INGAME_TURN_TIMEOUT"
-
-const TEXT_BY_CODE := {
-	INGAME_MOVE_OK: "Valider",
-	INGAME_MOVE_DENIED: "Deplacement refuse",
-	INGAME_MOVE_INVALID_SLOT: "Slot ID invalide",
-	INGAME_MOVE_REJECTED: "ApplyMove rejected",
-	INGAME_RULE_CARD_NOT_FOUND: "Carte introuvable",
-	INGAME_RULE_CARD_UNKNOWN: "Carte inconnue",
-	INGAME_RULE_SOURCE_SLOT_MISSING_CARD: "Carte absente du slot source",
-	INGAME_RULE_UNKNOWN_PLAYER: "Joueur inconnu pour cette partie",
-	INGAME_RULE_SLOT_VALIDATOR_MISSING: "Aucun validateur pour ce slot",
-	INGAME_RULE_TABLE_SLOT_NOT_FOUND: "Slot Table introuvable",
-	INGAME_RULE_DECK_ONLY_TO_TABLE: "Carte du deck uniquement sur slot Table",
-	INGAME_RULE_NOT_YOUR_TURN: "Pas votre tour",
-	INGAME_RULE_BENCH_ONLY_TO_TABLE: "Carte du banc uniquement sur slot Table",
-	INGAME_RULE_ACE_BLOCKS_BENCH_DECK_TOP: "Banc interdit tant qu'un As est sur le dessus du deck",
-	INGAME_RULE_ACE_BLOCKS_BENCH_HAND: "Banc interdit tant qu'un As est en main",
-	INGAME_RULE_CARD_NOT_ALLOWED_ON_TABLE: "Carte interdite sur Table (attendu: {accepted})",
-	INGAME_RULE_CANNOT_PLAY_ON_DECK: "Interdit de jouer sur un deck",
-	INGAME_RULE_CANNOT_PLAY_ON_HAND: "Interdit de jouer sur la main",
-	INGAME_RULE_CANNOT_PLAY_ON_DRAWPILE: "Interdit de jouer sur la pioche",
-	INGAME_RULE_OPPONENT_SLOT_FORBIDDEN: "Slot adverse interdit",
-	INGAME_TURN_START_FIRST: "A vous de commencer",
-	INGAME_TURN_START: "A vous de jouer",
-	INGAME_TURN_TIMEOUT: "Temps ecoule",
-}
 
 const INGAME_GREEN_CODES := {
 	INGAME_TURN_START_FIRST: true,
@@ -98,10 +74,7 @@ static func create_ui_state() -> Dictionary:
 	}
 
 static func text_for_code(message_code: String, params: Dictionary = {}) -> String:
-	var template := String(TEXT_BY_CODE.get(String(message_code).strip_edges(), ""))
-	if template == "":
-		return ""
-	return _format_template(template, params)
+	return LanguageManager.ingame_text(message_code, params)
 
 static func normalize_ingame_message(ui_message: Dictionary) -> Dictionary:
 	var text := String(ui_message.get("text", "")).strip_edges()
@@ -231,12 +204,6 @@ static func _payload(message_code: String, text: String) -> Dictionary:
 		"message_code": String(message_code),
 		"text": String(text),
 	}
-
-static func _format_template(template: String, params: Dictionary) -> String:
-	var out := String(template)
-	for key in params.keys():
-		out = out.replace("{%s}" % String(key), String(params[key]))
-	return out
 
 static func _setup_ingame_label(ingame_label: RichTextLabel) -> void:
 	if ingame_label == null:

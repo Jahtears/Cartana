@@ -9,7 +9,13 @@ import { getCardById } from "../game/helpers/cardHelpers.js";
 import { mapSlotFromClientToServer, mapSlotForClient } from "../game/helpers/slotHelpers.js";
 import { getTableSlots } from "../game/helpers/tableHelper.js";
 import { applyMove } from '../game/MoveApplier.js';
-import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot } from '../game/Regles.js';
+import {
+  validateMove,
+  isBenchSlot,
+  refillHandIfEmpty,
+  hasWonByEmptyDeckSlot,
+  haseLoseByEmptyPileSlot,
+} from '../game/Regles.js';
 import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../game/helpers/turnFlowHelpers.js";
 import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
 import { verifyOrCreateUser } from '../handlers/auth/usersStore.js';
@@ -55,6 +61,7 @@ const { baseCtx, loginCtx, onSocketClose } = createServerContext({
   tryExpireTurn,
   refillHandIfEmpty,
   hasWonByEmptyDeckSlot,
+  haseLoseByEmptyPileSlot,
   saveGameState,
   loadGameState,
   deleteGameState,
