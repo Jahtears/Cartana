@@ -65,12 +65,15 @@ const LABEL_NODE_NAME := "GameMessage"
 const TIMER_NODE_NAME := "GameMessageTimer"
 const DISPLAY_DURATION := 2.0
 const FADE_DURATION := 0.3
-const CENTER_OFFSET_P1_HAND := Vector2(-30.0, -110.0)
+const CENTER_OFFSET_P1_HAND := Vector2(-40.0, -125.0)
+const DEFAULT_LABEL_WIDTH := 420.0
+const DEFAULT_LABEL_HEIGHT := 32.0
 
 static func create_ui_state() -> Dictionary:
 	return {
 		"label": null,
 		"timer": null,
+		"anchor_position": Vector2.ZERO,
 	}
 
 static func text_for_code(message_code: String, params: Dictionary = {}) -> String:
@@ -142,7 +145,8 @@ static func apply_layout(state: Dictionary, anchor_position: Vector2) -> void:
 	var label := _get_label(state)
 	if label == null:
 		return
-	label.position = anchor_position + CENTER_OFFSET_P1_HAND
+	state["anchor_position"] = anchor_position
+	_reposition_label(state)
 
 static func show_ingame_message(ui_message: Dictionary, state: Dictionary) -> void:
 	var ingame_label := _get_label(state)
@@ -160,6 +164,8 @@ static func show_ingame_message(ui_message: Dictionary, state: Dictionary) -> vo
 		ingame_color(String(normalized.get("message_code", "")), text).to_html(),
 		text
 	]
+	_resize_single_line_label(ingame_label)
+	_reposition_label(state)
 	ingame_label.visible = true
 
 	if ingame_timer != null and ingame_timer.has_method("start"):
@@ -212,9 +218,28 @@ static func _setup_ingame_label(ingame_label: RichTextLabel) -> void:
 	ingame_label.clear()
 	ingame_label.bbcode_enabled = true
 	ingame_label.fit_content = true
+	ingame_label.scroll_active = false
+	ingame_label.custom_minimum_size = Vector2.ZERO
+	ingame_label.size = Vector2(DEFAULT_LABEL_WIDTH, DEFAULT_LABEL_HEIGHT)
 	ingame_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	ingame_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ingame_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+static func _reposition_label(state: Dictionary) -> void:
+	var label := _get_label(state)
+	if label == null:
+		return
+	var anchor :Vector2= state.get("anchor_position", Vector2.ZERO)
+	var anchor_position :Vector2= anchor if anchor is Vector2 else Vector2.ZERO
+	var label_width := maxf(label.size.x, DEFAULT_LABEL_WIDTH)
+	label.position = anchor_position + CENTER_OFFSET_P1_HAND - Vector2(label_width * 0.5, 0.0)
+
+static func _resize_single_line_label(label: RichTextLabel) -> void:
+	if label == null:
+		return
+	label.reset_size()
+	var minimum_size := label.get_minimum_size()
+	label.size = Vector2(maxf(DEFAULT_LABEL_WIDTH, minimum_size.x), DEFAULT_LABEL_HEIGHT)
 
 static func _get_label(state: Dictionary) -> RichTextLabel:
 	var label := state.get("label", null) as RichTextLabel

@@ -43,7 +43,7 @@ const POPUP_TEXT_BY_CODE = {
 	"POPUP_UI_ACTION_IMPOSSIBLE": "Action impossible",
 	"POPUP_LOBBY_GET_PLAYERS_ERROR": "Erreur get_players",
 
-	"POPUP_SPECTATE_CONFIRM": "Regarder cette partie en spectateur ?\n(game_id : {game_id})\nJoueurs : {players}",
+	"POPUP_SPECTATE_CONFIRM": "Regarder cette partie en spectateur ?\nJoueurs : {players}",
 	"POPUP_LOGOUT_CONFIRM": "Se déconnecter et revenir à l’écran de connexion ?",
 	"POPUP_OPPONENT_DISCONNECTED": "{name} s’est déconnecté",
 	"POPUP_OPPONENT_REJOINED": "{name} a rejoint la partie",
@@ -68,7 +68,7 @@ const INGAME_TEXT_BY_CODE = {
 	"INGAME_RULE_BENCH_ONLY_TO_TABLE": "Carte du banc uniquement sur un slot table",
 	"INGAME_RULE_ACE_BLOCKS_BENCH_DECK_TOP": "Banc interdit tant qu’un As est sur le dessus du deck",
 	"INGAME_RULE_ACE_BLOCKS_BENCH_HAND": "Banc interdit tant qu’un As est en main",
-	"INGAME_RULE_CARD_NOT_ALLOWED_ON_TABLE": "Carte interdite sur table (attendu : {accepted})",
+	"INGAME_RULE_CARD_NOT_ALLOWED_ON_TABLE": "Carte interdite sur table attendu : {accepted}",
 	"INGAME_RULE_CANNOT_PLAY_ON_DECK": "Interdit de jouer sur un deck",
 	"INGAME_RULE_CANNOT_PLAY_ON_HAND": "Interdit de jouer sur la main",
 	"INGAME_RULE_CANNOT_PLAY_ON_DRAWPILE": "Interdit de jouer sur la pioche",

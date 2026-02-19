@@ -16,8 +16,6 @@ const FLOW_INVITE_REQUEST_FALLBACK := "invite_request"
 const ACTION_CONFIRM_YES_FALLBACK := "confirm_yes"
 const ACTION_NETWORK_RETRY := "network_retry"
 
-const GAME_ROW_PREFIX := "Partie "
-
 var _is_changing_scene := false
 var _statuses: Dictionary = {}            # username -> status
 var _network_disconnected := false
@@ -172,7 +170,7 @@ func start_game(game_id: String, players: Array, spectator: bool) -> void:
 	call_deferred("_deferred_change_to_game")
 
 func update_players_list(players: Array) -> void:
-	var list: Node = $PlayersBox/PlayersList
+	var list: Node = $PlayersBox/PlayersList/PlayersItems
 	for child in list.get_children():
 		child.queue_free()
 
@@ -194,7 +192,7 @@ func update_players_list(players: Array) -> void:
 func update_games_list(games: Array) -> void:
 	Global.current_games = games
 
-	var list: Node = $GameBox/GameList
+	var list: Node = $GameBox/GameList/GameItems
 	for child in list.get_children():
 		child.queue_free()
 
@@ -207,7 +205,7 @@ func create_game_box(game: Variant) -> Button:
 	var players: Array = g.get("players", [])
 
 	var btn := Button.new()
-	btn.text = GAME_ROW_PREFIX + game_id + " : " + str(players)
+	btn.text = str(players) #player vs player
 	btn.custom_minimum_size = Vector2(300, 40)
 	btn.focus_mode = Control.FOCUS_NONE
 

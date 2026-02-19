@@ -31,6 +31,12 @@ size_flags_vertical = 0
 placeholder_text = "Identifant"
 alignment = 1
 
+[node name="RememberUsernameCheckBox" type="CheckBox" parent="." unique_id=1647095791]
+layout_mode = 0
+offset_right = 164.0
+offset_bottom = 26.0
+text = "Retenir l'identifiant"
+
 [node name="Pin_input" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=6927831]
 layout_mode = 2
 size_flags_horizontal = 4
@@ -72,7 +78,9 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.13333334, 0.5254902, 0.5764706, 1)
 
+[connection signal="text_changed" from="CenterContainer/VBoxContainer/Username_input" to="." method="_on_username_input_text_changed"]
 [connection signal="text_submitted" from="CenterContainer/VBoxContainer/Username_input" to="." method="_on_username_input_text_submitted"]
 [connection signal="text_submitted" from="CenterContainer/VBoxContainer/Pin_input" to="." method="_on_pin_input_text_submitted"]
 [connection signal="pressed" from="CenterContainer/VBoxContainer/Login_button" to="." method="_on_login_button_pressed"]
 [connection signal="item_selected" from="LanguageRow/LanguageOptionButton" to="." method="_on_language_option_button_item_selected"]
+[connection signal="toggled" from="RememberUsernameCheckBox" to="." method="_on_remember_username_check_box_toggled"]

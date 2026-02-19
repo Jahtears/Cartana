@@ -19,10 +19,10 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -48.0
-offset_top = -152.0
-offset_right = 52.0
-offset_bottom = -52.0
+offset_left = -63.99994
+offset_top = -136.0
+offset_right = 36.00006
+offset_bottom = -49.0
 grow_horizontal = 2
 grow_vertical = 0
 
@@ -35,11 +35,11 @@ anchor_right = 0.48
 anchor_bottom = 0.88
 offset_left = 6.3999977
 offset_top = -52.640007
-offset_right = 6.4000244
-offset_bottom = -52.640015
+offset_right = -103.599976
+offset_bottom = -57.640015
 color = Color(0, 0, 0, 0)
 
-[node name="PlayersList" type="GridContainer" parent="PlayersBox" unique_id=1527846370]
+[node name="PlayersList" type="ScrollContainer" parent="PlayersBox" unique_id=1527846370]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -50,6 +50,11 @@ offset_right = -12.0
 offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="PlayersItems" type="VBoxContainer" parent="PlayersBox/PlayersList" unique_id=1359874975]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 3
 
 [node name="GameBox" type="ColorRect" parent="." unique_id=1596528923]
 layout_mode = 1
@@ -58,13 +63,13 @@ anchor_left = 0.52
 anchor_top = 0.18
 anchor_right = 0.95
 anchor_bottom = 0.88
-offset_left = -7.039978
+offset_left = 102.96002
 offset_top = -52.640007
-offset_right = -7.039917
-offset_bottom = -52.640015
+offset_right = -7.040039
+offset_bottom = -56.23999
 color = Color(0, 0, 0, 0)
 
-[node name="GameList" type="GridContainer" parent="GameBox" unique_id=1098180103]
+[node name="GameList" type="ScrollContainer" parent="GameBox" unique_id=1098180103]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -75,6 +80,11 @@ offset_right = -12.0
 offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="GameItems" type="VBoxContainer" parent="GameBox/GameList" unique_id=1199569160]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+size_flags_horizontal = 3
 
 [node name="Deconnexion" type="Button" parent="." unique_id=1298183396]
 layout_mode = 1
