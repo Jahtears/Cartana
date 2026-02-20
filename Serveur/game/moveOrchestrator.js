@@ -4,7 +4,8 @@
 import { SLOT_TYPES, SlotId } from "./constants/slots.js";
 import { DEFAULT_HAND_SIZE } from "./constants/turnFlow.js";
 import { isTableSlot } from "./helpers/slotHelpers.js";
-import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
+import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
+import { GAME_END_REASONS } from "./constants/gameEnd.js";
 
 export const MOVE_RESULT_CODE = Object.freeze({
   NOT_FOUND: "NOT_FOUND",
@@ -27,12 +28,13 @@ export const MOVE_RESULT_CODE = Object.freeze({
  * @param {Function} params.isBenchSlot - Bench detection
  * @param {Function} params.refillHandIfEmpty - Hand refill
  * @param {Function} params.hasWonByEmptyDeckSlot - Win check
+ * @param {Function} params.haseLoseByEmptyPileSlot - Pile empty check
  * @param {Function} params.getTableSlots - Get table slots
  * @param {Function} params.endTurnAfterBenchPlay - End turn logic
  * @param {Function} params.withGameUpdate - Game state update builder
  * @param {Object} params.ctx - Request context (for trace)
  * 
- * @returns {Object} Result = { valid, reason?, response?, shouldEnd?, winner? }
+ * @returns {Object} Result = { valid, reason?, response?, shouldEnd?, winner?, game_end_reason? }
  */
 export function orchestrateMove(params) {
   const {
@@ -48,6 +50,7 @@ export function orchestrateMove(params) {
     isBenchSlot,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
+    haseLoseByEmptyPileSlot,
     getTableSlots,
     endTurnAfterBenchPlay,
     withGameUpdate,
@@ -64,7 +67,7 @@ export function orchestrateMove(params) {
   if (!card) {
     return {
       valid: false,
-      reason: INLINE_MESSAGE.RULE_CARD_NOT_FOUND,
+      reason: INGAME_MESSAGE.RULE_CARD_NOT_FOUND,
       code: MOVE_RESULT_CODE.NOT_FOUND,
     };
   }
@@ -89,7 +92,7 @@ export function orchestrateMove(params) {
   if (!moveResult) {
     return {
       valid: false,
-      reason: INLINE_MESSAGE.MOVE_REJECTED,
+      reason: INGAME_MESSAGE.MOVE_REJECTED,
       code: MOVE_RESULT_CODE.MOVE_DENIED,
     };
   }
@@ -107,7 +110,22 @@ export function orchestrateMove(params) {
   // ========================
   // 6) CHECK WIN CONDITION
   // ========================
-  const winner = hasWonByEmptyDeckSlot(game, actor) ? actor : null;
+  const resolveGameEnd = () => {
+    if (hasWonByEmptyDeckSlot(game, actor)) {
+      return {
+        winner: actor,
+        game_end_reason: GAME_END_REASONS.DECK_EMPTY,
+      };
+    }
+    if (haseLoseByEmptyPileSlot(game, actor)) {
+      return {
+        winner: null,
+        game_end_reason: GAME_END_REASONS.PILE_EMPTY,
+      };
+    }
+    return null;
+  };
+  const gameEnd = resolveGameEnd();
 
   // ========================
   // 7) TRACK GAME UPDATES (standard move)
@@ -129,16 +147,17 @@ export function orchestrateMove(params) {
   // ========================
   // 8) IF WINNER, STOP HERE
   // ========================
-  if (winner) {
+  if (gameEnd) {
     return {
       valid: true,
       response: {
         card_id: cardId,
         from_slot_id: fromSlotId,
         to_slot_id: toSlotId,
-        winner,
+        winner: gameEnd.winner,
       },
-      winner,
+      winner: gameEnd.winner,
+      game_end_reason: gameEnd.game_end_reason,
     };
   }
 
@@ -176,6 +195,21 @@ export function orchestrateMove(params) {
     fx.touch(pileSlotId);
     fx.turn();
   }, ctx?.trace);
+
+  const postTurnGameEnd = resolveGameEnd();
+  if (postTurnGameEnd) {
+    return {
+      valid: true,
+      response: {
+        card_id: cardId,
+        from_slot_id: fromSlotId,
+        to_slot_id: toSlotId,
+        winner: postTurnGameEnd.winner,
+      },
+      winner: postTurnGameEnd.winner,
+      game_end_reason: postTurnGameEnd.game_end_reason,
+    };
+  }
 
   return {
     valid: true,

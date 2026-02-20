@@ -25,6 +25,7 @@ export function createServerContext(deps) {
     tryExpireTurn,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
+    haseLoseByEmptyPileSlot,
     saveGameState,
     loadGameState,
     deleteGameState,
@@ -272,6 +273,7 @@ export function createServerContext(deps) {
     endTurnAfterBenchPlay,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
+    haseLoseByEmptyPileSlot,
     withGameUpdate,
     processTurnTimeout,
 

@@ -146,7 +146,14 @@ export function createFlush(bc, trace) {
   };
 
   const flush = () => {
-    if (trace) trace("FLUSH", { table: !!tableSlots, slots: slots.size, turn: !!wantTurn });
+    if (trace) {
+      trace("FLUSH", {
+        table: !!tableSlots,
+        table_slots: tableSlots ? tableSlots.map(slotIdToString) : [],
+        slots: slots.size,
+        turn: !!wantTurn
+      });
+    }
 
     // 1) table_sync
     if (tableSlots) {

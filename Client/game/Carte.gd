@@ -1,5 +1,13 @@
 extends Node2D
-const HitboxUtil = preload("res://Client/game/helpers/hitbox.gd")
+
+# ============= CONSTANTS =============
+const DRAG_Z := 3000
+const MIN_OVERLAP_AREA := 200.0
+const DRAG_SCALE := 1.05
+const HOVER_SCALE := 1.08
+const PREVIEW_CHECK_INTERVAL := 3
+const PREVIEW_CARD_GLOW_COLOR := Color(0.35, 0.95, 0.45, 0.45)
+const PREVIEW_CARD_GLOW_SIZE := 6
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
@@ -29,15 +37,9 @@ var _in_drag_layer := false
 var _drag_original_parent: Node = null
 var _drag_original_z := 0
 
-# ============= CONSTANTS =============
-const DRAG_Z := 3000
-const MIN_OVERLAP_AREA := 200.0
-const DRAG_SCALE := 1.05
-const HOVER_SCALE := 1.08
-const PREVIEW_CHECK_INTERVAL := 3
-
 # ============= PREVIEW & SLOT =============
 var _current_preview_slot: Node2D = null
+var _current_preview_card: Node2D = null  # ← NOUVEAU : carte en preview
 var slot: Node2D = null
 var _slot_cache: Array = []
 var _slot_cache_valid := false
@@ -59,7 +61,102 @@ func _process(_delta: float) -> void:
 		var frame = get_tree().get_frame()
 		if frame - _last_preview_frame >= PREVIEW_CHECK_INTERVAL:
 			_preview_slot_under_card()
+			_preview_card_under_card()  # ← NOUVEAU : détect cartes aussi
 			_last_preview_frame = frame
+	else:
+		# ===== HOVER STATE MANAGEMENT =====
+		_update_hover_state()
+
+# ============= PREVIEW CARD (VISUAL FEEDBACK) =============
+func _preview_card_under_card() -> void:
+	var card_rect = _get_card_rect_global()
+	var cards_group = get_tree().get_nodes_in_group("cards")
+	
+	var best_card: Node2D = null
+	var best_overlap := 0.0
+	
+	for card in cards_group:
+		if not (card is Node2D):
+			continue
+		if card == self:  # Ignore self
+			continue
+		if not is_instance_valid(card):
+			continue
+		if not card.has_method("_get_card_rect_global"):
+			continue
+		
+		var other_rect: Rect2 = card.call("_get_card_rect_global")
+		var intersection = _rect_intersection(card_rect, other_rect)
+		var overlap_area = intersection.get_area()
+		
+		if overlap_area > best_overlap:
+			best_overlap = overlap_area
+			best_card = card
+	
+	# Si overlap suffisant, on highlight
+	if best_overlap >= MIN_OVERLAP_AREA:
+		_set_preview_card(best_card)
+	else:
+		_set_preview_card(null)
+
+func _set_preview_card(card: Node2D) -> void:
+	# Si c'est la même, rien à faire
+	if _current_preview_card == card:
+		return
+	
+	# Reset l'ancienne carte
+	if _current_preview_card != null and is_instance_valid(_current_preview_card):
+		_current_preview_card._reset_card_preview()
+	
+	# Set la nouvelle
+	_current_preview_card = card
+	if _current_preview_card != null and is_instance_valid(_current_preview_card):
+		_current_preview_card._highlight_card_preview()
+
+# ============= VISUAL METHODS =============
+func _highlight_card_preview() -> void:
+	"""Applique un glow léger pendant le drag"""
+	var bord = $Front/Bord
+	if bord:
+		var style = bord.get_theme_stylebox("panel")
+		if style and style is StyleBoxFlat:
+			# Le glow est une ombre diffuse: on garde la couleur du bord inchangée.
+			var new_style = style.duplicate()
+			new_style.shadow_size = PREVIEW_CARD_GLOW_SIZE
+			new_style.shadow_color = PREVIEW_CARD_GLOW_COLOR
+			new_style.shadow_offset = Vector2.ZERO
+			bord.add_theme_stylebox_override("panel", new_style)
+
+func _reset_card_preview() -> void:
+	"""Retire le glow et restaure l'état normal"""
+	var bord = $Front/Bord
+	if bord:
+		var style = bord.get_theme_stylebox("panel")
+		if style and style is StyleBoxFlat:
+			# On retire uniquement le glow; la couleur du bord reste pilotée par dos_couleur.
+			var new_style = style.duplicate()
+			new_style.shadow_size = 0
+			new_style.shadow_color = Color(0, 0, 0, 0)
+			new_style.shadow_offset = Vector2.ZERO
+			new_style.border_color = _get_back_color(dos_couleur)
+			bord.add_theme_stylebox_override("panel", new_style)
+		
+func _update_hover_state() -> void:
+	# Si on ne peut pas interagir, forcer IDLE
+	if not _can_interact() or dragging:
+		if state != CardState.IDLE:
+			set_state(CardState.IDLE)
+		return
+
+	# Vérifier si la souris est topmost sur cette carte
+	if _is_topmost_card_at_mouse():
+		# Passer en HOVER_TOP si on n'y est pas
+		if state != CardState.HOVER_TOP:
+			set_state(CardState.HOVER_TOP)
+	else:
+		# Pas topmost → IDLE
+		if state == CardState.HOVER_TOP or state == CardState.HOVER:
+			set_state(CardState.IDLE)
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -126,8 +223,10 @@ func set_card_data(v: String, c: String, d: bool, d_couleur: String, can_drag: b
 	update_card()
 
 func update_card() -> void:
+	_apply_back_visual(dos_couleur)
+	_apply_border_visual(dos_couleur)
+
 	if dos:
-		_apply_back_visual(dos_couleur)
 		_show_back()
 		return
 
@@ -153,10 +252,24 @@ func update_card() -> void:
 	$Front/Bottom/SymboleB.modulate = texte_couleur
 
 func _apply_back_visual(code: String) -> void:
+	$Back.modulate = _get_back_color(code)
+
+func _apply_border_visual(code: String) -> void:
+	var bord = $Front/Bord
+	if not bord:
+		return
+
+	var style = bord.get_theme_stylebox("panel")
+	if style and style is StyleBoxFlat:
+		var new_style = style.duplicate()
+		new_style.border_color = _get_back_color(code)
+		bord.add_theme_stylebox_override("panel", new_style)
+
+func _get_back_color(code: String) -> Color:
 	var col := Color(0.2, 0.4, 1.0)
 	if code == "rouge":
 		col = Color(0.77, 0.435, 0.597, 1.0)
-	$Back.modulate = col
+	return col
 
 func _show_front() -> void:
 	$Front.visible = true
@@ -167,24 +280,11 @@ func _show_back() -> void:
 	$Back.visible = true
 
 # ============= HOVER =============
-func _on_area_2d_mouse_entered() -> void:
-	if not _can_interact() or dragging:
-		return
-
-	# Ne hover que si topmost
-	if _is_topmost_card_at_mouse():
-		set_state(CardState.HOVER_TOP)
-		# (on ne fait rien sinon, surtout pas de HOVER ni IDLE ici)
-
-func _on_area_2d_mouse_exited() -> void:
-	# Si cette carte était en hover, on la reset
-	if state == CardState.HOVER or state == CardState.HOVER_TOP:
-		set_state(CardState.IDLE)
 
 func _is_topmost_card_at_mouse() -> bool:
 	var mouse_pos = get_global_mouse_position()
 	var cards_group = get_tree().get_nodes_in_group("cards")
-	var topmost = HitboxUtil.pick_topmost_node_at_point(cards_group, mouse_pos)
+	var topmost := _pick_topmost_node_at_point(cards_group, mouse_pos)
 	return topmost == self
 
 # ============= DRAG INPUT =============
@@ -212,6 +312,12 @@ func _start_drag(mouse_pos: Vector2) -> void:
 
 func _end_drag() -> void:
 	dragging = false
+	
+	# Reset preview card
+	_set_preview_card(null)
+	# Recalculer une dernière fois le slot sous la carte au moment du release.
+	# Evite les drops ratés si PREVIEW_CHECK_INTERVAL n'a pas encore rafraichi.
+	_preview_slot_under_card(true)
 
 	if not _can_interact():
 		_rollback_drag()
@@ -232,6 +338,7 @@ func _end_drag() -> void:
 	_set_preview_slot(null)
 
 func _rollback_drag() -> void:
+	_set_preview_card(null)  # ← Reset card preview aussi
 	_leave_drag_layer_to_original()
 	global_position = original_position
 	set_state(CardState.IDLE)
@@ -290,9 +397,9 @@ func _leave_drag_layer_to_original() -> void:
 	_slot_cache_valid = false
 
 # ============= PREVIEW SLOT =============
-func _preview_slot_under_card() -> void:
+func _preview_slot_under_card(ignore_topmost: bool = false) -> void:
 	# 🔥 Ne preview que si la carte est topmost sous la souris
-	if not _is_topmost_card_at_mouse():
+	if not ignore_topmost and not _is_topmost_card_at_mouse():
 		_set_preview_slot(null)
 		return
 
@@ -312,7 +419,10 @@ func _preview_slot_under_card() -> void:
 		if s.has_method("get_cached_rect"):
 			slot_rect = s.call("get_cached_rect")
 		else:
-			slot_rect = HitboxUtil.rect_from_collision_shape_2d(s)
+			if s is Node2D:
+				slot_rect = _rect_from_collision_shape_node(s as Node2D)
+			else:
+				slot_rect = Rect2()
 
 		if slot_rect.size == Vector2.ZERO:
 			continue
@@ -370,6 +480,59 @@ func _rect_intersection(a: Rect2, b: Rect2) -> Rect2:
 
 	return Rect2(Vector2(x1, y1), Vector2(w, h))
 
+func _rect_from_collision_shape_node(node: Node2D) -> Rect2:
+	if node == null:
+		return Rect2()
+
+	var shape_node := node.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if shape_node == null:
+		shape_node = node.find_child("CollisionShape2D", true, false) as CollisionShape2D
+	if shape_node == null:
+		return Rect2()
+
+	var shape := shape_node.shape
+	if shape is RectangleShape2D:
+		var size := (shape as RectangleShape2D).size
+		var scale := shape_node.global_transform.get_scale()
+		var scaled := Vector2(size.x * absf(scale.x), size.y * absf(scale.y))
+		return Rect2(shape_node.global_position - scaled * 0.5, scaled)
+	return Rect2()
+
+func _contains_global_point(node: Node2D, global_point: Vector2) -> bool:
+	var rect := _rect_from_collision_shape_node(node)
+	if rect.size == Vector2.ZERO:
+		return false
+	return rect.has_point(global_point)
+
+func _pick_topmost_node_at_point(candidates: Array, global_point: Vector2) -> Node2D:
+	var best: Node2D = null
+	var best_z := -2147483648
+	var best_order := -2147483648
+
+	for item in candidates:
+		if not (item is Node2D):
+			continue
+		var node := item as Node2D
+		if not is_instance_valid(node):
+			continue
+		if not _contains_global_point(node, global_point):
+			continue
+
+		var node_z := node.z_index
+		var node_order := node.get_index()
+		if best == null:
+			best = node
+			best_z = node_z
+			best_order = node_order
+			continue
+
+		if node_z > best_z or (node_z == best_z and node_order > best_order):
+			best = node
+			best_z = node_z
+			best_order = node_order
+
+	return best
+
 # ============= NETWORK =============
 func get_card_id() -> String:
 	if has_meta("card_id"):
@@ -394,6 +557,7 @@ func _send_move_if_valid(to_slot_id: String) -> void:
 
 	if from_slot_id == to_slot_id:
 		print("[MOVE] Ignoring same slot drop: %s → %s" % [from_slot_id, to_slot_id])
+		_rollback_drag()
 		return
 
 	var card_id := get_card_id()

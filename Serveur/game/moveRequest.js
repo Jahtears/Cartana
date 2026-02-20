@@ -5,7 +5,7 @@ import { resBadRequest, resBadState, resError, resNotFound } from "../net/transp
 import { orchestrateMove, MOVE_RESULT_CODE } from "./moveOrchestrator.js";
 import { ensureGameMeta } from "./meta.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
-import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
+import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 import { POPUP_MESSAGE } from "../shared/popupMessages.js";
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
@@ -20,6 +20,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     endTurnAfterBenchPlay,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
+    haseLoseByEmptyPileSlot,
     getTableSlots,
     processTurnTimeout,
     withGameUpdate,
@@ -41,7 +42,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   if (typeof processTurnTimeout === "function") {
     const didExpire = processTurnTimeout(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
-      return resError(sendRes, ws, req, INLINE_MESSAGE.TURN_TIMEOUT, { game_id });
+      return resError(sendRes, ws, req, INGAME_MESSAGE.TURN_TIMEOUT, { game_id });
     }
   }
 
@@ -53,11 +54,22 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const from_slot_id = mapSlotFromClientToServer(raw_from, actor, game);
   const to_slot_id = mapSlotFromClientToServer(raw_to, actor, game);
 
+  ctx.trace?.("MOVE_REQ", {
+    actor,
+    card_id,
+    raw_from,
+    raw_to,
+    from_slot_id: from_slot_id ? String(from_slot_id) : null,
+    to_slot_id: to_slot_id ? String(to_slot_id) : null,
+    turn_current: String(game?.turn?.current ?? ""),
+    turn_number: Number(game?.turn?.number ?? 0),
+  });
+
   if (!from_slot_id || !to_slot_id) {
-    resBadRequest(sendRes, ws, req, INLINE_MESSAGE.MOVE_INVALID_SLOT, {
+    resBadRequest(sendRes, ws, req, INGAME_MESSAGE.MOVE_INVALID_SLOT, {
       from_slot_id: raw_from,
       to_slot_id: raw_to,
-      message_code: INLINE_MESSAGE.MOVE_INVALID_SLOT,
+      message_code: INGAME_MESSAGE.MOVE_INVALID_SLOT,
     });
     return true;
   }
@@ -79,6 +91,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     isBenchSlot,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
+    haseLoseByEmptyPileSlot,
     getTableSlots,
     endTurnAfterBenchPlay,
     withGameUpdate,
@@ -87,6 +100,14 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
 
   // ✅ HANDLE RESULT
   if (!orchResult.valid) {
+    ctx.trace?.("MOVE_DENIED", {
+      actor,
+      card_id,
+      from_slot_id: String(client_from),
+      to_slot_id: String(client_to),
+      reason: String(orchResult.reason ?? ""),
+    });
+
     const details = {
       card_id,
       from_slot_id: client_from,
@@ -103,14 +124,14 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
       return resBadRequest(sendRes, ws, req, orchResult.reason, details);
     }
 
-    return resBadState(sendRes, ws, req, orchResult.reason || INLINE_MESSAGE.MOVE_REJECTED, details);
+    return resBadState(sendRes, ws, req, orchResult.reason || INGAME_MESSAGE.MOVE_REJECTED, details);
   }
 
   // ✅ GAME END: emit end then broadcast
-  if (orchResult.winner) {
+  if (orchResult.winner || orchResult.game_end_reason) {
     emitGameEndThenSnapshot(ctx, game_id, {
       winner: orchResult.winner,
-      reason: GAME_END_REASONS.DECK_EMPTY,
+      reason: orchResult.game_end_reason || GAME_END_REASONS.DECK_EMPTY,
       by: actor,
       at: Date.now(),
     });

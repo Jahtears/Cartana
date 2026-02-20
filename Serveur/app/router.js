@@ -153,6 +153,10 @@ export function createRouter({
 
       // ✅ Routes mapping (handlers externes)
       const routes = {
+        ping: async () => {
+          sendResWithRidCache(ws, req, true, { server_ms: Date.now() });
+        },
+
         get_players: async () => {
           ctx.trace?.("get_players");
           sendResWithRidCache(ws, req, true, {

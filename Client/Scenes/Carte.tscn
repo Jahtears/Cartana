@@ -7,20 +7,15 @@ size = Vector2(80, 119)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3122v"]
 draw_center = false
-border_width_left = 4
-border_width_top = 4
-border_width_right = 3
-border_width_bottom = 3
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
 border_color = Color(0, 0, 0, 1)
 
 [node name="Carte" type="Node2D" unique_id=616561034]
 z_index = 1
 script = ExtResource("1_d822b")
-valeur = null
-couleur = null
-dos = null
-dos_couleur = null
-draggable = null
 
 [node name="Area2D" type="Area2D" parent="." unique_id=759047316]
 
@@ -100,9 +95,4 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=175487624]
-speed_scale = -4.0
-
 [connection signal="input_event" from="Area2D" to="." method="_on_area_2d_input_event"]
-[connection signal="mouse_entered" from="Area2D" to="." method="_on_area_2d_mouse_entered"]
-[connection signal="mouse_exited" from="Area2D" to="." method="_on_area_2d_mouse_exited"]

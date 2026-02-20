@@ -1,41 +1,30 @@
-# Slot.gd v2.2 - Fix: tri par index, slot MAIN invisible, layout cohérent
-
+# Slot.gd - Refactorisé sans redondances
 extends Area2D
 
 const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
+const GameLayoutConfig = preload("res://Client/game/GameLayoutConfig.gd")
 
 # ============= EXPORTS =============
 @export var slot_id: String = ""
-@export var snap_duration := 0.18
+@export var snap_duration: float = GameLayoutConfig.SNAP_DURATION
 
 # ============= STATE =============
 var stacked_cards: Array[Node] = []
-var preview_active := false
+var preview_active: bool = false
 var _cached_rect: Rect2 = Rect2()
-var _rect_cache_dirty := true
-var _is_hand_slot := false
+var _rect_cache_dirty: bool = true
+var _server_sync_active: bool = false
+var _server_sync_animate_on_finalize: bool = false
 
-# ============= FAN PARAMETERS (HAND layout) =============
-const HAND_FAN_X_STEP := 60.0
-const HAND_FAN_CENTER_LIFT := 20.0
-const HAND_FAN_MAX_ANGLE_DEG := 50.0
-const HAND_FAN_MAX_CARDS := 5
-
-# ============= CASCADE PARAMETERS =============
-const CASCADE_BANC := Vector2(0, 24)
-const CASCADE_TABLE := Vector2(0, 0)
-const CASCADE_DEFAULT := Vector2(0, 0)
-
-# ============= PREVIEW COLORS =============
-const PREVIEW_HIGHLIGHT_COLOR := Color(1, 1, 0.5)
-const PREVIEW_NORMAL_COLOR := Color(1, 1, 1)
-const PREVIEW_CARD_SCALE := Vector2(1.03, 1.03)
+@onready var _background: CanvasItem = get_node_or_null("Background") as CanvasItem
+@onready var _collision_shape: CollisionShape2D = get_node_or_null("CollisionShape2D") as CollisionShape2D
 
 # ============= LIFECYCLE =============
 
 func _ready() -> void:
 	add_to_group("slots")
-	modulate = PREVIEW_NORMAL_COLOR
+	_apply_slot_type_mode()
+	modulate = GameLayoutConfig.PREVIEW_NORMAL_COLOR
 
 func _process(_delta: float) -> void:
 	if _rect_cache_dirty:
@@ -52,6 +41,10 @@ func get_cached_rect() -> Rect2:
 		_update_cached_rect()
 	return _cached_rect
 
+func begin_server_sync(animate_on_finalize: bool = false) -> void:
+	_server_sync_active = true
+	_server_sync_animate_on_finalize = animate_on_finalize
+
 # ============= PREVIEW (VISUAL FEEDBACK) =============
 
 func on_card_enter_preview() -> void:
@@ -61,15 +54,14 @@ func on_card_exit_preview() -> void:
 	_set_preview(false)
 
 func _set_preview(active: bool) -> void:
+	if _is_hand_slot_type():
+		preview_active = false
+		return
+
 	if preview_active == active:
 		return
 	preview_active = active
-
-	# ✅ Pas de highlight pour HAND (déjà invisible)
-	if not _is_hand_slot:
-		$Background.modulate = PREVIEW_HIGHLIGHT_COLOR if active else PREVIEW_NORMAL_COLOR
-	else:
-		$Background.modulate = PREVIEW_NORMAL_COLOR
+	_apply_preview_visual(active)
 
 # ============= SNAP (PLACEMENT) =============
 
@@ -78,55 +70,70 @@ func _remove_card_ref(card: Node) -> void:
 		stacked_cards.erase(card)
 
 func snap_card(card: Node2D, animate: bool = true) -> void:
-	# Retirer des slots précédents
 	if card.slot != null and card.slot != self and card.slot.has_method("_remove_card_ref"):
 		card.slot.call("_remove_card_ref", card)
 
-	# Reparent
 	if card.get_parent() != self:
 		card.reparent(self, true)
 
-	# Setter
 	card.slot = self
 	card.set_meta("last_slot_id", get_slot_id())
-	card.visible = true	
+	card.visible = true
 
-	# Ajouter
 	_remove_card_ref(card)
 	stacked_cards.append(card)
+	_sort_stacked_cards_by_server_order()
 
-	# Kill tween précédent
-	if card.has_meta("_snap_tween"):
-		var old_t := card.get_meta("_snap_tween") as Tween
-		if old_t != null and is_instance_valid(old_t):
-			old_t.kill()
+	_kill_card_snap_tween(card)
 
-	_layout_stack(animate)
+	var should_defer_layout := _server_sync_active and _is_hand_slot_type()
+	if not should_defer_layout:
+		_layout_stack(animate)
 	_rect_cache_dirty = true
 
+func _sort_stacked_cards_by_server_order() -> void:
+	if stacked_cards.size() <= 1:
+		return
+
+	stacked_cards.sort_custom(func(a, b):
+		var ao := 2147483647
+		var bo := 2147483647
+		if a is Node and (a as Node).has_meta("_server_array_order"):
+			ao = int((a as Node).get_meta("_server_array_order"))
+		if b is Node and (b as Node).has_meta("_server_array_order"):
+			bo = int((b as Node).get_meta("_server_array_order"))
+		return ao < bo
+	)
+
+func finalize_server_sync() -> void:
+	_server_sync_active = false
+	_sort_stacked_cards_by_server_order()
+	_kill_snap_tweens()
+	_layout_stack(_server_sync_animate_on_finalize)
+	_server_sync_animate_on_finalize = false
+
 func clear_slot() -> void:
+	_server_sync_active = false
+	_server_sync_animate_on_finalize = false
 	if stacked_cards.is_empty():
 		_reset_background()
 		return
 
 	var root := get_tree().current_scene if is_inside_tree() else null
-	
+
 	for c in stacked_cards:
 		if not is_instance_valid(c):
 			continue
-		
-		if c.has_meta("_snap_tween"):
-			var old_t :Tween= c.get_meta("_snap_tween")
-			if old_t and is_instance_valid(old_t):
-				old_t.kill()
-		
+
+		_kill_card_snap_tween(c)
+
 		c.slot = null
 		c.set_meta("last_slot_id", get_slot_id())
 		c.visible = false
-		
+
 		if root:
 			c.reparent(root, true)
-	
+
 	stacked_cards.clear()
 	_reset_background()
 	_rect_cache_dirty = true
@@ -142,94 +149,110 @@ func _layout_stack(animate: bool) -> void:
 		"HAND":
 			_layout_hand_fan(animate, player_id)
 		"BENCH":
-			_layout_cascade(animate, CASCADE_BANC)
+			_layout_cascade(animate, GameLayoutConfig.CASCADE_BANC)
 		"TABLE":
-			_layout_cascade(animate, CASCADE_TABLE)
+			_layout_cascade(animate, GameLayoutConfig.CASCADE_TABLE)
 		_:
-			_layout_cascade(animate, CASCADE_DEFAULT)
+			_layout_cascade(animate, GameLayoutConfig.CASCADE_DEFAULT)
 
 func _layout_hand_fan(animate: bool, player_id: int) -> void:
-	var card_count = stacked_cards.size()
-	
+	var card_count: int = stacked_cards.size()
+	if card_count <= 0:
+		return
+
+	var order_by_card: Dictionary = {}
+	var max_order := -1
+
 	for i in range(card_count):
-		var c: Node2D = stacked_cards[i]
-		if !is_instance_valid(c):
+		var cc := stacked_cards[i] as Node2D
+		if cc == null or !is_instance_valid(cc):
 			continue
+		var order := _get_effective_server_order(cc, i)
+		order_by_card[cc] = order
+		if order > max_order:
+			max_order = order
+
+	var span := maxi(card_count, max_order + 1)
+	var fan_count: int = mini(span, GameLayoutConfig.HAND_FAN_MAX_CARDS)
+	var x_radius: float = GameLayoutConfig.HAND_FAN_X_STEP * float(maxi(1, fan_count - 1)) * 0.5
+	var vertical_sign: float = -1.0 if player_id == 1 else 1.0
+	var angle_sign: float = 1.0 if player_id == 1 else -1.0
+
+	for i in range(card_count):
+		var c := stacked_cards[i] as Node2D
+		if c == null or !is_instance_valid(c):
+			continue
+
+		var order := int(order_by_card.get(c, i))
+		var clamped_order := clampi(order, 0, maxi(0, span - 1))
+		c.z_index = clamped_order
 
 		var target_pos := Vector2.ZERO
 		var target_rot := 0.0
 
-		if card_count > 1:
-			# ✅ i = index du serveur (après tri)
-			var t: float = float(i) / float(card_count - 1)
+		if span > 1:
+			var t: float = float(clamped_order) / float(span - 1)
 			var centered: float = t * 2.0 - 1.0
 			var arc: float = 1.0 - centered * centered
-			
-			var fan_count: int = mini(card_count, HAND_FAN_MAX_CARDS)
-			var x_radius: float = HAND_FAN_X_STEP * float(maxi(1, fan_count - 1)) * 0.5
-			
-			# Vertical/angle sign selon player
-			var vertical_sign: float = -1.0 if player_id == 1 else 1.0
-			var angle_sign: float = 1.0 if player_id == 1 else -1.0
-			
-			# Position
+
 			target_pos = Vector2(
 				centered * x_radius,
-				vertical_sign * HAND_FAN_CENTER_LIFT * arc
+				vertical_sign * GameLayoutConfig.HAND_FAN_CENTER_LIFT * arc
 			)
-			# Rotation
-			target_rot = deg_to_rad(angle_sign * centered * HAND_FAN_MAX_ANGLE_DEG)
+			target_rot = deg_to_rad(angle_sign * centered * GameLayoutConfig.HAND_FAN_MAX_ANGLE_DEG)
 		else:
 			target_pos = Vector2.ZERO
 			target_rot = 0.0
 
-		c.z_index = i
+		_snap_card_position(c, target_pos, target_rot, animate)
 
-		if animate:
-			var t := c.create_tween()
-			t.set_parallel(true)
-			t.tween_property(c, "position", target_pos, 0.15)
-			t.tween_property(c, "rotation", target_rot, 0.15)
-			c.set_meta("_snap_tween", t)
-		else:
-			c.position = target_pos
-			c.rotation = target_rot
-
-# ============= CASCADE layout (BENCH, TABLE) =============
-
-func _layout_cascade(animate: bool, step: Vector2) -> void:
-	for i in range(stacked_cards.size()):
-		var c: Node2D = stacked_cards[i]
-		if !is_instance_valid(c):
+func _layout_cascade(animate: bool, cascade_offset: Vector2) -> void:
+	var count: int = stacked_cards.size()
+	for i in range(count):
+		var c := stacked_cards[i] as Node2D
+		if c == null or !is_instance_valid(c):
 			continue
-
-		var target_pos := step * i
 		c.z_index = i
+		var target_pos: Vector2 = cascade_offset * i
+		_snap_card_position(c, target_pos, 0.0, animate)
 
-		if animate:
-			var t := c.create_tween()
-			t.set_parallel(true)
-			t.tween_property(c, "position", target_pos, 0.12)
-			t.tween_property(c, "rotation", 0.0, 0.12)
-			c.set_meta("_snap_tween", t)
-		else:
-			c.position = target_pos
-			c.rotation = 0.0
+func _snap_card_position(card: Node2D, target_pos: Vector2, target_rot: float, animate: bool) -> void:
+	if not animate:
+		card.position = target_pos
+		card.rotation = target_rot
+		card.scale = Vector2.ONE
+		return
 
-# ============= HITBOX CACHE =============
+	_kill_card_snap_tween(card)
+
+	var tween_duration := maxf(0.01, snap_duration)
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_parallel(true)
+	tween.tween_property(card, "position", target_pos, tween_duration)
+	tween.tween_property(card, "rotation", target_rot, tween_duration)
+	tween.tween_property(card, "scale", Vector2.ONE, tween_duration)
+	card.set_meta("_snap_tween", tween)
+
+# ============= RECT CACHE =============
 
 func _update_cached_rect() -> void:
-	var shape_node := $CollisionShape2D
-	if shape_node == null:
+	if _is_hand_slot_type():
 		_cached_rect = Rect2()
 		return
 
-	var shape = shape_node.shape
+	if _collision_shape == null:
+		_cached_rect = Rect2()
+		return
+
+	var shape := _collision_shape.shape
 	if shape is RectangleShape2D:
-		var size: Vector2 = (shape as RectangleShape2D).size
-		var scale: Vector2 = shape_node.global_transform.get_scale()
+		var rect_shape := shape as RectangleShape2D
+		var size: Vector2 = rect_shape.size
+		var scale: Vector2 = _collision_shape.global_transform.get_scale()
 		var scaled: Vector2 = Vector2(size.x * absf(scale.x), size.y * absf(scale.y))
-		_cached_rect = Rect2(shape_node.global_position - scaled * 0.5, scaled)
+		_cached_rect = Rect2(_collision_shape.global_position - scaled * 0.5, scaled)
 	else:
 		_cached_rect = Rect2()
 
@@ -238,8 +261,56 @@ func invalidate_rect_cache() -> void:
 
 # ============= HELPERS =============
 
+func _is_hand_slot_type() -> bool:
+	var parsed := SlotIdHelper.parse_slot_id(get_slot_id())
+	return String(parsed.get("type", "")) == "HAND"
+
+func _apply_slot_type_mode() -> void:
+	var is_hand := _is_hand_slot_type()
+
+	_set_background_visible(not is_hand)
+
+	if _collision_shape != null:
+		_collision_shape.disabled = is_hand
+
+	_rect_cache_dirty = true
+
+func _get_effective_server_order(card: Node2D, fallback_order: int) -> int:
+	if card != null and card.has_meta("_server_array_order"):
+		var order := int(card.get_meta("_server_array_order"))
+		if order >= 0 and order < 2147483647:
+			return order
+	return fallback_order
+
+func _kill_snap_tweens() -> void:
+	for c in stacked_cards:
+		if c == null or !is_instance_valid(c):
+			continue
+		_kill_card_snap_tween(c)
+
 func _reset_background() -> void:
-	if _is_hand_slot:
-		$Background.modulate = Color(1, 1, 1, 0.1)
+	if _is_hand_slot_type():
+		_set_background_visible(false)
 	else:
-		$Background.modulate = PREVIEW_NORMAL_COLOR
+		_set_background_visible(true)
+		_set_background_modulate(GameLayoutConfig.PREVIEW_NORMAL_COLOR)
+
+func _apply_preview_visual(active: bool) -> void:
+	_set_background_modulate(GameLayoutConfig.PREVIEW_HIGHLIGHT_COLOR if active else GameLayoutConfig.PREVIEW_NORMAL_COLOR)
+
+func _set_background_visible(is_visible: bool) -> void:
+	if _background != null:
+		_background.visible = is_visible
+
+func _set_background_modulate(color: Color) -> void:
+	if _background != null:
+		_background.modulate = color
+
+func _kill_card_snap_tween(card: Node) -> void:
+	if card == null or not is_instance_valid(card):
+		return
+	if not card.has_meta("_snap_tween"):
+		return
+	var old_t := card.get_meta("_snap_tween") as Tween
+	if old_t != null and is_instance_valid(old_t):
+		old_t.kill()

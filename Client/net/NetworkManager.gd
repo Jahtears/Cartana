@@ -4,6 +4,10 @@ extends Node
 
 signal connected()
 signal disconnected(code: int, reason: String)
+signal connection_lost()
+signal connection_restored()
+signal reconnect_failed()
+signal server_closed(server_reason: String, close_code: int, raw_reason: String)
 signal response(rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary)
 signal evt(type: String, data: Dictionary)
 
@@ -12,6 +16,9 @@ const DEFAULT_TIMEOUT_SEC = 10.0
 const MAX_RETRIES = 3
 const MAX_QUEUE_SIZE = 100
 const HEARTBEAT_CHECK_MS = 5000
+const HEARTBEAT_TIMEOUT_MS = 8000
+const HEARTBEAT_PROBE_TYPE = "ping"
+const HEARTBEAT_CLIENT_TIMEOUT_REASON = "Connection lost (heartbeat timeout)"
 
 # ✅ NOUVEAU: Reconnexion automatique
 const RECONNECT_INITIAL_DELAY_SEC = 1.0
@@ -19,7 +26,9 @@ const RECONNECT_MAX_DELAY_SEC = 30.0
 const RECONNECT_BACKOFF_MULTIPLIER = 1.5
 const DISCONNECT_REASON_CLOSE = "close"
 const DISCONNECT_REASON_LOGOUT = "logout"
-const LOCAL_ERROR_MESSAGE_CODE = "MSG_POPUP_TECH_ERROR_GENERIC"
+const DISCONNECT_REASON_RECONNECT_MAX = "Max reconnect attempts exceeded"
+const SERVER_CLOSE_REASON_PREFIX = "SERVER_"
+const LOCAL_ERROR_MESSAGE_CODE = "POPUP_TECH_ERROR_GENERIC"
 
 # ============= STATE =============
 var _ws := WebSocketPeer.new()
@@ -27,8 +36,11 @@ var _url := ""
 var _rid_counter: int = 0
 var server_clock_offset_ms: int = 0
 var _was_open: bool = false
-var _last_pong_ms: int = 0
+var _last_rx_ms: int = 0
 var _connect_in_flight: bool = false
+var _heartbeat_probe_rid: String = ""
+var _heartbeat_probe_sent_ms: int = 0
+var _heartbeat_probe_counter: int = 0
 
 # Queue + Retry
 var _request_queue: Array = []
@@ -37,6 +49,8 @@ var _pending_requests: Dictionary = {}
 
 # Priorité
 enum RequestPriority { LOW = 0, NORMAL = 5, HIGH = 8, CRITICAL = 10 }
+enum ConnectionState { IDLE, CONNECTING, CONNECTED, RECOVERING }
+enum DisconnectClass { VOLUNTARY, SERVER_CLOSED_EXPLICIT, CLIENT_LOST }
 
 # ✅ NOUVEAU: Reconnexion state
 var _reconnect_timer: Timer = null
@@ -48,6 +62,8 @@ var _is_authenticated: bool = false
 var _login_in_flight: bool = false
 var _allow_reconnect: bool = true
 var _disconnect_reason: String = ""
+var _client_connection_lost: bool = false
+var _connection_state: int = ConnectionState.IDLE
 
 # ============= LIFECYCLE =============
 
@@ -59,16 +75,23 @@ func connect_to_server(url: String = "ws://192.168.1.40:3000", reset_backoff: bo
 		_url = url
 	if _url == "":
 		return
+	if is_open() or _connect_in_flight:
+		return
 
 	_allow_reconnect = true
 	_disconnect_reason = ""
 	if reset_backoff:
 		_reset_reconnect_state()
 
+	if _client_connection_lost:
+		_connection_state = ConnectionState.RECOVERING
+	else:
+		_connection_state = ConnectionState.CONNECTING
 	_connect_in_flight = true
 	var err := _ws.connect_to_url(_url)
 	if err != OK:
 		push_error("WebSocket connect error: %s" % err)
+		_connect_in_flight = false
 		_schedule_reconnect()
 		return
 	print("[NET] Connecting to %s" % _url)
@@ -82,6 +105,8 @@ func close(code: int = 1000, reason: String = "") -> void:
 	_disconnect_reason = String(reason).strip_edges()
 	if _disconnect_reason == "":
 		_disconnect_reason = DISCONNECT_REASON_CLOSE
+	_client_connection_lost = false
+	_connection_state = ConnectionState.IDLE
 
 	_request_queue.clear()
 	_pending_requests.clear()
@@ -90,10 +115,20 @@ func close(code: int = 1000, reason: String = "") -> void:
 	_is_authenticated = false
 	_login_in_flight = false
 	_connect_in_flight = false
+	_reset_heartbeat_probe()
 	if is_open():
 		_ws.close(code, _disconnect_reason)
 	else:
 		_was_open = false
+
+func retry_now() -> void:
+	if _url == "" or is_open():
+		return
+	_allow_reconnect = true
+	_cancel_reconnect_timer()
+	_reset_reconnect_state()
+	_connect_in_flight = false
+	connect_to_server(_url, true)
 
 func set_login_credentials(username: String, pin: String) -> void:
 	var user := username.strip_edges()
@@ -135,8 +170,7 @@ func _schedule_reconnect() -> void:
 	if _url == "":
 		return
 	if _reconnect_attempts >= _max_reconnect_attempts:
-		push_error("[NET] Max reconnect attempts reached (%d)" % _max_reconnect_attempts)
-		disconnected.emit(1000, "Max reconnect attempts exceeded")
+		_on_reconnect_exhausted()
 		return
 	
 	_cancel_reconnect_timer()
@@ -157,12 +191,74 @@ func _schedule_reconnect() -> void:
 	_reconnect_timer.timeout.connect(_on_reconnect_timeout)
 	_reconnect_timer.start()
 
+func _on_reconnect_exhausted() -> void:
+	push_error("[NET] Max reconnect attempts reached (%d)" % _max_reconnect_attempts)
+	if _connection_state == ConnectionState.RECOVERING and _client_connection_lost:
+		reconnect_failed.emit()
+	_connection_state = ConnectionState.IDLE
+	disconnected.emit(1000, DISCONNECT_REASON_RECONNECT_MAX)
+
 func _on_reconnect_timeout() -> void:
 	if not _allow_reconnect:
 		return
 	print("[NET] Attempting reconnect #%d" % _reconnect_attempts)
 	_reconnect_timer = null
 	connect_to_server(_url, false)
+
+func _reset_heartbeat_probe() -> void:
+	_heartbeat_probe_rid = ""
+	_heartbeat_probe_sent_ms = 0
+
+func _send_heartbeat_probe(now_ms: int) -> bool:
+	if not is_open():
+		return false
+	_heartbeat_probe_counter += 1
+	_heartbeat_probe_rid = "hb_%d" % _heartbeat_probe_counter
+	_heartbeat_probe_sent_ms = now_ms
+	var env := {
+		"v": 1,
+		"kind": "req",
+		"type": HEARTBEAT_PROBE_TYPE,
+		"rid": _heartbeat_probe_rid,
+		"data": {}
+	}
+	var err := _ws.send_text(JSON.stringify(env))
+	if err != OK:
+		_reset_heartbeat_probe()
+		return false
+	return true
+
+func _mark_client_connection_lost(reason: String) -> void:
+	if _connection_state == ConnectionState.RECOVERING and _client_connection_lost:
+		return
+	_was_open = false
+	_connect_in_flight = false
+	_is_authenticated = false
+	_login_in_flight = false
+	_disconnect_reason = ""
+	_reset_heartbeat_probe()
+	disconnected.emit(1006, reason)
+	if not _client_connection_lost:
+		_client_connection_lost = true
+		connection_lost.emit()
+	_connection_state = ConnectionState.RECOVERING
+	_ws = WebSocketPeer.new()
+	_schedule_reconnect()
+
+func _check_heartbeat(now_ms: int) -> void:
+	if not _allow_reconnect:
+		return
+	if not _is_authenticated:
+		return
+	if _heartbeat_probe_rid == "":
+		if now_ms - _last_rx_ms < HEARTBEAT_CHECK_MS:
+			return
+		if not _send_heartbeat_probe(now_ms):
+			_mark_client_connection_lost("Connection lost")
+		return
+	if now_ms - _heartbeat_probe_sent_ms >= HEARTBEAT_TIMEOUT_MS:
+		push_warning("[NET] Heartbeat timeout, forcing reconnect")
+		_mark_client_connection_lost(HEARTBEAT_CLIENT_TIMEOUT_REASON)
 
 # ============= PROCESS LOOP =============
 
@@ -172,15 +268,21 @@ func _process(_delta: float) -> void:
 	var st := _ws.get_ready_state()
 	if st == WebSocketPeer.STATE_OPEN:
 		if not _was_open:
+			var was_recovering := _connection_state == ConnectionState.RECOVERING and _client_connection_lost
 			_was_open = true
 			_connect_in_flight = false
-			_last_pong_ms = Time.get_ticks_msec()
+			_last_rx_ms = Time.get_ticks_msec()
+			_reset_heartbeat_probe()
 			_reset_reconnect_state()  # ✅ Reset backoff on success
+			_connection_state = ConnectionState.CONNECTED
 			if has_login_credentials() and not _is_authenticated:
 				_try_auto_login()
 			else:
 				_drain_queue()
 			connected.emit()
+			if was_recovering:
+				_client_connection_lost = false
+				connection_restored.emit()
 			print("[NET] Connected to server")
 	elif st == WebSocketPeer.STATE_CLOSED:
 		if _was_open or _connect_in_flight:
@@ -188,13 +290,33 @@ func _process(_delta: float) -> void:
 			_connect_in_flight = false
 			_is_authenticated = false
 			_login_in_flight = false
-			var reason := _disconnect_reason if _disconnect_reason != "" else "Connection lost"
-			disconnected.emit(0, reason)
-			if _allow_reconnect:
-				print("[NET] Connection closed, scheduling reconnect")
-				_schedule_reconnect()
-			else:
-				print("[NET] Connection closed (manual): %s" % reason)
+			_reset_heartbeat_probe()
+			var close_code := _ws.get_close_code()
+			var close_reason := String(_ws.get_close_reason()).strip_edges()
+			var reason := _resolve_disconnect_reason(close_reason)
+			disconnected.emit(close_code, reason)
+			var classification := _classify_disconnection(close_code, close_reason, reason, _allow_reconnect, _disconnect_reason)
+			match int(classification.get("class", DisconnectClass.CLIENT_LOST)):
+				DisconnectClass.VOLUNTARY:
+					_connection_state = ConnectionState.IDLE
+					_client_connection_lost = false
+					print("[NET] Connection closed (manual): %s" % reason)
+				DisconnectClass.SERVER_CLOSED_EXPLICIT:
+					_connection_state = ConnectionState.IDLE
+					_client_connection_lost = false
+					_allow_reconnect = false
+					server_closed.emit(
+						String(classification.get("server_reason", "")),
+						close_code,
+						close_reason
+					)
+				_:
+					if not _client_connection_lost:
+						_client_connection_lost = true
+						connection_lost.emit()
+					_connection_state = ConnectionState.RECOVERING
+					print("[NET] Connection closed, scheduling reconnect")
+					_schedule_reconnect()
 			_disconnect_reason = ""
 		return
 
@@ -202,6 +324,8 @@ func _process(_delta: float) -> void:
 	while _ws.get_available_packet_count() > 0:
 		var pkt := _ws.get_packet().get_string_from_utf8()
 		_handle_packet(pkt)
+
+	_check_heartbeat(Time.get_ticks_msec())
 
 	# Timeout des requêtes
 	_check_request_timeouts()
@@ -309,6 +433,7 @@ func _check_request_timeouts() -> void:
 # ============= PACKET HANDLING =============
 
 func _handle_packet(pkt: String) -> void:
+	_last_rx_ms = Time.get_ticks_msec()
 	var json = JSON.new()
 	var error = json.parse(pkt)
 	
@@ -338,6 +463,9 @@ func _handle_packet(pkt: String) -> void:
 		var ok := bool(env.get("ok", false))
 		var data := env.get("data", {}) as Dictionary
 		var err := env.get("error", {}) as Dictionary
+		if type == HEARTBEAT_PROBE_TYPE and rid == _heartbeat_probe_rid:
+			_reset_heartbeat_probe()
+			return
 
 		if type == "login":
 			_login_in_flight = false
@@ -437,3 +565,34 @@ func get_queue_stats() -> Dictionary:
 
 func get_pending_request(rid: String) -> Dictionary:
 	return _pending_requests.get(rid, {})
+
+func _resolve_disconnect_reason(close_reason: String) -> String:
+	var reason := _disconnect_reason
+	if reason == "":
+		reason = close_reason
+	if reason == "":
+		reason = "Connection lost"
+	return reason
+
+func _classify_disconnection(
+	_close_code: int,
+	close_reason: String,
+	fallback_reason: String,
+	allow_reconnect: bool,
+	disconnect_reason: String
+) -> Dictionary:
+	var explicit_reason := close_reason if close_reason != "" else fallback_reason
+	var normalized_disconnect_reason := String(disconnect_reason).strip_edges()
+
+	if normalized_disconnect_reason == DISCONNECT_REASON_LOGOUT or normalized_disconnect_reason == DISCONNECT_REASON_CLOSE:
+		return {"class": DisconnectClass.VOLUNTARY, "server_reason": ""}
+	if not allow_reconnect and normalized_disconnect_reason != "":
+		return {"class": DisconnectClass.VOLUNTARY, "server_reason": ""}
+
+	if explicit_reason.begins_with(SERVER_CLOSE_REASON_PREFIX):
+		var server_reason := explicit_reason.substr(SERVER_CLOSE_REASON_PREFIX.length())
+		if server_reason == "":
+			server_reason = explicit_reason
+		return {"class": DisconnectClass.SERVER_CLOSED_EXPLICIT, "server_reason": server_reason}
+
+	return {"class": DisconnectClass.CLIENT_LOST, "server_reason": ""}

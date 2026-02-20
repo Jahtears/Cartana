@@ -17,7 +17,7 @@ import {
   getSlotValidator,
 } from "./slotValidators.js";
 import { debugLog } from "./helpers/debugHelpers.js";
-import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
+import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 
 function hasWonByEmptyDeckSlot(game, player) {
   if (!player || !game) return false;
@@ -32,8 +32,18 @@ function hasWonByEmptyDeckSlot(game, player) {
   return Array.isArray(deckStack) ? deckStack.length === 0 : !deckStack;
 }
 
+function haseLoseByEmptyPileSlot(game, player) {
+  if (!game) return false;
+  if (player && !game.players.includes(player)) return false;
+
+  const pileSlot = SlotId.create(0, SLOT_TYPES.PILE, 1);
+  const pileStack = getSlotContent(game, pileSlot);
+
+  return Array.isArray(pileStack) ? pileStack.length === 0 : !pileStack;
+}
+
 function ruleCardMustBeInFromSlot(game, player, card, fromSlotId, toSlotId) {
-  if (!card || !card.id) return { valid: false, reason: INLINE_MESSAGE.RULE_CARD_UNKNOWN };
+  if (!card || !card.id) return { valid: false, reason: INGAME_MESSAGE.RULE_CARD_UNKNOWN };
   if (!hasCardInSlot(game, fromSlotId, card.id)) {
     // Debug helper: log effective slot state.
     const slotContent = getSlotContent(game, fromSlotId);
@@ -48,7 +58,7 @@ function ruleCardMustBeInFromSlot(game, player, card, fromSlotId, toSlotId) {
       card_in_game: !!card,
       all_slots: allSlots,
     });
-    return { valid: false, reason: INLINE_MESSAGE.RULE_SOURCE_SLOT_MISSING_CARD };
+    return { valid: false, reason: INGAME_MESSAGE.RULE_SOURCE_SLOT_MISSING_CARD };
   }
   return { valid: true };
 }
@@ -66,17 +76,17 @@ function ruleNotOnOpponentSide(game, player, card, fromSlotId, toSlotId) {
       : null;
   
   if (playerIndex === null) {
-    return { valid: false, reason: INLINE_MESSAGE.RULE_UNKNOWN_PLAYER };
+    return { valid: false, reason: INGAME_MESSAGE.RULE_UNKNOWN_PLAYER };
   }
 
   // Source slot cannot be opponent-owned.
   if (fromPlayer !== null && fromPlayer !== 0 && fromPlayer !== playerIndex) {
-    return { valid: false, reason: INLINE_MESSAGE.RULE_OPPONENT_SLOT_FORBIDDEN };
+    return { valid: false, reason: INGAME_MESSAGE.RULE_OPPONENT_SLOT_FORBIDDEN };
   }
 
   // Target slot cannot be opponent-owned.
   if (toPlayer !== null && toPlayer !== 0 && toPlayer !== playerIndex) {
-    return { valid: false, reason: INLINE_MESSAGE.RULE_OPPONENT_SLOT_FORBIDDEN };
+    return { valid: false, reason: INGAME_MESSAGE.RULE_OPPONENT_SLOT_FORBIDDEN };
   }
 
   return { valid: true };
@@ -89,7 +99,7 @@ function ruleDeckMustPlayOnTable(game, player, card, fromSlotId, toSlotId) {
   if (fromIsDeck && !toIsTable) {
     return {
       valid: false,
-      reason: INLINE_MESSAGE.RULE_DECK_ONLY_TO_TABLE,
+      reason: INGAME_MESSAGE.RULE_DECK_ONLY_TO_TABLE,
     };
   }
   return { valid: true };
@@ -99,7 +109,7 @@ function ruleDeckMustPlayOnTable(game, player, card, fromSlotId, toSlotId) {
 function ruleIsPlayersTurn(game, player, card, fromSlotId, toSlotId) {
   if (!game || !game.turn || !game.turn.current) return { valid: true };
   if (game.turn.current !== player) {
-    return { valid: false, reason: INLINE_MESSAGE.RULE_NOT_YOUR_TURN };
+    return { valid: false, reason: INGAME_MESSAGE.RULE_NOT_YOUR_TURN };
   }
   return { valid: true };
 }
@@ -112,7 +122,7 @@ function ruleBenchMustPlayOnTable(game, player, card, fromSlotId, toSlotId) {
   if (fromIsBench && !toIsTable) {
     return {
       valid: false,
-      reason: INLINE_MESSAGE.RULE_BENCH_ONLY_TO_TABLE,
+      reason: INGAME_MESSAGE.RULE_BENCH_ONLY_TO_TABLE,
     };
   }
   return { valid: true };
@@ -124,7 +134,7 @@ function ruleAceMustBePlayed(game, player, card, fromSlotId, toSlotId) {
 
   const playerIndex = game.players.indexOf(player);
   if (playerIndex === -1) {
-    return { valid: false, reason: INLINE_MESSAGE.RULE_UNKNOWN_PLAYER };
+    return { valid: false, reason: INGAME_MESSAGE.RULE_UNKNOWN_PLAYER };
   }
 
   // Convert array index (0/1) to slot player index (1/2).
@@ -135,7 +145,7 @@ function ruleAceMustBePlayed(game, player, card, fromSlotId, toSlotId) {
   if (slotTopHasAce(game, deckSlot)) {
     return {
       valid: false,
-      reason: INLINE_MESSAGE.RULE_ACE_BLOCKS_BENCH_DECK_TOP,
+      reason: INGAME_MESSAGE.RULE_ACE_BLOCKS_BENCH_DECK_TOP,
     };
   }
 
@@ -144,7 +154,7 @@ function ruleAceMustBePlayed(game, player, card, fromSlotId, toSlotId) {
   if (slotAnyHasAce(game, handSlot)) {
     return {
       valid: false,
-      reason: INLINE_MESSAGE.RULE_ACE_BLOCKS_BENCH_HAND,
+      reason: INGAME_MESSAGE.RULE_ACE_BLOCKS_BENCH_HAND,
     };
   }
 
@@ -159,7 +169,7 @@ function ruleAceMustBePlayed(game, player, card, fromSlotId, toSlotId) {
 function validateMove(game, player, card, fromSlotId, toSlotId) {
   if (!card) {
     debugLog("[RULES] Carte inconnue", { player, from_slot_id: fromSlotId, to_slot_id: toSlotId });
-    return { valid: false, reason: INLINE_MESSAGE.RULE_CARD_UNKNOWN };
+    return { valid: false, reason: INGAME_MESSAGE.RULE_CARD_UNKNOWN };
   }
 
   const globalRules = [
@@ -190,7 +200,7 @@ function validateMove(game, player, card, fromSlotId, toSlotId) {
 
   if (!validator) {
     debugLog("[RULES] WARNING Aucun validateur pour", toSlotId);
-    return { valid: false, reason: INLINE_MESSAGE.RULE_SLOT_VALIDATOR_MISSING };
+    return { valid: false, reason: INGAME_MESSAGE.RULE_SLOT_VALIDATOR_MISSING };
   }
 
   const slotResult = validator(game, card, fromSlotId, toSlotId);
@@ -221,4 +231,5 @@ export {
   isBenchSlot,
   refillHandIfEmpty,
   hasWonByEmptyDeckSlot,
+  haseLoseByEmptyPileSlot,
 };

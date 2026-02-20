@@ -5,9 +5,11 @@ import {
 } from "../constants/slotView.js";
 
 function toSlotStack(slotValue) {
-  if (Array.isArray(slotValue)) return slotValue;
+  if (Array.isArray(slotValue)) {
+    return slotValue.filter((id) => typeof id === "string" && id.length > 0);
+  }
   if (!slotValue) return [];
-  return [slotValue];
+  return typeof slotValue === "string" ? [slotValue] : [];
 }
 
 function getVisibleCardIdsForSlot(slotType, stack) {

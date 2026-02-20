@@ -7,7 +7,7 @@ import {
   parseSlotId,
 } from "./helpers/slotHelpers.js";
 import { debugLog } from "./helpers/debugHelpers.js";
-import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
+import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 
 /**
  * Validate placement on Table slot
@@ -15,7 +15,7 @@ import { INLINE_MESSAGE } from "./constants/inlineMessages.js";
  */
 export function validateTableSlot(game, card, fromSlotId, toSlotId) {
   if (!isSlotIdPresent(game, toSlotId)) {
-    return { valid: false, reason: INLINE_MESSAGE.RULE_TABLE_SLOT_NOT_FOUND };
+    return { valid: false, reason: INGAME_MESSAGE.RULE_TABLE_SLOT_NOT_FOUND };
   }
 
   const slot = getSlotContent(game, toSlotId);
@@ -50,7 +50,7 @@ export function validateTableSlot(game, card, fromSlotId, toSlotId) {
 
     return {
       valid: false,
-      reason: INLINE_MESSAGE.RULE_CARD_NOT_ALLOWED_ON_TABLE,
+      reason: INGAME_MESSAGE.RULE_CARD_NOT_ALLOWED_ON_TABLE,
       reason_params: { accepted: acceptedStr },
     };
   }
@@ -62,14 +62,14 @@ export function validateTableSlot(game, card, fromSlotId, toSlotId) {
  * Validate placement on Deck slot (not allowed)
  */
 export function validateDeckSlot(game, card, fromSlotId, toSlotId) {
-  return { valid: false, reason: INLINE_MESSAGE.RULE_CANNOT_PLAY_ON_DECK };
+  return { valid: false, reason: INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DECK };
 }
 
 /**
  * Validate placement on Hand slot (not allowed)
  */
 export function validateHandSlot(game, card, fromSlotId, toSlotId) {
-  return { valid: false, reason: INLINE_MESSAGE.RULE_CANNOT_PLAY_ON_HAND };
+  return { valid: false, reason: INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_HAND };
 }
 
 /**
@@ -83,7 +83,7 @@ export function validateBenchSlot(game, card, fromSlotId, toSlotId) {
  * Validate placement on Draw Pile slot (not allowed)
  */
 export function validateDrawPileSlot(game, card, fromSlotId, toSlotId) {
-  return { valid: false, reason: INLINE_MESSAGE.RULE_CANNOT_PLAY_ON_DRAWPILE };
+  return { valid: false, reason: INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DRAWPILE };
 }
 
 function normalizeSlotType(slotType) {
