@@ -24,11 +24,11 @@ export function getExistingGameOrRes(ctx, ws, req, game_id) {
   const { state } = ctx;
   const sendRes = getResponder(ctx);
 
-  if (!game_id || !state.hasGame(game_id)) {
+  if (!game_id || !state.games.has(game_id)) {
     resNotFound(sendRes, ws, req, POPUP_MESSAGE.TECH_NOT_FOUND);
     return null;
   }
-  return state.getGame(game_id);
+  return state.games.get(game_id);
 }
 
 /**
@@ -38,12 +38,12 @@ export function getPlayerGameOrRes(ctx, ws, req, actor) {
   const { state } = ctx;
   const sendRes = getResponder(ctx);
 
-  const game_id = state.getUserGame(actor);
-  if (!game_id || !state.hasGame(game_id)) {
+  const game_id = state.userToGame.get(actor);
+  if (!game_id || !state.games.has(game_id)) {
     resNotFound(sendRes, ws, req, POPUP_MESSAGE.TECH_NOT_FOUND);
     return null;
   }
-  return { game_id, game: state.getGame(game_id) };
+  return { game_id, game: state.games.get(game_id) };
 }
 
 export function getGameIdFromDataOrMapping(
@@ -94,7 +94,7 @@ export function getGameIdFromDataOrMapping(
   }
   // data key (optionnel) : on ne force pas l’erreur ici, car fallback mapping possible
   const fromData = String(data?.[key] ?? "").trim();
-  const inferred = String(state.getUserGame(actor) ?? state.getUserSpectate(actor) ?? "").trim();
+  const inferred = String(state.userToGame.get(actor) ?? state.userToSpectate.get(actor) ?? "").trim();
 
   const game_id = preferMapping ? (inferred || fromData) : (fromData || inferred);
 
@@ -110,9 +110,7 @@ export function rejectIfBusyOrRes(ctx, ws, req, username, message = POPUP_MESSAG
   const sendRes = getResponder(ctx);
   const state = ctx?.state;
 
-  const inGame = typeof state?.getUserGame === "function"
-    ? !!state.getUserGame(username)
-    : !!state?.userToGame?.get?.(username);
+  const inGame = !!state?.userToGame?.get?.(username);
 
   if (inGame) {
     resBadState(sendRes, ws, req, message);
@@ -132,9 +130,7 @@ export function rejectIfSpectatorOrRes(
   const sendRes = getResponder(ctx);
   const state = ctx?.state;
 
-  const spectatingGameId = typeof state?.getUserSpectate === "function"
-    ? state.getUserSpectate(actor)
-    : state?.userToSpectate?.get?.(actor);
+  const spectatingGameId = state?.userToSpectate?.get?.(actor);
 
   const sameGameAsSpectator = String(spectatingGameId ?? "") === String(game_id ?? "");
 

@@ -13,6 +13,7 @@ export function createRoles(ctx) {
     userToSpectate,
     gameSpectators,
     pendingInviteTo,
+    inviteFrom,
     gameMeta,
     sendEvtUser,
   } = ctx;
@@ -70,13 +71,6 @@ export function createRoles(ctx) {
     userToSpectate.delete(username);
   }
 
-  function _findInviteSentBy(username) {
-    for (const inv of pendingInviteTo.values()) {
-      if (inv.from === username) return inv;
-    }
-    return null;
-  }
-
   /**
    * status = { online, activity, invite }
    */
@@ -104,7 +98,8 @@ export function createRoles(ctx) {
     if (invToMe) {
       invite = { type: "invited", from: invToMe.from, createdAt: invToMe.createdAt };
     } else {
-      const invFromMe = _findInviteSentBy(username);
+      const invitedTo = inviteFrom.get(username);
+      const invFromMe = invitedTo ? pendingInviteTo.get(invitedTo) : null;
       if (invFromMe) {
         invite = { type: "inviting", to: invFromMe.to, createdAt: invFromMe.createdAt };
       }
@@ -131,18 +126,18 @@ export function createRoles(ctx) {
     if (pendingInviteTo.has(username)) {
       const inv = pendingInviteTo.get(username);
       pendingInviteTo.delete(username);
+      if (inv?.from) inviteFrom.delete(inv.from);
       if (inv?.from) {
         sendEvtUser(inv.from, "invite_cancelled", { to: username, reason: "offline" });
       }
     }
 
     // si username invitait quelqu’un
-    for (const [to, inv] of pendingInviteTo.entries()) {
-      if (inv.from === username) {
-        pendingInviteTo.delete(to);
-        sendEvtUser(to, "invite_cancelled", { from: username, reason: "offline" });
-        break;
-      }
+    const to = inviteFrom.get(username);
+    if (to) {
+      pendingInviteTo.delete(to);
+      inviteFrom.delete(username);
+      sendEvtUser(to, "invite_cancelled", { from: username, reason: "offline" });
     }
   }
 
