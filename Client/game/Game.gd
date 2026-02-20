@@ -425,7 +425,7 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 
 	if ok:
 		_show_game_feedback({
-			"message_code": GameMessage.INGAME_MOVE_OK,
+			"message_code": GameMessage.INGAME_RULE_OK,
 		})
 	else:
 		var ui := _normalize_move_error(error, GameMessage.INGAME_MOVE_DENIED)

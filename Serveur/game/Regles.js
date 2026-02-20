@@ -203,7 +203,7 @@ function validateMove(game, player, card, fromSlotId, toSlotId) {
     return slotResult;
   }
 
-  debugLog("[RULES] MOVE_OK", {
+  debugLog("[RULES] RULE_OK", {
     player,
     card_id: card.id,
     from_slot_id: fromSlotId,

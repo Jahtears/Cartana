@@ -216,7 +216,6 @@ func _send_heartbeat_probe(now_ms: int) -> bool:
 	_heartbeat_probe_rid = "hb_%d" % _heartbeat_probe_counter
 	_heartbeat_probe_sent_ms = now_ms
 	var env := {
-		"v": 1,
 		"kind": "req",
 		"type": HEARTBEAT_PROBE_TYPE,
 		"rid": _heartbeat_probe_rid,
@@ -380,7 +379,6 @@ func _drain_queue() -> void:
 
 func _send_request_packet(rid: String, type: String, data: Dictionary) -> bool:
 	var env := {
-		"v": 1,
 		"kind": "req",
 		"type": type,
 		"rid": rid,
@@ -447,7 +445,7 @@ func _handle_packet(pkt: String) -> void:
 		return
 
 	var env := parsed as Dictionary
-	if env.get("v") != 1:
+	if env.has("v") and int(env.get("v")) != 1:
 		return
 
 	var kind := String(env.get("kind", ""))

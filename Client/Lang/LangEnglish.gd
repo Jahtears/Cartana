@@ -52,7 +52,7 @@ const POPUP_TEXT_BY_CODE = {
 }
 
 const INGAME_TEXT_BY_CODE = {
-	"INGAME_MOVE_OK": "Confirm",
+	"INGAME_RULE_OK": "Confirm",
 	"INGAME_MOVE_DENIED": "Move denied",
 	"INGAME_MOVE_INVALID_SLOT": "Invalid slot ID",
 	"INGAME_MOVE_REJECTED": "ApplyMove rejected",

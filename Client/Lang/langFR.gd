@@ -52,17 +52,18 @@ const POPUP_TEXT_BY_CODE = {
 }
 
 const INGAME_TEXT_BY_CODE = {
-	"INGAME_MOVE_OK": "Valider",
+	# erreur inutile au joueur
 	"INGAME_MOVE_DENIED": "Déplacement refusé",
 	"INGAME_MOVE_INVALID_SLOT": "ID de slot invalide",
 	"INGAME_MOVE_REJECTED": "ApplyMove rejeté",
-
 	"INGAME_RULE_CARD_NOT_FOUND": "Carte introuvable",
 	"INGAME_RULE_CARD_UNKNOWN": "Carte inconnue",
 	"INGAME_RULE_SOURCE_SLOT_MISSING_CARD": "Carte absente du slot source",
 	"INGAME_RULE_UNKNOWN_PLAYER": "Joueur inconnu pour cette partie",
 	"INGAME_RULE_SLOT_VALIDATOR_MISSING": "Aucun validateur pour ce slot",
 	"INGAME_RULE_TABLE_SLOT_NOT_FOUND": "Slot table introuvable",
+	# explication de regles au joueur
+	"INGAME_RULE_OK": "Valider",
 	"INGAME_RULE_DECK_ONLY_TO_TABLE": "Carte du deck uniquement sur un slot table",
 	"INGAME_RULE_NOT_YOUR_TURN": "Pas votre tour",
 	"INGAME_RULE_BENCH_ONLY_TO_TABLE": "Carte du banc uniquement sur un slot table",
@@ -73,7 +74,6 @@ const INGAME_TEXT_BY_CODE = {
 	"INGAME_RULE_CANNOT_PLAY_ON_HAND": "Interdit de jouer sur la main",
 	"INGAME_RULE_CANNOT_PLAY_ON_DRAWPILE": "Interdit de jouer sur la pioche",
 	"INGAME_RULE_OPPONENT_SLOT_FORBIDDEN": "Slot adverse interdit",
-
 	"INGAME_TURN_START_FIRST": "À vous de commencer",
 	"INGAME_TURN_START": "À vous de jouer",
 	"INGAME_TURN_TIMEOUT": "Temps écoulé",

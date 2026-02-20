@@ -1,7 +1,7 @@
 // game/moveRequest.js v2.0 - Thin handler using MoveOrchestrator
 import { emitGameEndThenSnapshot } from "../net/broadcast.js";
 import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../net/guards.js";
-import { resBadRequest, resBadState, resError, resNotFound } from "../net/transport.js";
+import { resError } from "../net/transport.js";
 import { orchestrateMove, MOVE_RESULT_CODE } from "./moveOrchestrator.js";
 import { ensureGameMeta } from "./meta.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
@@ -56,7 +56,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   });
 
   if (!from_slot_id || !to_slot_id) {
-    resBadRequest(sendRes, ws, req, INGAME_MESSAGE.MOVE_INVALID_SLOT, {
+    resError(sendRes, ws, req, INGAME_MESSAGE.MOVE_INVALID_SLOT, {
       from_slot_id: raw_from,
       to_slot_id: raw_to,
       message_code: INGAME_MESSAGE.MOVE_INVALID_SLOT,
@@ -97,14 +97,14 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     };
 
     if (orchResult.code === MOVE_RESULT_CODE.NOT_FOUND) {
-      return resNotFound(sendRes, ws, req, orchResult.reason, details);
+      return resError(sendRes, ws, req, orchResult.reason, details);
     }
 
     if (orchResult.code === MOVE_RESULT_CODE.MOVE_DENIED) {
-      return resBadRequest(sendRes, ws, req, orchResult.reason, details);
+      return resError(sendRes, ws, req, orchResult.reason, details);
     }
 
-    return resBadState(sendRes, ws, req, orchResult.reason || INGAME_MESSAGE.MOVE_REJECTED, details);
+    return resError(sendRes, ws, req, orchResult.reason || INGAME_MESSAGE.MOVE_REJECTED, details);
   }
 
   // ✅ GAME END: emit end then broadcast

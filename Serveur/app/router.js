@@ -81,7 +81,6 @@ export function createRouter({
 
     if (
       !env ||
-      env.v !== 1 ||
       env.kind !== "req" ||
       typeof env.type !== "string" ||
       typeof env.rid !== "string"
