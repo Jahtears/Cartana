@@ -14,8 +14,8 @@ export function ensureGameMeta(gameMeta, gameId, { initialSent } = {}) {
   if (typeof meta.initialSent !== "boolean") meta.initialSent = false;
   if (typeof initialSent === "boolean") meta.initialSent = meta.initialSent || initialSent;
 
-  if (!meta.slot_sig || typeof meta.slot_sig !== "object") meta.slot_sig = Object.create(null);
-  if (typeof meta.turn_sig !== "string") meta.turn_sig = "";
+  meta.slot_sig ??= Object.create(null);
+  meta.turn_sig ??= "";
 
   if (!("result" in meta)) meta.result = null;
 

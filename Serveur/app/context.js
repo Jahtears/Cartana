@@ -71,10 +71,7 @@ export function createServerContext({ onTransportSend } = {}) {
     broadcastGamesList,
     refreshLobby,
   } = createLobbyLists({
-    games: state.games,
-    gameMeta: state.gameMeta,
-    gameSpectators: state.gameSpectators,
-    wsByUser: state.wsByUser,
+    state,
     sendEvtLobby,
     getUserStatus,
   });
@@ -83,10 +80,7 @@ export function createServerContext({ onTransportSend } = {}) {
   // NOTIFIER
   // ========================
   const { emitStartGameToUser, emitSnapshotsToAudience, emitGameEndOnce } = createGameNotifier({
-    games: state.games,
-    gameMeta: state.gameMeta,
-    gameSpectators: state.gameSpectators,
-    wsByUser: state.wsByUser,
+    state,
     sendEvtSocket,
     sendEvtUser,
   });
@@ -119,11 +113,8 @@ export function createServerContext({ onTransportSend } = {}) {
     // Builder incrémental: table_sync -> slot_state -> turn_update -> messages.
     const fx = {
       game,
-      touches: new Set(),
-
       touch(slot_id) {
         if (!slot_id) return;
-        this.touches.add(slot_id);
         fl.touch(slot_id);
       },
 

@@ -30,20 +30,19 @@ export function handleSpectateGame(ctx, ws, req, data, actor) {
   attachSpectator(game_id, actor);
 
   // Premier passage depuis le lobby: notifier l'entree en mode spectateur.
-  if (!alreadySpectatingThisGame && typeof emitStartGameToUser === "function") {
+  if (!alreadySpectatingThisGame) {
     emitStartGameToUser(actor, game_id, { spectator: true });
   }
 
   // Resync explicite (depuis l'ecran Game): snapshot complet spectateur.
   if (
     alreadySpectatingThisGame &&
-    meta.initialSent &&
-    typeof emitFullState === "function"
+    meta.initialSent
   ) {
     emitFullState(game, actor, wsByUser, sendEvtSocket, { view: "spectator", gameMeta, game_id });
   }
 
-  if (!alreadySpectatingThisGame && typeof refreshLobby === "function") refreshLobby();
+  if (!alreadySpectatingThisGame) refreshLobby();
 
   sendRes(ws, req, true, {
     ok: true,

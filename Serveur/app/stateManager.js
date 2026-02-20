@@ -14,7 +14,7 @@ export class StateManager {
     this.userToSpectate = new Map();  // username → game_id (en train de spectater)
 
     // Temporary state
-    this.readyPlayers = new Map();    // username → is_ready flag
+    this.readyPlayers = new Map();    // game_id → Set<username> (barrière d'entrée des joueurs)
     this.pendingInviteTo = new Map(); // username → {from, to, accepted}
     this.inviteFrom = new Map();      // username(from) → username(to)
   }
@@ -87,7 +87,11 @@ export class StateManager {
     if (ws) this.userByWs.delete(ws);
     this.userToGame.delete(username);
     this.userToSpectate.delete(username);
-    this.readyPlayers.delete(username);
+    for (const [game_id, joined] of this.readyPlayers.entries()) {
+      if (!(joined instanceof Set)) continue;
+      joined.delete(username);
+      if (joined.size === 0) this.readyPlayers.delete(game_id);
+    }
 
     const invToMe = this.pendingInviteTo.get(username);
     if (invToMe?.from) this.inviteFrom.delete(invToMe.from);
