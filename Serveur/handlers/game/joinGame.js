@@ -22,7 +22,7 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
     setUserActivity,
     Activity,
   } = ctx;
-  const { userToGame, gameMeta, readyPlayers, gameSpectators, wsByUser } = state;
+  const { userToGame, gameMeta, readyPlayers, wsByUser } = state;
 
   const game_id = requireParam(sendRes, ws, req, data, "game_id");
   if (!game_id) return true;
@@ -46,10 +46,8 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
   if (!alreadyInThisGame) {
     // Activité joueur et signal de démarrage uniquement lors de l'entrée depuis le lobby.
     setUserActivity(actor, Activity.IN_GAME, game_id);
-    if (typeof emitStartGameToUser === "function") {
-      emitStartGameToUser(actor, game_id, { spectator: false });
-    }
-    if (typeof refreshLobby === "function") refreshLobby();
+    emitStartGameToUser(actor, game_id, { spectator: false });
+    refreshLobby();
     sendRes(ws, req, true, { ok: true, game_id, players: game.players, joining: true });
     return true;
   }
@@ -79,19 +77,7 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
     });
   }
 
-  if (typeof emitSnapshotsToAudience === "function") {
-    emitSnapshotsToAudience(game_id, { reason: "init" });
-  } else {
-    for (const p of game.players) {
-      emitFullState(game, p, wsByUser, sendEvtSocket, { view: "player", gameMeta, game_id });
-    }
-    const specs = gameSpectators.get(game_id);
-    if (specs && specs.size) {
-      for (const s of specs) {
-        emitFullState(game, s, wsByUser, sendEvtSocket, { view: "spectator", gameMeta, game_id });
-      }
-    }
-  }
+  emitSnapshotsToAudience(game_id, { reason: "init" });
 
   saveGameState(game_id, game);
   sendRes(ws, req, true, { ok: true, game_id, players: game.players });

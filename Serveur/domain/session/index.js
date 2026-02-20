@@ -163,10 +163,11 @@ export function emitFullState(game, username, wsByUser, sendEvtSocket, { view = 
  * - game_end idempotent (émission unique à la création du result)
  */
 export function createGameNotifier({
-  games,
-  gameMeta,
-  gameSpectators,
-  wsByUser,
+  state = null,
+  games = state?.games,
+  gameMeta = state?.gameMeta,
+  gameSpectators = state?.gameSpectators,
+  wsByUser = state?.wsByUser,
   sendEvtSocket,
   sendEvtUser,
 }) {

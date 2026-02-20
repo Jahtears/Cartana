@@ -50,8 +50,8 @@ function cleanupIfOrphaned(ctx, game_id, { reason = "" } = {}) {
   clearCleanupTimer(meta);
   readyPlayers.delete(game_id);
   state.deleteGame(game_id);
-  if (typeof deleteGameState === "function") deleteGameState(game_id);
-  if (typeof refreshLobby === "function") refreshLobby();
+  deleteGameState(game_id);
+  refreshLobby();
   return true;
 }
 
@@ -78,18 +78,14 @@ function endGame(ctx, game_id, result, { exclude = [] } = {}) {
   const { gameMeta } = state;
   const meta = ensureGameEndMeta(gameMeta, game_id, { initialSent: true });
 
-  const res = typeof emitGameEndOnce === "function"
-    ? emitGameEndOnce(game_id, result, { exclude })
-    : { payload: null, created: false };
+  const res = emitGameEndOnce(game_id, result, { exclude });
 
   if (res.created) {
     meta.acks = new Set();
     meta.endedAt = Date.now();
   }
 
-  if (typeof emitSnapshotsToAudience === "function") {
-    emitSnapshotsToAudience(game_id, { reason: "game_end" });
-  }
+  emitSnapshotsToAudience(game_id, { reason: "game_end" });
 
   if (res.created) scheduleCleanup(ctx, game_id, "game_end");
   return res;
@@ -130,7 +126,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
     { exclude: [actor] }
   );
 
-  if (typeof refreshLobby === "function") refreshLobby();
+  refreshLobby();
 
   sendRes(ws, req, true, { left: true, game_id });
   return true;
@@ -155,7 +151,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
 
   // idempotent: sans game_id -> OK
   if (!game_id) {
-    if (typeof refreshLobby === "function") refreshLobby();
+    refreshLobby();
     sendRes(ws, req, true, { ack: true, game_id: "", alreadyGone: true });
     return true;
   }
@@ -173,12 +169,12 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
 
   // ✅ ACK idempotent : si game inexistante => OK
   if (!game_id || !games.has(game_id)) {
-    if (gameMeta?.has(game_id)) {
+    if (gameMeta.has(game_id)) {
       const meta = gameMeta.get(game_id);
       clearCleanupTimer(meta);
       gameMeta.delete(game_id);
     }
-    if (typeof refreshLobby === "function") refreshLobby();
+    refreshLobby();
     sendRes(ws, req, true, { ack: true, game_id, alreadyGone: true });
     return true;
   }
@@ -187,7 +183,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
 
   // si pas concerné: OK mais pas de cleanup
   if (!wasPlayer && !wasSpec) {
-    if (typeof refreshLobby === "function") refreshLobby();
+    refreshLobby();
     sendRes(ws, req, true, { ack: true, game_id, ignored: true });
     return true;
   }
@@ -213,7 +209,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
 
   cleanupIfOrphaned(ctx, game_id, { reason: "ack" });
 
-  if (typeof refreshLobby === "function") refreshLobby();
+  refreshLobby();
   sendRes(ws, req, true, { ack: true, game_id });
   return true;
 }

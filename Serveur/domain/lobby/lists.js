@@ -8,11 +8,12 @@ export function createLobbyRefresher({ broadcastPlayersList, broadcastGamesList 
 }
 
 export function createLobbyLists(ctx) {
+  const state = ctx?.state;
   const {
-    games,
-    gameMeta,
-    gameSpectators,
-    wsByUser,
+    games = state?.games,
+    gameMeta = state?.gameMeta,
+    gameSpectators = state?.gameSpectators,
+    wsByUser = state?.wsByUser,
     sendEvtLobby,
     getUserStatus,
   } = ctx;
