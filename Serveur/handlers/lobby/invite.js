@@ -63,7 +63,7 @@ export function handleInvite(ctx, ws, req, data, actor) {
   sendEvtUser(to, "invite_request", { from: actor });
   sendRes(ws, req, true, { sent: true });
 
-  if (typeof refreshLobby === "function") refreshLobby();
+  refreshLobby();
 
   return true;
 }
@@ -111,7 +111,7 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
     );
     sendRes(ws, req, true, { accepted: false });
 
-    if (typeof refreshLobby === "function") refreshLobby();
+    refreshLobby();
 
     return true;
   }
@@ -127,12 +127,9 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
   setUserActivity(actor, Activity.IN_GAME, game_id);
   setUserActivity(to, Activity.IN_GAME, game_id);
 
-  if (typeof refreshLobby === "function") refreshLobby();
-
-  if (typeof emitStartGameToUser === "function") {
-    emitStartGameToUser(actor, game_id, { spectator: false });
-    emitStartGameToUser(to, game_id, { spectator: false });
-  }
+  refreshLobby();
+  emitStartGameToUser(actor, game_id, { spectator: false });
+  emitStartGameToUser(to, game_id, { spectator: false });
 
   sendRes(ws, req, true, { accepted: true, game_id, players: game.players });
   return true;

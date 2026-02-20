@@ -22,7 +22,6 @@ import { stopHeartbeatManager } from '../net/heartbeat.js';
 import { metrics, createMetricsMiddleware } from '../net/monitoring.js';
 
 const DEBUG_TRACE_ENABLED = process.env.DEBUG_TRACE === "1";
-const GAME_DEBUG_ENABLED = process.env.GAME_DEBUG === "1" || DEBUG_TRACE_ENABLED;
 
 // ============= INITIALISATION =============
 
@@ -155,7 +154,7 @@ httpServer.listen(PORT, HOST, () => {
   console.log(`🚀 Server listening on http://${HOST}:${PORT}`);
   console.log(`📊 Metrics available at http://${HOST}:${PORT}/metrics`);
   console.log(`❤️ Health check at http://${HOST}:${PORT}/health`);
-  if (DEBUG_TRACE_ENABLED || GAME_DEBUG_ENABLED) {
-    console.log(`🧪 Debug flags: DEBUG_TRACE=${DEBUG_TRACE_ENABLED ? "1" : "0"} GAME_DEBUG=${GAME_DEBUG_ENABLED ? "1" : "0"}`);
+  if (DEBUG_TRACE_ENABLED || process.env.GAME_DEBUG === "1") {
+    console.log(`🧪 Debug flags: DEBUG_TRACE=${DEBUG_TRACE_ENABLED ? "1" : "0"} GAME_DEBUG=${process.env.GAME_DEBUG === "1" || DEBUG_TRACE_ENABLED ? "1" : "0"}`);
   }
 });

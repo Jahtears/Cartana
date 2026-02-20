@@ -13,17 +13,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     sendRes,
     mapSlotFromClientToServer,
     mapSlotForClient,
-    getCardById,
-    validateMove,
-    applyMove,
-    isBenchSlot,
-    endTurnAfterBenchPlay,
-    refillHandIfEmpty,
-    hasWonByEmptyDeckSlot,
-    haseLoseByEmptyPileSlot,
-    getTableSlots,
     processTurnTimeout,
-    withGameUpdate,
   } = ctx;
 
   // ✅ GUARDS: game, player, spectator, ended
@@ -85,16 +75,6 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     card_id,
     from_slot_id,
     to_slot_id,
-    validateMove,
-    applyMove,
-    getCardById,
-    isBenchSlot,
-    refillHandIfEmpty,
-    hasWonByEmptyDeckSlot,
-    haseLoseByEmptyPileSlot,
-    getTableSlots,
-    endTurnAfterBenchPlay,
-    withGameUpdate,
     ctx,
   });
 

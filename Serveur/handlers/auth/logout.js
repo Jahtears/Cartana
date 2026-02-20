@@ -15,19 +15,13 @@ export function handleLogout(ctx, ws, req, data, actor) {
   state.unregisterUser(user, ws);
 
   // Clear invites
-  if (typeof clearInvitesForUser === "function") {
-    clearInvitesForUser(user);
-  }
+  clearInvitesForUser(user);
 
   // Sortie explicite de session: retour lobby + detach des mappings.
-  if (typeof setUserActivity === "function") {
-    setUserActivity(user, Activity.LOBBY, null);
-  }
+  setUserActivity(user, Activity.LOBBY, null);
 
   // Refresh lobby for other players
-  if (typeof refreshLobby === "function") {
-    refreshLobby();
-  }
+  refreshLobby();
 
   // Send response confirming logout
   sendRes(ws, req, true, { logged_out: true });
