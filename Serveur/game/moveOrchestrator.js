@@ -22,16 +22,6 @@ export const MOVE_RESULT_CODE = Object.freeze({
  * @param {string} params.card_id - Card ID to move
  * @param {Object} params.from_slot_id - Source slot (server-side SlotId)
  * @param {Object} params.to_slot_id - Target slot (server-side SlotId)
- * @param {Function} params.validateMove - Validation function
- * @param {Function} params.applyMove - Application function
- * @param {Function} params.getCardById - Card lookup
- * @param {Function} params.isBenchSlot - Bench detection
- * @param {Function} params.refillHandIfEmpty - Hand refill
- * @param {Function} params.hasWonByEmptyDeckSlot - Win check
- * @param {Function} params.haseLoseByEmptyPileSlot - Pile empty check
- * @param {Function} params.getTableSlots - Get table slots
- * @param {Function} params.endTurnAfterBenchPlay - End turn logic
- * @param {Function} params.withGameUpdate - Game state update builder
  * @param {Object} params.ctx - Request context (for trace)
  * 
  * @returns {Object} Result = { valid, reason?, response?, shouldEnd?, winner?, game_end_reason? }
@@ -44,21 +34,28 @@ export function orchestrateMove(params) {
     card_id: cardId,
     from_slot_id: fromSlotId,
     to_slot_id: toSlotId,
+    ctx,
+  } = params;
+  const {
     validateMove,
     applyMove,
     getCardById,
     isBenchSlot,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
-    haseLoseByEmptyPileSlot,
+    hasLoseByEmptyPileSlot,
     getTableSlots,
     endTurnAfterBenchPlay,
     withGameUpdate,
-    ctx,
-  } = params;
+  } = ctx;
 
   //    (player index 0)(slot type pile )(slot index 1)
   const pileSlotId = SlotId.create(0, SLOT_TYPES.PILE, 1);
+  const baseResponse = {
+    card_id: cardId,
+    from_slot_id: fromSlotId,
+    to_slot_id: toSlotId,
+  };
 
   // ========================
   // 1) FIND CARD
@@ -117,7 +114,7 @@ export function orchestrateMove(params) {
         game_end_reason: GAME_END_REASONS.DECK_EMPTY,
       };
     }
-    if (haseLoseByEmptyPileSlot(game, actor)) {
+    if (hasLoseByEmptyPileSlot(game, actor)) {
       return {
         winner: null,
         game_end_reason: GAME_END_REASONS.PILE_EMPTY,
@@ -150,12 +147,7 @@ export function orchestrateMove(params) {
   if (gameEnd) {
     return {
       valid: true,
-      response: {
-        card_id: cardId,
-        from_slot_id: fromSlotId,
-        to_slot_id: toSlotId,
-        winner: gameEnd.winner,
-      },
+      response: { ...baseResponse, winner: gameEnd.winner },
       winner: gameEnd.winner,
       game_end_reason: gameEnd.game_end_reason,
     };
@@ -167,11 +159,7 @@ export function orchestrateMove(params) {
   if (!endsTurn) {
     return {
       valid: true,
-      response: {
-        card_id: cardId,
-        from_slot_id: fromSlotId,
-        to_slot_id: toSlotId,
-      },
+      response: baseResponse,
     };
   }
 
@@ -200,12 +188,7 @@ export function orchestrateMove(params) {
   if (postTurnGameEnd) {
     return {
       valid: true,
-      response: {
-        card_id: cardId,
-        from_slot_id: fromSlotId,
-        to_slot_id: toSlotId,
-        winner: postTurnGameEnd.winner,
-      },
+      response: { ...baseResponse, winner: postTurnGameEnd.winner },
       winner: postTurnGameEnd.winner,
       game_end_reason: postTurnGameEnd.game_end_reason,
     };
@@ -213,10 +196,6 @@ export function orchestrateMove(params) {
 
   return {
     valid: true,
-    response: {
-      card_id: cardId,
-      from_slot_id: fromSlotId,
-      to_slot_id: toSlotId,
-    },
+    response: baseResponse,
   };
 }

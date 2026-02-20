@@ -1,21 +1,9 @@
 // game/Regles.js - Game rules validation (dispatcher only, slot validators delegated)
 import { SlotId, SLOT_TYPES } from "./constants/slots.js";
 import { refillHandIfEmpty } from "./helpers/pileFlowHelpers.js";
-import {
-  slotTopHasAce,
-  slotAnyHasAce,
-} from "./helpers/cardHelpers.js";
-import {
-  hasCardInSlot,
-  isBenchSlot,
-  isDeckSlot,
-  getSlotContent,
-  getPlayerFromSlotId,
-  isTableSlot,
-} from "./helpers/slotHelpers.js";
-import {
-  getSlotValidator,
-} from "./slotValidators.js";
+import { slotTopHasAce, slotAnyHasAce } from "./helpers/cardHelpers.js";
+import { hasCardInSlot, isBenchSlot, isDeckSlot, getSlotContent, getPlayerFromSlotId, isTableSlot } from "./helpers/slotHelpers.js";
+import {  getSlotValidator } from "./slotValidators.js";
 import { debugLog } from "./helpers/debugHelpers.js";
 import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 
@@ -32,7 +20,7 @@ function hasWonByEmptyDeckSlot(game, player) {
   return Array.isArray(deckStack) ? deckStack.length === 0 : !deckStack;
 }
 
-function haseLoseByEmptyPileSlot(game, player) {
+function hasLoseByEmptyPileSlot(game, player) {
   if (!game) return false;
   if (player && !game.players.includes(player)) return false;
 
@@ -231,5 +219,5 @@ export {
   isBenchSlot,
   refillHandIfEmpty,
   hasWonByEmptyDeckSlot,
-  haseLoseByEmptyPileSlot,
+  hasLoseByEmptyPileSlot,
 };

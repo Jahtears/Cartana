@@ -108,9 +108,9 @@ export function getGameIdFromDataOrMapping(
 
 export function rejectIfBusyOrRes(ctx, ws, req, username, message = POPUP_MESSAGE.TECH_BAD_STATE) {
   const sendRes = getResponder(ctx);
-  const state = ctx?.state;
+  const state = ctx.state;
 
-  const inGame = !!state?.userToGame?.get?.(username);
+  const inGame = !!state.userToGame.get(username);
 
   if (inGame) {
     resBadState(sendRes, ws, req, message);
@@ -128,9 +128,9 @@ export function rejectIfSpectatorOrRes(
   message = POPUP_MESSAGE.TECH_FORBIDDEN
 ) {
   const sendRes = getResponder(ctx);
-  const state = ctx?.state;
+  const state = ctx.state;
 
-  const spectatingGameId = state?.userToSpectate?.get?.(actor);
+  const spectatingGameId = state.userToSpectate.get(actor);
 
   const sameGameAsSpectator = String(spectatingGameId ?? "") === String(game_id ?? "");
 

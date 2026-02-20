@@ -9,14 +9,7 @@ import { pauseTurnClock, resumeTurnClock } from "../../game/turnClock.js";
  */
 export function createPresence(ctx) {
   const {
-    // state
-    games,
-    gameMeta,
-    gameSpectators,
-    userToGame,
-    userToSpectate,
-    userByWs,
-    wsByUser,
+    state,
 
     // roles/helpers
     detachSpectator,
@@ -37,6 +30,15 @@ export function createPresence(ctx) {
     emitStartGameToUser,
     emitSnapshotsToAudience,
   } = ctx;
+  const {
+    games,
+    gameMeta,
+    gameSpectators,
+    userToGame,
+    userToSpectate,
+    userByWs,
+    wsByUser,
+  } = state;
 
   function pauseTurnForDisconnect(game) {
     if (!game?.turn) return false;
@@ -68,7 +70,7 @@ export function createPresence(ctx) {
     const paused = pauseTurnForDisconnect(game);
 
     saveGameState(game_id, game);
-    if (paused && typeof emitSnapshotsToAudience === "function") {
+    if (paused) {
       emitSnapshotsToAudience(game_id, { reason: "opponent_disconnect_pause" });
     }
 
@@ -120,22 +122,12 @@ export function createPresence(ctx) {
     }
 
     // Retour direct en game pour le joueur reconnecté.
-    if (typeof emitStartGameToUser === "function") {
-      emitStartGameToUser(username, game_id, { spectator: false });
-    }
-    if (resumed && typeof emitSnapshotsToAudience === "function") {
+    emitStartGameToUser(username, game_id, { spectator: false });
+    if (resumed) {
       emitSnapshotsToAudience(game_id, { reason: "opponent_rejoined_resume" });
     }
 
-    if (typeof notifyOpponent === "function") {
-      notifyOpponent(game_id, game, "opponent_rejoined", { game_id, username });
-    } else {
-      for (const p of game.players) {
-        if (p !== username) {
-          sendEvtUser(p, "opponent_rejoined", { game_id, username });
-        }
-      }
-    }
+    notifyOpponent(game_id, game, "opponent_rejoined", { game_id, username });
 
     const spectators = gameSpectators.get(game_id);
     if (spectators?.size) {
@@ -152,9 +144,7 @@ export function createPresence(ctx) {
     if (!username) return;
 
     // purge invites avant suppression wsByUser
-    if (typeof clearInvitesForUser === "function") {
-      clearInvitesForUser(username);
-    }
+    clearInvitesForUser(username);
 
     // garde association user->game pour reconnect (logique existante)
     handleDisconnect(username);
@@ -162,7 +152,7 @@ export function createPresence(ctx) {
     userByWs.delete(ws);
     wsByUser.delete(username);
 
-    if (typeof refreshLobby === "function") refreshLobby();
+    refreshLobby();
   }
 
   return { handleDisconnect, handleReconnect, onSocketClose };

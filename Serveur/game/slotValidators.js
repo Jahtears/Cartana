@@ -1,11 +1,7 @@
 // game/slotValidators.js - Slot-specific validators extracted from Regles.js
 
 import { SLOT_TYPES } from "./constants/slots.js";
-import {
-  getSlotContent,
-  isSlotIdPresent,
-  parseSlotId,
-} from "./helpers/slotHelpers.js";
+import { getSlotContent, isSlotIdPresent, parseSlotId } from "./helpers/slotHelpers.js";
 import { debugLog } from "./helpers/debugHelpers.js";
 import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 

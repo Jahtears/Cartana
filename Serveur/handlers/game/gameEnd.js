@@ -31,8 +31,8 @@ function cleanupIfOrphaned(ctx, game_id, { reason = "" } = {}) {
   } = ctx;
   const { games, gameMeta, readyPlayers, gameSpectators, userToGame } = state;
 
-  if (!game_id || !games?.has(game_id)) {
-    if (gameMeta?.has(game_id)) {
+  if (!games.has(game_id)) {
+    if (gameMeta.has(game_id)) {
       const meta = gameMeta.get(game_id);
       clearCleanupTimer(meta);
       gameMeta.delete(game_id);
@@ -49,8 +49,7 @@ function cleanupIfOrphaned(ctx, game_id, { reason = "" } = {}) {
   const meta = gameMeta.get(game_id);
   clearCleanupTimer(meta);
   readyPlayers.delete(game_id);
-  gameMeta.delete(game_id);
-  games.delete(game_id);
+  state.deleteGame(game_id);
   if (typeof deleteGameState === "function") deleteGameState(game_id);
   if (typeof refreshLobby === "function") refreshLobby();
   return true;
@@ -114,7 +113,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
   const game = getExistingGameOrRes(ctx, ws, req, game_id);
   if (!game) return true;
 
-  if (!game || !game.players.includes(actor)) {
+  if (!game.players.includes(actor)) {
     return resForbidden(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN)
   }
 

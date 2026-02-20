@@ -1,5 +1,6 @@
 // server/context.js v3.1 - Utilise StateManager + Notifier pour émission
 
+import { randomUUID } from "node:crypto";
 import { createTransport } from "../net/transport.js";
 import { createBroadcaster, createFlush } from "../net/broadcast.js";
 import { createRoles } from "../domain/roles/roles.js";
@@ -11,19 +12,8 @@ import { getCardById } from "../game/helpers/cardHelpers.js";
 import { mapSlotFromClientToServer, mapSlotForClient } from "../game/helpers/slotHelpers.js";
 import { getTableSlots } from "../game/helpers/tableHelper.js";
 import { applyMove } from "../game/MoveApplier.js";
-import {
-  validateMove,
-  isBenchSlot,
-  refillHandIfEmpty,
-  hasWonByEmptyDeckSlot,
-  haseLoseByEmptyPileSlot,
-} from "../game/Regles.js";
-import {
-  TURN_FLOW_MESSAGES,
-  initTurnForGame,
-  endTurnAfterBenchPlay,
-  tryExpireTurn,
-} from "../game/helpers/turnFlowHelpers.js";
+import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot, hasLoseByEmptyPileSlot } from "../game/Regles.js";
+import { TURN_FLOW_MESSAGES, initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../game/helpers/turnFlowHelpers.js";
 import { saveGameState, loadGameState, deleteGameState } from "../domain/session/Saves.js";
 import { verifyOrCreateUser } from "../handlers/auth/usersStore.js";
 import { createStateManager } from "./stateManager.js";
@@ -106,7 +96,7 @@ export function createServerContext({ onTransportSend } = {}) {
   // ========================
 
   function generateGameID() {
-    return "game_" + Math.random().toString(36).substr(2, 9);
+    return `game_${randomUUID()}`;
   }
 
   function withGameUpdate(game_id, callback, trace) {
@@ -167,8 +157,6 @@ export function createServerContext({ onTransportSend } = {}) {
   }
 
   function processTurnTimeout(gameId, now = Date.now()) {
-    if (typeof tryExpireTurn !== "function") return false;
-
     const game = state.games.get(gameId);
     if (!game?.turn) return false;
 
@@ -205,13 +193,7 @@ export function createServerContext({ onTransportSend } = {}) {
   // PRESENCE (disconnect/reconnect)
   // ========================
   const { handleReconnect, onSocketClose } = createPresence({
-    games: state.games,
-    gameMeta: state.gameMeta,
-    gameSpectators: state.gameSpectators,
-    userToGame: state.userToGame,
-    userToSpectate: state.userToSpectate,
-    userByWs: state.userByWs,
-    wsByUser: state.wsByUser,
+    state,
     detachSpectator,
     clearInvitesForUser,
     sendEvtUser,
@@ -272,7 +254,7 @@ export function createServerContext({ onTransportSend } = {}) {
     endTurnAfterBenchPlay,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
-    haseLoseByEmptyPileSlot,
+    hasLoseByEmptyPileSlot,
     withGameUpdate,
     processTurnTimeout,
 
