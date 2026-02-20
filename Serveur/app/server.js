@@ -3,24 +3,6 @@
 import { WebSocketServer } from "ws";
 import http from "http";
 
-// ============= IMPORTS MÉTIER =============
-import { createGame } from "../game/builders/gameBuilder.js";
-import { getCardById } from "../game/helpers/cardHelpers.js";
-import { mapSlotFromClientToServer, mapSlotForClient } from "../game/helpers/slotHelpers.js";
-import { getTableSlots } from "../game/helpers/tableHelper.js";
-import { applyMove } from '../game/MoveApplier.js';
-import {
-  validateMove,
-  isBenchSlot,
-  refillHandIfEmpty,
-  hasWonByEmptyDeckSlot,
-  haseLoseByEmptyPileSlot,
-} from '../game/Regles.js';
-import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../game/helpers/turnFlowHelpers.js";
-import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
-import { verifyOrCreateUser } from '../handlers/auth/usersStore.js';
-import { emitSlotState, emitFullState } from '../domain/session/index.js';
-
 // ============= IMPORTS HANDLERS =============
 import { handleLogin } from '../handlers/auth/login.js';
 import { handleLogout } from '../handlers/auth/logout.js';
@@ -46,26 +28,6 @@ const GAME_DEBUG_ENABLED = process.env.GAME_DEBUG === "1" || DEBUG_TRACE_ENABLED
 
 // 1️⃣ Créer le contexte (état + helpers)
 const { baseCtx, loginCtx, onSocketClose } = createServerContext({
-  createGame,
-  emitSlotState,
-  emitFullState,
-  getTableSlots,
-  getCardById,
-  mapSlotFromClientToServer,
-  mapSlotForClient,
-  validateMove,
-  applyMove,
-  initTurnForGame,
-  isBenchSlot,
-  endTurnAfterBenchPlay,
-  tryExpireTurn,
-  refillHandIfEmpty,
-  hasWonByEmptyDeckSlot,
-  haseLoseByEmptyPileSlot,
-  saveGameState,
-  loadGameState,
-  deleteGameState,
-  verifyOrCreateUser,
   onTransportSend: () => metrics.recordMessageSent(),
 });
 

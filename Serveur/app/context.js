@@ -6,32 +6,30 @@ import { createRoles } from "../domain/roles/roles.js";
 import { createLobbyLists } from "../domain/lobby/lists.js";
 import { createGameNotifier, emitSlotState, emitFullState } from "../domain/session/index.js";
 import { createPresence } from "../domain/session/presence.js";
-import { TURN_FLOW_MESSAGES } from "../game/helpers/turnFlowHelpers.js";
+import { createGame } from "../game/builders/gameBuilder.js";
+import { getCardById } from "../game/helpers/cardHelpers.js";
+import { mapSlotFromClientToServer, mapSlotForClient } from "../game/helpers/slotHelpers.js";
+import { getTableSlots } from "../game/helpers/tableHelper.js";
+import { applyMove } from "../game/MoveApplier.js";
+import {
+  validateMove,
+  isBenchSlot,
+  refillHandIfEmpty,
+  hasWonByEmptyDeckSlot,
+  haseLoseByEmptyPileSlot,
+} from "../game/Regles.js";
+import {
+  TURN_FLOW_MESSAGES,
+  initTurnForGame,
+  endTurnAfterBenchPlay,
+  tryExpireTurn,
+} from "../game/helpers/turnFlowHelpers.js";
+import { saveGameState, loadGameState, deleteGameState } from "../domain/session/Saves.js";
+import { verifyOrCreateUser } from "../handlers/auth/usersStore.js";
 import { createStateManager } from "./stateManager.js";
 import { emitGameMessage } from "../shared/uiMessage.js";
 
-export function createServerContext(deps) {
-  const {
-    createGame,
-    getTableSlots,
-    getCardById,
-    mapSlotFromClientToServer,
-    mapSlotForClient,
-    validateMove,
-    applyMove,
-    initTurnForGame,
-    isBenchSlot,
-    endTurnAfterBenchPlay,
-    tryExpireTurn,
-    refillHandIfEmpty,
-    hasWonByEmptyDeckSlot,
-    haseLoseByEmptyPileSlot,
-    saveGameState,
-    loadGameState,
-    deleteGameState,
-    verifyOrCreateUser,
-    onTransportSend,
-  } = deps;
+export function createServerContext({ onTransportSend } = {}) {
 
   // ========================
   // STATE MANAGER (CENTRALISÉ)
@@ -67,6 +65,7 @@ export function createServerContext(deps) {
     userToSpectate: state.userToSpectate,
     gameSpectators: state.gameSpectators,
     pendingInviteTo: state.pendingInviteTo,
+    inviteFrom: state.inviteFrom,
     gameMeta: state.gameMeta,
     sendEvtUser,
   });
@@ -111,7 +110,7 @@ export function createServerContext(deps) {
   }
 
   function withGameUpdate(game_id, callback, trace) {
-    const game = state.getGame(game_id);
+    const game = state.games.get(game_id);
     if (!game) return;
 
     const specs = state.gameSpectators.get(game_id);
@@ -170,7 +169,7 @@ export function createServerContext(deps) {
   function processTurnTimeout(gameId, now = Date.now()) {
     if (typeof tryExpireTurn !== "function") return false;
 
-    const game = state.getGame(gameId);
+    const game = state.games.get(gameId);
     if (!game?.turn) return false;
 
     const meta = state.gameMeta.get(gameId);

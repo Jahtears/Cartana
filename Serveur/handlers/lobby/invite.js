@@ -12,7 +12,7 @@ export function handleInvite(ctx, ws, req, data, actor) {
     sendEvtUser,
     refreshLobby,
   } = ctx;
-  const { pendingInviteTo } = state;
+  const { pendingInviteTo, inviteFrom } = state;
 
   const to = requireParam(sendRes, ws, req, data, "to");
   if (!to) return true;
@@ -28,15 +28,13 @@ export function handleInvite(ctx, ws, req, data, actor) {
     );
   }
   // destinataire invite déjà quelqu'un
-  for (const inv of pendingInviteTo.values()) {
-    if (inv.from === to) {
-      return resError(
-        sendRes,
-        ws,
-        req,
-        POPUP_MESSAGE.INVITE_TARGET_ALREADY_INVITING
-      );
-    }
+  if (inviteFrom.has(to)) {
+    return resError(
+      sendRes,
+      ws,
+      req,
+      POPUP_MESSAGE.INVITE_TARGET_ALREADY_INVITING
+    );
   }
 
   // acteur a déjà une invite reçue
@@ -49,18 +47,18 @@ export function handleInvite(ctx, ws, req, data, actor) {
     );
   }
   // acteur invite déjà quelqu'un
-  for (const inv of pendingInviteTo.values()) {
-    if (inv.from === actor) {
-      return resError(
-        sendRes,
-        ws,
-        req,
-        POPUP_MESSAGE.INVITE_ACTOR_ALREADY_INVITING
-      );
-    }
+  if (inviteFrom.has(actor)) {
+    return resError(
+      sendRes,
+      ws,
+      req,
+      POPUP_MESSAGE.INVITE_ACTOR_ALREADY_INVITING
+    );
   }
 
-  pendingInviteTo.set(to, { from: actor, to, createdAt: Date.now() });
+  const invite = { from: actor, to, createdAt: Date.now() };
+  pendingInviteTo.set(to, invite);
+  inviteFrom.set(actor, to);
 
   sendEvtUser(to, "invite_request", { from: actor });
   sendRes(ws, req, true, { sent: true });
@@ -83,7 +81,7 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
     setUserActivity,
     Activity,
   } = ctx;
-  const { pendingInviteTo, games, gameMeta } = state;
+  const { pendingInviteTo, inviteFrom, games, gameMeta } = state;
 
   const to = requireParam(sendRes, ws, req, data, "to");
   if (!to) return true;
@@ -94,6 +92,7 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
     return resError(sendRes, ws, req, POPUP_MESSAGE.INVITE_NOT_FOUND);
   }
   pendingInviteTo.delete(actor);
+  inviteFrom.delete(pending.from);
 
   if (!accepted) {
     emitPopupMessage(
