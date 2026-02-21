@@ -4,13 +4,11 @@
 import { SLOT_TYPES, SlotId } from "./constants/slots.js";
 import { DEFAULT_HAND_SIZE } from "./constants/turnFlow.js";
 import { isTableSlot } from "./helpers/slotHelpers.js";
-import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
 
-export const MOVE_RESULT_CODE = Object.freeze({
-  NOT_FOUND: "NOT_FOUND",
-  MOVE_DENIED: "MOVE_DENIED",
-});
+function technicalDenied(debugReason) {
+  return { valid: false, kind: "technical", debug_reason: debugReason };
+}
 
 /**
  * Orchestrate a complete move: validate -> apply -> refill -> track updates -> check win.
@@ -24,7 +22,7 @@ export const MOVE_RESULT_CODE = Object.freeze({
  * @param {Object} params.to_slot_id - Target slot (server-side SlotId)
  * @param {Object} params.ctx - Request context (for trace)
  * 
- * @returns {Object} Result = { valid, reason?, response?, shouldEnd?, winner?, game_end_reason? }
+ * @returns {Object} Result = { valid, kind?, code?, params?, debug_reason?, response?, winner?, game_end_reason? }
  */
 export function orchestrateMove(params) {
   const {
@@ -62,24 +60,16 @@ export function orchestrateMove(params) {
   // ========================
   const card = getCardById(game, cardId);
   if (!card) {
-    return {
-      valid: false,
-      reason: INGAME_MESSAGE.RULE_CARD_NOT_FOUND,
-      code: MOVE_RESULT_CODE.NOT_FOUND,
-    };
+    return technicalDenied("card_not_found");
   }
 
   // ========================
   // 2) VALIDATE MOVE
   // ========================
   const validation = validateMove(game, actor, card, fromSlotId, toSlotId);
-  if (!validation.valid) {
-    return {
-      valid: false,
-      reason: validation.reason,
-      reason_params: validation.reason_params ?? {},
-      code: MOVE_RESULT_CODE.MOVE_DENIED,
-    };
+  if (!validation || validation.valid !== true) {
+    if (validation && typeof validation === "object") return validation;
+    return technicalDenied("validate_move_denied");
   }
 
   // ========================
@@ -87,11 +77,7 @@ export function orchestrateMove(params) {
   // ========================
   const moveResult = applyMove(game, card, fromSlotId, toSlotId, actor);
   if (!moveResult) {
-    return {
-      valid: false,
-      reason: INGAME_MESSAGE.MOVE_REJECTED,
-      code: MOVE_RESULT_CODE.MOVE_DENIED,
-    };
+    return technicalDenied("apply_move_rejected");
   }
 
   // ========================

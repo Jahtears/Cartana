@@ -54,15 +54,6 @@ const POPUP_TEXT_BY_CODE = {
 const INGAME_TEXT_BY_CODE = {
 	"INGAME_RULE_OK": "Confirm",
 	"INGAME_MOVE_DENIED": "Move denied",
-	"INGAME_MOVE_INVALID_SLOT": "Invalid slot ID",
-	"INGAME_MOVE_REJECTED": "ApplyMove rejected",
-
-	"INGAME_RULE_CARD_NOT_FOUND": "Card not found",
-	"INGAME_RULE_CARD_UNKNOWN": "Unknown card",
-	"INGAME_RULE_SOURCE_SLOT_MISSING_CARD": "No card in source slot",
-	"INGAME_RULE_UNKNOWN_PLAYER": "Unknown player for this game",
-	"INGAME_RULE_SLOT_VALIDATOR_MISSING": "No validator for this slot",
-	"INGAME_RULE_TABLE_SLOT_NOT_FOUND": "Table slot not found",
 	"INGAME_RULE_DECK_ONLY_TO_TABLE": "Deck cards can only be played on a Table slot",
 	"INGAME_RULE_NOT_YOUR_TURN": "Not your turn",
 	"INGAME_RULE_BENCH_ONLY_TO_TABLE": "Bench cards can only be played on a Table slot",

@@ -74,10 +74,6 @@ static func normalize_popup_message(payload: Dictionary) -> Dictionary:
 	var message_code := _extract_message_code(payload)
 	var text_override := _extract_text(payload)
 
-	if text_override.begins_with(POPUP_PREFIX):
-		message_code = text_override
-		text_override = ""
-
 	if not message_code.begins_with(POPUP_PREFIX):
 		if text_override != "":
 			message_code = POPUP_TECH_ERROR_GENERIC
@@ -109,18 +105,8 @@ static func normalize_game_message(payload: Dictionary) -> Dictionary:
 	return normalize_popup_message(payload)
 
 static func normalize_popup_error(error: Dictionary, fallback_message := DEFAULT_ERROR_FALLBACK) -> Dictionary:
-	var details_val = error.get("details", {})
-	var details: Dictionary = details_val if details_val is Dictionary else {}
 	var top_params_val = error.get("message_params", {})
 	var top_params: Dictionary = top_params_val if top_params_val is Dictionary else {}
-	var details_params_val = details.get("message_params", {})
-	var details_params: Dictionary = details_params_val if details_params_val is Dictionary else {}
-
-	var message_params: Dictionary = {}
-	for key in details_params.keys():
-		message_params[key] = details_params[key]
-	for key in top_params.keys():
-		message_params[key] = top_params[key]
 
 	var message_code := String(error.get("message_code", "")).strip_edges()
 	var text_override := String(error.get("text", "")).strip_edges()
@@ -141,7 +127,7 @@ static func normalize_popup_error(error: Dictionary, fallback_message := DEFAULT
 
 	return normalize_popup_message({
 		"message_code": message_code,
-		"message_params": message_params,
+		"message_params": top_params,
 		"text": text_override,
 	})
 
@@ -190,18 +176,6 @@ static func invite_action_request(action_id: String, payload: Dictionary) -> Dic
 	if action_id == String(POPUP_ACTION["CONFIRM_NO"]):
 		return {"to": from_user, "accepted": false}
 	return {}
-
-static func is_ingame_game_message(payload: Dictionary) -> bool:
-	return not normalize_ingame_message(payload).is_empty()
-
-static func ingame_message_color(payload: Dictionary) -> Color:
-	var normalized := normalize_ingame_message(payload)
-	if normalized.is_empty():
-		return Color.WHITE
-	var color_val = normalized.get("color", null)
-	if color_val is Color:
-		return color_val
-	return Color.WHITE
 
 static func game_end_popup_message(data: Dictionary, username: String, is_spectator: bool) -> Dictionary:
 	var server_popup_code := _safe_text(data.get("message_code", ""))
@@ -275,17 +249,14 @@ static func _safe_text(value: Variant) -> String:
 	return str(value).strip_edges()
 
 static func _extract_message_params(payload: Dictionary) -> Dictionary:
-	var params_val = payload.get("message_params", payload.get("params", payload.get("meta", {})))
+	var params_val = payload.get("message_params", {})
 	return params_val if params_val is Dictionary else {}
 
 static func _extract_message_code(payload: Dictionary) -> String:
 	return String(payload.get("message_code", "")).strip_edges()
 
 static func _extract_text(payload: Dictionary) -> String:
-	var text := String(payload.get("text", "")).strip_edges()
-	if text == "":
-		text = String(payload.get("message", "")).strip_edges()
-	return text
+	return String(payload.get("text", "")).strip_edges()
 
 static func _extract_color(payload: Dictionary, fallback: Color) -> Color:
 	var color := fallback

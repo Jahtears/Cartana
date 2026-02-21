@@ -7,55 +7,13 @@ const INGAME_PREFIX := "INGAME_"
 
 const INGAME_RULE_OK := "INGAME_RULE_OK"
 const INGAME_MOVE_DENIED := "INGAME_MOVE_DENIED"
-const INGAME_MOVE_INVALID_SLOT := "INGAME_MOVE_INVALID_SLOT"
-const INGAME_MOVE_REJECTED := "INGAME_MOVE_REJECTED"
-const INGAME_RULE_CARD_NOT_FOUND := "INGAME_RULE_CARD_NOT_FOUND"
-const INGAME_RULE_CARD_UNKNOWN := "INGAME_RULE_CARD_UNKNOWN"
-const INGAME_RULE_SOURCE_SLOT_MISSING_CARD := "INGAME_RULE_SOURCE_SLOT_MISSING_CARD"
-const INGAME_RULE_UNKNOWN_PLAYER := "INGAME_RULE_UNKNOWN_PLAYER"
-const INGAME_RULE_SLOT_VALIDATOR_MISSING := "INGAME_RULE_SLOT_VALIDATOR_MISSING"
-const INGAME_RULE_TABLE_SLOT_NOT_FOUND := "INGAME_RULE_TABLE_SLOT_NOT_FOUND"
-const INGAME_RULE_DECK_ONLY_TO_TABLE := "INGAME_RULE_DECK_ONLY_TO_TABLE"
-const INGAME_RULE_NOT_YOUR_TURN := "INGAME_RULE_NOT_YOUR_TURN"
-const INGAME_RULE_BENCH_ONLY_TO_TABLE := "INGAME_RULE_BENCH_ONLY_TO_TABLE"
-const INGAME_RULE_ACE_BLOCKS_BENCH_DECK_TOP := "INGAME_RULE_ACE_BLOCKS_BENCH_DECK_TOP"
-const INGAME_RULE_ACE_BLOCKS_BENCH_HAND := "INGAME_RULE_ACE_BLOCKS_BENCH_HAND"
-const INGAME_RULE_CARD_NOT_ALLOWED_ON_TABLE := "INGAME_RULE_CARD_NOT_ALLOWED_ON_TABLE"
-const INGAME_RULE_CANNOT_PLAY_ON_DECK := "INGAME_RULE_CANNOT_PLAY_ON_DECK"
-const INGAME_RULE_CANNOT_PLAY_ON_HAND := "INGAME_RULE_CANNOT_PLAY_ON_HAND"
-const INGAME_RULE_CANNOT_PLAY_ON_DRAWPILE := "INGAME_RULE_CANNOT_PLAY_ON_DRAWPILE"
-const INGAME_RULE_OPPONENT_SLOT_FORBIDDEN := "INGAME_RULE_OPPONENT_SLOT_FORBIDDEN"
 const INGAME_TURN_START_FIRST := "INGAME_TURN_START_FIRST"
 const INGAME_TURN_START := "INGAME_TURN_START"
-const INGAME_TURN_TIMEOUT := "INGAME_TURN_TIMEOUT"
 
 const INGAME_GREEN_CODES := {
 	INGAME_TURN_START_FIRST: true,
 	INGAME_TURN_START: true,
 	INGAME_RULE_OK: true,
-}
-
-const INGAME_RED_CODES := {
-	INGAME_MOVE_DENIED: true,
-	INGAME_MOVE_INVALID_SLOT: true,
-	INGAME_MOVE_REJECTED: true,
-	INGAME_RULE_CARD_NOT_FOUND: true,
-	INGAME_RULE_CARD_UNKNOWN: true,
-	INGAME_RULE_SOURCE_SLOT_MISSING_CARD: true,
-	INGAME_RULE_UNKNOWN_PLAYER: true,
-	INGAME_RULE_SLOT_VALIDATOR_MISSING: true,
-	INGAME_RULE_TABLE_SLOT_NOT_FOUND: true,
-	INGAME_RULE_DECK_ONLY_TO_TABLE: true,
-	INGAME_RULE_NOT_YOUR_TURN: true,
-	INGAME_RULE_BENCH_ONLY_TO_TABLE: true,
-	INGAME_RULE_ACE_BLOCKS_BENCH_DECK_TOP: true,
-	INGAME_RULE_ACE_BLOCKS_BENCH_HAND: true,
-	INGAME_RULE_CARD_NOT_ALLOWED_ON_TABLE: true,
-	INGAME_RULE_CANNOT_PLAY_ON_DECK: true,
-	INGAME_RULE_CANNOT_PLAY_ON_HAND: true,
-	INGAME_RULE_CANNOT_PLAY_ON_DRAWPILE: true,
-	INGAME_RULE_OPPONENT_SLOT_FORBIDDEN: true,
-	INGAME_TURN_TIMEOUT: true,
 }
 
 const INGAME_GREEN_COLOR := Color(0.0, 1.0, 0.0)
@@ -80,26 +38,17 @@ static func text_for_code(message_code: String, params: Dictionary = {}) -> Stri
 	return LanguageManager.ingame_text(message_code, params)
 
 static func normalize_ingame_message(ui_message: Dictionary) -> Dictionary:
-	var text := String(ui_message.get("text", "")).strip_edges()
-	if text == "":
-		text = String(ui_message.get("message", "")).strip_edges()
-	var params_val = ui_message.get("message_params", ui_message.get("params", {}))
-	var params: Dictionary = params_val if params_val is Dictionary else {}
-
-	var message_code := infer_message_code({
-		"text": text,
-		"message_code": String(ui_message.get("message_code", "")),
-	})
+	var message_code := String(ui_message.get("message_code", "")).strip_edges()
 	if not message_code.begins_with(INGAME_PREFIX):
 		return {}
 
-	if text == "" or text == message_code:
-		text = text_for_code(message_code, params)
+	var params_val = ui_message.get("message_params", {})
+	var params: Dictionary = params_val if params_val is Dictionary else {}
+	var text := text_for_code(message_code, params)
+	if text == "":
+		return {}
 
-	var color := color_for_payload({
-		"message_code": message_code,
-		"text": text,
-	})
+	var color := color_for_code(message_code)
 	var color_val = ui_message.get("color", null)
 	if color_val is Color:
 		color = color_val
@@ -161,7 +110,7 @@ static func show_ingame_message(ui_message: Dictionary, state: Dictionary) -> vo
 		return
 
 	ingame_label.text = "[center][color=%s]%s[/color][/center]" % [
-		ingame_color(String(normalized.get("message_code", "")), text).to_html(),
+		color_for_code(String(normalized.get("message_code", ""))).to_html(),
 		text
 	]
 	_resize_single_line_label(ingame_label)
@@ -181,35 +130,10 @@ static func get_label(state: Dictionary) -> RichTextLabel:
 static func get_fade_duration() -> float:
 	return FADE_DURATION
 
-static func infer_message_code(payload: Dictionary) -> String:
-	var explicit_code := String(payload.get("message_code", "")).strip_edges()
-	if explicit_code.begins_with(INGAME_PREFIX):
-		return explicit_code
-
-	var text := String(payload.get("text", "")).strip_edges()
-	if text.begins_with(INGAME_PREFIX):
-		return text
-	return ""
-
-static func is_ingame_message(message_code: String, text: String) -> bool:
-	return infer_message_code(_payload(message_code, text)) != ""
-
-static func ingame_color(message_code: String, text: String) -> Color:
-	return color_for_payload(_payload(message_code, text))
-
-static func color_for_payload(payload: Dictionary) -> Color:
-	var message_code := infer_message_code(payload)
+static func color_for_code(message_code: String) -> Color:
 	if INGAME_GREEN_CODES.has(message_code):
 		return INGAME_GREEN_COLOR
-	if INGAME_RED_CODES.has(message_code):
-		return INGAME_RED_COLOR
 	return INGAME_RED_COLOR
-
-static func _payload(message_code: String, text: String) -> Dictionary:
-	return {
-		"message_code": String(message_code),
-		"text": String(text),
-	}
 
 static func _setup_ingame_label(ingame_label: RichTextLabel) -> void:
 	if ingame_label == null:

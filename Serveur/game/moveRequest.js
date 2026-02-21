@@ -2,11 +2,65 @@
 import { emitGameEndThenSnapshot } from "../net/broadcast.js";
 import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../net/guards.js";
 import { resError } from "../net/transport.js";
-import { orchestrateMove, MOVE_RESULT_CODE } from "./moveOrchestrator.js";
+import { orchestrateMove } from "./moveOrchestrator.js";
 import { ensureGameMeta } from "./meta.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
 import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 import { POPUP_MESSAGE } from "../shared/popupMessages.js";
+
+function safeObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value;
+}
+
+const INGAME_MESSAGE_CODES = new Set(Object.values(INGAME_MESSAGE));
+
+function buildMoveDetails(cardId, fromSlotId) {
+  const details = {};
+  const normalizedCardId = String(cardId ?? "").trim();
+  const normalizedFromSlotId = String(fromSlotId ?? "").trim();
+
+  if (normalizedCardId) details.card_id = normalizedCardId;
+  if (normalizedFromSlotId) details.from_slot_id = normalizedFromSlotId;
+  return details;
+}
+
+function buildMoveClientErrorPayload({ moveError, cardId, fromSlotId }) {
+  const kind = String(moveError?.kind ?? "").trim();
+  const payload = {
+    message_code: INGAME_MESSAGE.MOVE_DENIED,
+  };
+
+  if (kind === "user") {
+    const userCode = String(moveError?.code ?? "").trim();
+    if (INGAME_MESSAGE_CODES.has(userCode)) {
+      payload.message_code = userCode;
+    }
+
+    const params = safeObject(moveError?.params);
+    if (Object.keys(params).length > 0) {
+      payload.message_params = params;
+    }
+  }
+
+  const details = buildMoveDetails(cardId, fromSlotId);
+  if (Object.keys(details).length > 0) payload.details = details;
+
+  return payload;
+}
+
+function deniedTracePayload(moveError) {
+  const kind = String(moveError?.kind ?? "").trim();
+  if (kind === "user") {
+    return {
+      reason_code: String(moveError?.code ?? ""),
+    };
+  }
+
+  return {
+    reason_debug: String(moveError?.debug_reason ?? "unknown"),
+  };
+}
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
   const {
@@ -56,11 +110,27 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   });
 
   if (!from_slot_id || !to_slot_id) {
-    resError(sendRes, ws, req, INGAME_MESSAGE.MOVE_INVALID_SLOT, {
-      from_slot_id: raw_from,
-      to_slot_id: raw_to,
-      message_code: INGAME_MESSAGE.MOVE_INVALID_SLOT,
+    const moveError = {
+      valid: false,
+      kind: "technical",
+      debug_reason: "invalid_client_slot",
+    };
+    const errorPayload = buildMoveClientErrorPayload({
+      moveError,
+      cardId: card_id,
+      fromSlotId: raw_from,
     });
+
+    ctx.trace?.("MOVE_DENIED", {
+      actor,
+      card_id,
+      from_slot_id: raw_from || null,
+      to_slot_id: raw_to || null,
+      ...deniedTracePayload(moveError),
+      reason_client: errorPayload.message_code,
+    });
+
+    sendRes(ws, req, false, errorPayload);
     return true;
   }
 
@@ -80,31 +150,23 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
 
   // ✅ HANDLE RESULT
   if (!orchResult.valid) {
+    const errorPayload = buildMoveClientErrorPayload({
+      moveError: orchResult,
+      cardId: card_id,
+      fromSlotId: client_from,
+    });
+
     ctx.trace?.("MOVE_DENIED", {
       actor,
       card_id,
       from_slot_id: String(client_from),
       to_slot_id: String(client_to),
-      reason: String(orchResult.reason ?? ""),
+      ...deniedTracePayload(orchResult),
+      reason_client: errorPayload.message_code,
     });
 
-    const details = {
-      card_id,
-      from_slot_id: client_from,
-      to_slot_id: client_to,
-      message_code: orchResult.reason ?? "",
-      message_params: orchResult.reason_params ?? {},
-    };
-
-    if (orchResult.code === MOVE_RESULT_CODE.NOT_FOUND) {
-      return resError(sendRes, ws, req, orchResult.reason, details);
-    }
-
-    if (orchResult.code === MOVE_RESULT_CODE.MOVE_DENIED) {
-      return resError(sendRes, ws, req, orchResult.reason, details);
-    }
-
-    return resError(sendRes, ws, req, orchResult.reason || INGAME_MESSAGE.MOVE_REJECTED, details);
+    sendRes(ws, req, false, errorPayload);
+    return true;
   }
 
   // ✅ GAME END: emit end then broadcast

@@ -8,6 +8,8 @@ const HOVER_SCALE := 1.08
 const PREVIEW_CHECK_INTERVAL := 3
 const PREVIEW_CARD_GLOW_COLOR := Color(0.35, 0.95, 0.45, 0.45)
 const PREVIEW_CARD_GLOW_SIZE := 6
+const BACK_TEXTURE_DECK_A := preload("res://DosA.png")
+const BACK_TEXTURE_DECK_B := preload("res://DosB.png")
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
@@ -116,30 +118,27 @@ func _set_preview_card(card: Node2D) -> void:
 # ============= VISUAL METHODS =============
 func _highlight_card_preview() -> void:
 	"""Applique un glow léger pendant le drag"""
-	var bord = $Front/Bord
-	if bord:
-		var style = bord.get_theme_stylebox("panel")
-		if style and style is StyleBoxFlat:
-			# Le glow est une ombre diffuse: on garde la couleur du bord inchangée.
-			var new_style = style.duplicate()
-			new_style.shadow_size = PREVIEW_CARD_GLOW_SIZE
-			new_style.shadow_color = PREVIEW_CARD_GLOW_COLOR
-			new_style.shadow_offset = Vector2.ZERO
-			bord.add_theme_stylebox_override("panel", new_style)
+	_set_border_glow($Front/Bord, true)
+	_set_border_glow($Back/Bord, true)
 
 func _reset_card_preview() -> void:
 	"""Retire le glow et restaure l'état normal"""
-	var bord = $Front/Bord
-	if bord:
-		var style = bord.get_theme_stylebox("panel")
-		if style and style is StyleBoxFlat:
-			# On retire uniquement le glow; la couleur du bord reste pilotée par dos_couleur.
-			var new_style = style.duplicate()
-			new_style.shadow_size = 0
-			new_style.shadow_color = Color(0, 0, 0, 0)
-			new_style.shadow_offset = Vector2.ZERO
-			new_style.border_color = _get_back_color(dos_couleur)
-			bord.add_theme_stylebox_override("panel", new_style)
+	_set_border_glow($Front/Bord, false)
+	_set_border_glow($Back/Bord, false)
+	_apply_border_visual(dos_couleur)
+
+func _set_border_glow(bord: Panel, enabled: bool) -> void:
+	if bord == null:
+		return
+
+	var style = bord.get_theme_stylebox("panel")
+	if style and style is StyleBoxFlat:
+		# Le glow est une ombre diffuse: on garde la couleur du bord inchangée.
+		var new_style = style.duplicate()
+		new_style.shadow_size = PREVIEW_CARD_GLOW_SIZE if enabled else 0
+		new_style.shadow_color = PREVIEW_CARD_GLOW_COLOR if enabled else Color(0, 0, 0, 0)
+		new_style.shadow_offset = Vector2.ZERO
+		bord.add_theme_stylebox_override("panel", new_style)
 		
 func _update_hover_state() -> void:
 	# Si on ne peut pas interagir, forcer IDLE
@@ -252,17 +251,26 @@ func update_card() -> void:
 	$Front/Bottom/SymboleB.modulate = texte_couleur
 
 func _apply_back_visual(code: String) -> void:
-	$Back.modulate = _get_back_color(code)
+	var back := $Back as TextureRect
+	if back == null:
+		return
+
+	back.texture = _get_back_texture(code)
+	back.modulate = Color(1, 1, 1, 1)
 
 func _apply_border_visual(code: String) -> void:
-	var bord = $Front/Bord
-	if not bord:
+	var deck_color := _get_back_color(code)
+	_set_border_color($Front/Bord, deck_color)
+	_set_border_color($Back/Bord, deck_color)
+
+func _set_border_color(bord: Panel, border_color: Color) -> void:
+	if bord == null:
 		return
 
 	var style = bord.get_theme_stylebox("panel")
 	if style and style is StyleBoxFlat:
 		var new_style = style.duplicate()
-		new_style.border_color = _get_back_color(code)
+		new_style.border_color = border_color
 		bord.add_theme_stylebox_override("panel", new_style)
 
 func _get_back_color(code: String) -> Color:
@@ -270,6 +278,11 @@ func _get_back_color(code: String) -> Color:
 	if code == "rouge":
 		col = Color(0.77, 0.435, 0.597, 1.0)
 	return col
+
+func _get_back_texture(code: String) -> Texture2D:
+	if code == "rouge":
+		return BACK_TEXTURE_DECK_A
+	return BACK_TEXTURE_DECK_B
 
 func _show_front() -> void:
 	$Front.visible = true
