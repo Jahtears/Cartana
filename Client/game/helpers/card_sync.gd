@@ -11,7 +11,7 @@ const KEY_SLOT_ID := "slot_id"
 const KEY_VALUE := "valeur"
 const KEY_SUIT := "couleur"
 const KEY_BACK := "dos"
-const KEY_BACK_COLOR := "dos_couleur"
+const KEY_DECKS_COLOR := "decksColor"
 const KEY_DRAGGABLE := "draggable"
 
 const KEY_ORDER_ARRAY := "_array_order"
@@ -59,7 +59,7 @@ static func apply_card_update(game_ctx: Dictionary, data: Dictionary) -> void:
 		String(payload.get(KEY_VALUE, "")),
 		String(payload.get(KEY_SUIT, "")),
 		bool(payload.get(KEY_BACK, false)),
-		String(payload.get(KEY_BACK_COLOR, "")),
+		String(payload.get(KEY_DECKS_COLOR, "")),
 		bool(payload.get(KEY_DRAGGABLE, false))
 	)
 
@@ -84,7 +84,7 @@ static func _extract_card_payload(data: Dictionary) -> Dictionary:
 		KEY_VALUE: String(data.get(KEY_VALUE, "")),
 		KEY_SUIT: String(data.get(KEY_SUIT, "")),
 		KEY_BACK: bool(data.get(KEY_BACK, false)),
-		KEY_BACK_COLOR: String(data.get(KEY_BACK_COLOR, "")),
+		KEY_DECKS_COLOR: String(data.get(KEY_DECKS_COLOR, "")),
 		KEY_DRAGGABLE: bool(data.get(KEY_DRAGGABLE, false)),
 	}
 

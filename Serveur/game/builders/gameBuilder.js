@@ -39,21 +39,21 @@ function createEmptySlots() {
   return slots;
 }
 
-function createCard(value, color, backColor) {
+function createCard(value, color, deckSource) {
   return {
     id: crypto.randomUUID(),
     value,
     color,
-    backColor,
+    deckSource,
   };
 }
 
-function generateCards(backColor, copies = 1) {
+function generateCards(deckSource, copies = 1) {
   const deck = [];
   for (let d = 0; d < copies; d++) {
     for (const value of CARD_VALUES) {
       for (const color of CARD_COLORS) {
-        deck.push(createCard(value, color, backColor));
+        deck.push(createCard(value, color, deckSource));
       }
     }
   }
@@ -61,8 +61,8 @@ function generateCards(backColor, copies = 1) {
 }
 
 function createShuffledDecks() {
-  const deckA = generateCards("rouge");
-  const deckB = generateCards("bleu");
+  const deckA = generateCards("A");
+  const deckB = generateCards("B");
   shuffle(deckA);
   shuffle(deckB);
   return { deckA, deckB };
@@ -184,7 +184,7 @@ function buildCardData(card, slotId, isOwner, disableDrag = false) {
     valeur: isFaceDown ? "" : card.value,
     couleur: isFaceDown ? "" : card.color,
     dos: isFaceDown,
-    dos_couleur: card.backColor,
+    decksColor: card.deckSource,
     draggable,
     slot_id: normalizedSlotId,
   };
