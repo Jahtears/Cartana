@@ -9,6 +9,8 @@ const POPUP_TEXT_BY_CODE = {
 	"POPUP_TECH_BAD_STATE": "Action impossible dans cet état",
 	"POPUP_TECH_NOT_IMPLEMENTED": "Action non gérée",
 	"POPUP_TECH_INTERNAL_ERROR": "Erreur serveur",
+	"POPUP_UI_ACTION_IMPOSSIBLE": "Action impossible",
+	"POPUP_LOBBY_GET_PLAYERS_ERROR": "Erreur get_players",
 
 	"POPUP_AUTH_REQUIRED": "Authentification requise",
 	"POPUP_AUTH_BAD_PIN": "PIN incorrect",
@@ -40,8 +42,7 @@ const POPUP_TEXT_BY_CODE = {
 	"POPUP_GAME_END_DECK_EMPTY": "Fin de partie : deck vide. Gagnant : {name}",
 	"POPUP_GAME_END_PILE_EMPTY": "Match nul : pioche vide",
 
-	"POPUP_UI_ACTION_IMPOSSIBLE": "Action impossible",
-	"POPUP_LOBBY_GET_PLAYERS_ERROR": "Erreur get_players",
+
 
 	"POPUP_SPECTATE_CONFIRM": "Regarder cette partie en spectateur ?\nJoueurs : {players}",
 	"POPUP_LOGOUT_CONFIRM": "Se déconnecter et revenir à l’écran de connexion ?",
@@ -52,17 +53,9 @@ const POPUP_TEXT_BY_CODE = {
 }
 
 const INGAME_TEXT_BY_CODE = {
-	"INGAME_MOVE_OK": "Valider",
 	"INGAME_MOVE_DENIED": "Déplacement refusé",
-	"INGAME_MOVE_INVALID_SLOT": "ID de slot invalide",
-	"INGAME_MOVE_REJECTED": "ApplyMove rejeté",
 
-	"INGAME_RULE_CARD_NOT_FOUND": "Carte introuvable",
-	"INGAME_RULE_CARD_UNKNOWN": "Carte inconnue",
-	"INGAME_RULE_SOURCE_SLOT_MISSING_CARD": "Carte absente du slot source",
-	"INGAME_RULE_UNKNOWN_PLAYER": "Joueur inconnu pour cette partie",
-	"INGAME_RULE_SLOT_VALIDATOR_MISSING": "Aucun validateur pour ce slot",
-	"INGAME_RULE_TABLE_SLOT_NOT_FOUND": "Slot table introuvable",
+	"INGAME_RULE_OK": "Valider",
 	"INGAME_RULE_DECK_ONLY_TO_TABLE": "Carte du deck uniquement sur un slot table",
 	"INGAME_RULE_NOT_YOUR_TURN": "Pas votre tour",
 	"INGAME_RULE_BENCH_ONLY_TO_TABLE": "Carte du banc uniquement sur un slot table",
@@ -73,7 +66,6 @@ const INGAME_TEXT_BY_CODE = {
 	"INGAME_RULE_CANNOT_PLAY_ON_HAND": "Interdit de jouer sur la main",
 	"INGAME_RULE_CANNOT_PLAY_ON_DRAWPILE": "Interdit de jouer sur la pioche",
 	"INGAME_RULE_OPPONENT_SLOT_FORBIDDEN": "Slot adverse interdit",
-
 	"INGAME_TURN_START_FIRST": "À vous de commencer",
 	"INGAME_TURN_START": "À vous de jouer",
 	"INGAME_TURN_TIMEOUT": "Temps écoulé",

@@ -1,7 +1,7 @@
 // game/slotValidators.js - Slot-specific validators extracted from Regles.js
 
 import { SLOT_TYPES } from "./constants/slots.js";
-import { getSlotContent, isSlotIdPresent, parseSlotId } from "./helpers/slotHelpers.js";
+import { getSlotContent, getSlotType, isSlotIdPresent } from "./helpers/slotHelpers.js";
 import { debugLog } from "./helpers/debugHelpers.js";
 import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 
@@ -11,7 +11,11 @@ import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
  */
 export function validateTableSlot(game, card, fromSlotId, toSlotId) {
   if (!isSlotIdPresent(game, toSlotId)) {
-    return { valid: false, reason: INGAME_MESSAGE.RULE_TABLE_SLOT_NOT_FOUND };
+    return {
+      valid: false,
+      kind: "technical",
+      debug_reason: "table_slot_not_found",
+    };
   }
 
   const slot = getSlotContent(game, toSlotId);
@@ -46,8 +50,9 @@ export function validateTableSlot(game, card, fromSlotId, toSlotId) {
 
     return {
       valid: false,
-      reason: INGAME_MESSAGE.RULE_CARD_NOT_ALLOWED_ON_TABLE,
-      reason_params: { accepted: acceptedStr },
+      kind: "user",
+      code: INGAME_MESSAGE.RULE_CARD_NOT_ALLOWED_ON_TABLE,
+      params: { accepted: acceptedStr },
     };
   }
 
@@ -58,14 +63,22 @@ export function validateTableSlot(game, card, fromSlotId, toSlotId) {
  * Validate placement on Deck slot (not allowed)
  */
 export function validateDeckSlot(game, card, fromSlotId, toSlotId) {
-  return { valid: false, reason: INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DECK };
+  return {
+    valid: false,
+    kind: "user",
+    code: INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DECK,
+  };
 }
 
 /**
  * Validate placement on Hand slot (not allowed)
  */
 export function validateHandSlot(game, card, fromSlotId, toSlotId) {
-  return { valid: false, reason: INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_HAND };
+  return {
+    valid: false,
+    kind: "user",
+    code: INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_HAND,
+  };
 }
 
 /**
@@ -79,12 +92,16 @@ export function validateBenchSlot(game, card, fromSlotId, toSlotId) {
  * Validate placement on Draw Pile slot (not allowed)
  */
 export function validateDrawPileSlot(game, card, fromSlotId, toSlotId) {
-  return { valid: false, reason: INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DRAWPILE };
+  return {
+    valid: false,
+    kind: "user",
+    code: INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DRAWPILE,
+  };
 }
 
 function normalizeSlotType(slotType) {
-  const parsed = parseSlotId(slotType);
-  if (parsed) return parsed.type;
+  const resolvedType = getSlotType(slotType);
+  if (resolvedType) return resolvedType;
 
   if (typeof slotType === "string") {
     return slotType;

@@ -3,7 +3,7 @@ import { ensureGameMeta } from "../../game/meta.js";
 import { TURN_FLOW_MESSAGES } from "../../game/helpers/turnFlowHelpers.js";
 import { emitGameMessage } from "../../shared/uiMessage.js";
 import { requireParam, getExistingGameOrRes } from "../../net/guards.js";
-import { resBadState, resForbidden } from "../../net/transport.js";
+import { resError } from "../../net/transport.js";
 import { saveGameState } from "../../domain/session/Saves.js";
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
@@ -32,12 +32,12 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
 
   // Interdire un join "hors players"
   if (!game.players.includes(actor)) {
-    return resForbidden(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN);
+    return resError(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN);
   }
 
   const currentGameId = String(userToGame.get(actor) ?? "");
   if (currentGameId && currentGameId !== game_id) {
-    return resBadState(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_STATE);
+    return resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_STATE);
   }
   const alreadyInThisGame = currentGameId === game_id;
 

@@ -3,7 +3,7 @@ import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
 import { mapSlotForClient, isOwnerForSlot } from "../../game/helpers/slotHelpers.js";
 import { buildCardData } from "../../game/builders/gameBuilder.js";
 import { getTableSlots } from "../../game/helpers/tableHelper.js";
-import { getSlotContent, isTableSlot, parseSlotId, slotIdToString } from "../../game/helpers/slotHelpers.js";
+import { getSlotContent, getSlotType, isTableSlot, slotIdToString } from "../../game/helpers/slotHelpers.js";
 import { applySlotDragPolicy, getVisibleCardIdsForSlot, toSlotStack } from "../../game/helpers/slotViewHelpers.js";
 import { getCardById } from "../../game/helpers/cardHelpers.js";
 import { getSlotCount } from "../../game/helpers/slotStackHelpers.js";
@@ -34,7 +34,7 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
 
   if (!stack.length) return { slot_id: clientSlot, cards, count };
 
-  const slotType = parseSlotId(slotIdToString(slot_id))?.type ?? null;
+  const slotType = getSlotType(slot_id);
   const ids = getVisibleCardIdsForSlot(slotType, stack);
 
   for (let i = 0; i < ids.length; i++) {

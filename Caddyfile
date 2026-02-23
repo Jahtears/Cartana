@@ -1,0 +1,19 @@
+{
+	local_certs
+	skip_install_trust
+	persist_config off
+	storage file_system {
+		root C:\Users\edoua\Documents\Cartana\.caddy
+	}
+}
+
+192.168.1.40 {
+	@backend path /ws* /health /metrics
+	reverse_proxy @backend 127.0.0.1:3001
+
+	@root path /
+	redir @root /Web/Cartana.html 302
+
+	root * C:\Users\edoua\Documents\Cartana
+	file_server
+}

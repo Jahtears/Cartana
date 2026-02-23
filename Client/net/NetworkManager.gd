@@ -29,6 +29,8 @@ const DISCONNECT_REASON_LOGOUT = "logout"
 const DISCONNECT_REASON_RECONNECT_MAX = "Max reconnect attempts exceeded"
 const SERVER_CLOSE_REASON_PREFIX = "SERVER_"
 const LOCAL_ERROR_MESSAGE_CODE = "POPUP_TECH_ERROR_GENERIC"
+const FORCED_WSS_URL = "wss://192.168.1.40/ws"
+const TLS_ROOT_CERT_PATH = "res://Client/certs/caddy-root.crt"
 
 # ============= STATE =============
 var _ws := WebSocketPeer.new()
@@ -70,9 +72,27 @@ var _connection_state: int = ConnectionState.IDLE
 func _ready() -> void:
 	pass
 
-func connect_to_server(url: String = "ws://192.168.1.40:3000", reset_backoff: bool = true) -> void:
-	if String(url).strip_edges() != "":
-		_url = url
+func _build_tls_client_options() -> TLSOptions:
+	if not _url.begins_with("wss://"):
+		return null
+	# Browser trust is handled by the browser store.
+	if OS.has_feature("web"):
+		return null
+
+	var cert := X509Certificate.new()
+	if not FileAccess.file_exists(TLS_ROOT_CERT_PATH):
+		push_error("[NET] Missing TLS root certificate: %s" % TLS_ROOT_CERT_PATH)
+		return TLSOptions.client()
+
+	var err := cert.load(TLS_ROOT_CERT_PATH)
+	if err != OK:
+		push_error("[NET] Failed to load TLS root certificate: %s (err=%s)" % [TLS_ROOT_CERT_PATH, err])
+		return TLSOptions.client()
+
+	return TLSOptions.client(cert)
+
+func connect_to_server(_unused_url: String = "", reset_backoff: bool = true) -> void:
+	_url = FORCED_WSS_URL
 	if _url == "":
 		return
 	if is_open() or _connect_in_flight:
@@ -88,7 +108,8 @@ func connect_to_server(url: String = "ws://192.168.1.40:3000", reset_backoff: bo
 	else:
 		_connection_state = ConnectionState.CONNECTING
 	_connect_in_flight = true
-	var err := _ws.connect_to_url(_url)
+	var tls_options := _build_tls_client_options()
+	var err := _ws.connect_to_url(_url, tls_options)
 	if err != OK:
 		push_error("WebSocket connect error: %s" % err)
 		_connect_in_flight = false
@@ -216,7 +237,6 @@ func _send_heartbeat_probe(now_ms: int) -> bool:
 	_heartbeat_probe_rid = "hb_%d" % _heartbeat_probe_counter
 	_heartbeat_probe_sent_ms = now_ms
 	var env := {
-		"v": 1,
 		"kind": "req",
 		"type": HEARTBEAT_PROBE_TYPE,
 		"rid": _heartbeat_probe_rid,
@@ -380,7 +400,6 @@ func _drain_queue() -> void:
 
 func _send_request_packet(rid: String, type: String, data: Dictionary) -> bool:
 	var env := {
-		"v": 1,
 		"kind": "req",
 		"type": type,
 		"rid": rid,
@@ -447,7 +466,7 @@ func _handle_packet(pkt: String) -> void:
 		return
 
 	var env := parsed as Dictionary
-	if env.get("v") != 1:
+	if env.has("v") and int(env.get("v")) != 1:
 		return
 
 	var kind := String(env.get("kind", ""))

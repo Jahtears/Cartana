@@ -100,7 +100,7 @@ func _resolve_label(options: Dictionary, option_key: String, default_label_key: 
 	return Protocol.popup_label(label_key)
 
 func _popup_action_id(key: String, fallback: String) -> String:
-	return String(Protocol.POPUP_ACTION.get(key, fallback))
+	return Protocol.popup_action(key, fallback)
 
 func _on_button_accept_pressed() -> void:
 	if _mode == Mode.CONFIRM:

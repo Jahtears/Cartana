@@ -1,7 +1,7 @@
 // handlers/gameEnd.js v1.1
 
 import { getExistingGameOrRes, getGameIdFromDataOrMapping } from "../../net/guards.js";
-import { resForbidden } from "../../net/transport.js";
+import { resError } from "../../net/transport.js";
 import { ensureGameMeta } from "../../game/meta.js";
 import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
@@ -110,7 +110,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
   if (!game) return true;
 
   if (!game.players.includes(actor)) {
-    return resForbidden(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN)
+    return resError(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN)
   }
 
   // abandonneur sort (l’adversaire / specs restent attachés jusqu’à ack)

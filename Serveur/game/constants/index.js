@@ -17,5 +17,4 @@ export {
 } from "./slotView.js";
 export {
   INGAME_MESSAGE,
-  INGAME_MESSAGE_SET,
 } from "./ingameMessages.js";

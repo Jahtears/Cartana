@@ -8,12 +8,16 @@ const HOVER_SCALE := 1.08
 const PREVIEW_CHECK_INTERVAL := 3
 const PREVIEW_CARD_GLOW_COLOR := Color(0.35, 0.95, 0.45, 0.45)
 const PREVIEW_CARD_GLOW_SIZE := 6
+const POINTER_ID_NONE := -2
+const POINTER_ID_MOUSE := -1
+const BACK_TEXTURE_DECK_A := preload("res://DosA.png")
+const BACK_TEXTURE_DECK_B := preload("res://DosB.png")
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
 @export var couleur: String = ""
 @export var dos: bool = false
-@export var dos_couleur: String = "bleu"
+@export var decks_color: String = "B"
 @export var draggable: bool = true
 
 # ============= STATES =============
@@ -36,6 +40,11 @@ var _drag_from_slot: Node2D = null
 var _in_drag_layer := false
 var _drag_original_parent: Node = null
 var _drag_original_z := 0
+var _pointer_global_pos := Vector2.ZERO
+var _pointer_valid := false
+var _active_pointer_id := POINTER_ID_NONE
+var _drag_started_frame := -1
+var _drag_canceled_frame := -1
 
 # ============= PREVIEW & SLOT =============
 var _current_preview_slot: Node2D = null
@@ -52,11 +61,13 @@ var _base_scale := Vector2.ONE
 func _ready() -> void:
 	add_to_group("cards")
 	_base_scale = scale
+	_pointer_global_pos = get_global_mouse_position()
+	_pointer_valid = true
 	update_card()
 
 func _process(_delta: float) -> void:
 	if state == CardState.DRAG or state == CardState.PREVIEW_SLOT:
-		global_position = get_global_mouse_position() - drag_offset
+		global_position = _get_pointer_global_position() - drag_offset
 
 		var frame = get_tree().get_frame()
 		if frame - _last_preview_frame >= PREVIEW_CHECK_INTERVAL:
@@ -116,30 +127,27 @@ func _set_preview_card(card: Node2D) -> void:
 # ============= VISUAL METHODS =============
 func _highlight_card_preview() -> void:
 	"""Applique un glow léger pendant le drag"""
-	var bord = $Front/Bord
-	if bord:
-		var style = bord.get_theme_stylebox("panel")
-		if style and style is StyleBoxFlat:
-			# Le glow est une ombre diffuse: on garde la couleur du bord inchangée.
-			var new_style = style.duplicate()
-			new_style.shadow_size = PREVIEW_CARD_GLOW_SIZE
-			new_style.shadow_color = PREVIEW_CARD_GLOW_COLOR
-			new_style.shadow_offset = Vector2.ZERO
-			bord.add_theme_stylebox_override("panel", new_style)
+	_set_border_glow($Front/Bord, true)
+	_set_border_glow($Back/Bord, true)
 
 func _reset_card_preview() -> void:
 	"""Retire le glow et restaure l'état normal"""
-	var bord = $Front/Bord
-	if bord:
-		var style = bord.get_theme_stylebox("panel")
-		if style and style is StyleBoxFlat:
-			# On retire uniquement le glow; la couleur du bord reste pilotée par dos_couleur.
-			var new_style = style.duplicate()
-			new_style.shadow_size = 0
-			new_style.shadow_color = Color(0, 0, 0, 0)
-			new_style.shadow_offset = Vector2.ZERO
-			new_style.border_color = _get_back_color(dos_couleur)
-			bord.add_theme_stylebox_override("panel", new_style)
+	_set_border_glow($Front/Bord, false)
+	_set_border_glow($Back/Bord, false)
+	_apply_border_visual(decks_color)
+
+func _set_border_glow(bord: Panel, enabled: bool) -> void:
+	if bord == null:
+		return
+
+	var style = bord.get_theme_stylebox("panel")
+	if style and style is StyleBoxFlat:
+		# Le glow est une ombre diffuse: on garde la couleur du bord inchangée.
+		var new_style = style.duplicate()
+		new_style.shadow_size = PREVIEW_CARD_GLOW_SIZE if enabled else 0
+		new_style.shadow_color = PREVIEW_CARD_GLOW_COLOR if enabled else Color(0, 0, 0, 0)
+		new_style.shadow_offset = Vector2.ZERO
+		bord.add_theme_stylebox_override("panel", new_style)
 		
 func _update_hover_state() -> void:
 	# Si on ne peut pas interagir, forcer IDLE
@@ -159,11 +167,34 @@ func _update_hover_state() -> void:
 			set_state(CardState.IDLE)
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		var mm := event as InputEventMouseMotion
+		_update_pointer_from_viewport(mm.position)
+		return
+
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
+		_update_pointer_from_viewport(mb.position)
+		if mb.pressed and _is_mouse_click_button(mb.button_index) and _try_cancel_drag_on_click(POINTER_ID_MOUSE):
+			return
 		if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
-			if state == CardState.DRAG or state == CardState.PREVIEW_SLOT:
+			if _active_pointer_id == POINTER_ID_MOUSE and _is_drag_in_progress():
 				_end_drag()
+		return
+
+	if event is InputEventScreenDrag:
+		var sd := event as InputEventScreenDrag
+		if not dragging or sd.index == _active_pointer_id:
+			_update_pointer_from_viewport(sd.position)
+		return
+
+	if event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		_update_pointer_from_viewport(st.position)
+		if st.pressed and _try_cancel_drag_on_click(st.index):
+			return
+		if not st.pressed and st.index == _active_pointer_id and _is_drag_in_progress():
+			_end_drag()
 
 # ============= STATE MACHINE =============
 func set_state(new_state: CardState) -> void:
@@ -212,19 +243,35 @@ func _can_interact() -> bool:
 func _can_drag() -> bool:
 	return draggable and _can_interact() and not dragging
 
+func _is_drag_in_progress() -> bool:
+	return state == CardState.DRAG or state == CardState.PREVIEW_SLOT
+
+func _update_pointer_global(global_pos: Vector2) -> void:
+	_pointer_global_pos = global_pos
+	_pointer_valid = true
+
+func _update_pointer_from_viewport(viewport_pos: Vector2) -> void:
+	var local_pos := get_global_transform_with_canvas().affine_inverse() * viewport_pos
+	_update_pointer_global(to_global(local_pos))
+
+func _get_pointer_global_position() -> Vector2:
+	if _pointer_valid:
+		return _pointer_global_pos
+	return get_global_mouse_position()
+
 # ============= VISUAL UPDATES =============
-func set_card_data(v: String, c: String, d: bool, d_couleur: String, can_drag: bool = true) -> void:
+func set_card_data(v: String, c: String, d: bool, deck_source: String, can_drag: bool = true) -> void:
 	valeur = v
 	couleur = c
 	dos = d
-	if d_couleur != "":
-		dos_couleur = d_couleur
+	if deck_source != "":
+		decks_color = deck_source
 	draggable = can_drag
 	update_card()
 
 func update_card() -> void:
-	_apply_back_visual(dos_couleur)
-	_apply_border_visual(dos_couleur)
+	_apply_back_visual(decks_color)
+	_apply_border_visual(decks_color)
 
 	if dos:
 		_show_back()
@@ -233,13 +280,13 @@ func update_card() -> void:
 	_show_front()
 
 	var symboles := {
-		"coeur": "♥",
-		"carreau": "♦",
-		"pique": "♠",
-		"trefle": "♣"
+		"H": "♥",
+		"C": "♦",
+		"P": "♠",
+		"S": "♣"
 	}
 
-	var texte_couleur := Color.RED if (couleur == "coeur" or couleur == "carreau") else Color.BLACK
+	var texte_couleur := Color.RED if (couleur == "H" or couleur == "C") else Color.BLACK
 
 	$Front/Top/ValeurT.text = valeur
 	$Front/Top/ValeurT.modulate = texte_couleur
@@ -252,24 +299,37 @@ func update_card() -> void:
 	$Front/Bottom/SymboleB.modulate = texte_couleur
 
 func _apply_back_visual(code: String) -> void:
-	$Back.modulate = _get_back_color(code)
+	var back := $Back as TextureRect
+	if back == null:
+		return
+
+	back.texture = _get_back_texture(code)
+	back.modulate = Color(1, 1, 1, 1)
 
 func _apply_border_visual(code: String) -> void:
-	var bord = $Front/Bord
-	if not bord:
+	var deck_color := _get_back_color(code)
+	_set_border_color($Front/Bord, deck_color)
+	_set_border_color($Back/Bord, deck_color)
+
+func _set_border_color(bord: Panel, border_color: Color) -> void:
+	if bord == null:
 		return
 
 	var style = bord.get_theme_stylebox("panel")
 	if style and style is StyleBoxFlat:
 		var new_style = style.duplicate()
-		new_style.border_color = _get_back_color(code)
+		new_style.border_color = border_color
 		bord.add_theme_stylebox_override("panel", new_style)
 
 func _get_back_color(code: String) -> Color:
-	var col := Color(0.2, 0.4, 1.0)
-	if code == "rouge":
-		col = Color(0.77, 0.435, 0.597, 1.0)
-	return col
+	if code == "A":
+		return Color(0.77, 0.435, 0.597, 1.0)
+	return Color(0.2, 0.4, 1.0)
+
+func _get_back_texture(code: String) -> Texture2D:
+	if code == "A":
+		return BACK_TEXTURE_DECK_A
+	return BACK_TEXTURE_DECK_B
 
 func _show_front() -> void:
 	$Front.visible = true
@@ -282,7 +342,7 @@ func _show_back() -> void:
 # ============= HOVER =============
 
 func _is_topmost_card_at_mouse() -> bool:
-	var mouse_pos = get_global_mouse_position()
+	var mouse_pos = _get_pointer_global_position()
 	var cards_group = get_tree().get_nodes_in_group("cards")
 	var topmost := _pick_topmost_node_at_point(cards_group, mouse_pos)
 	return topmost == self
@@ -291,16 +351,36 @@ func _is_topmost_card_at_mouse() -> bool:
 func _on_area_2d_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
+		_update_pointer_from_viewport(mb.position)
+		if mb.pressed and _is_mouse_click_button(mb.button_index) and _try_cancel_drag_on_click(POINTER_ID_MOUSE):
+			return
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-			if not _is_topmost_card_at_mouse():
-				return
-			if not _can_drag():
-				return
-			_start_drag(get_global_mouse_position())
+			_try_start_drag(POINTER_ID_MOUSE)
+		return
+
+	if event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		_update_pointer_from_viewport(st.position)
+		if st.pressed and _try_cancel_drag_on_click(st.index):
+			return
+		if st.pressed:
+			_try_start_drag(st.index)
+
+func _try_start_drag(pointer_id: int) -> void:
+	if get_tree().get_frame() == _drag_canceled_frame:
+		return
+	if not _is_topmost_card_at_mouse():
+		return
+	if not _can_drag():
+		return
+	_start_drag(_get_pointer_global_position(), pointer_id)
 
 # ============= DRAG LIFECYCLE =============
-func _start_drag(mouse_pos: Vector2) -> void:
+func _start_drag(mouse_pos: Vector2, pointer_id: int = POINTER_ID_MOUSE) -> void:
 	dragging = true
+	_active_pointer_id = pointer_id
+	_drag_started_frame = get_tree().get_frame()
+	_update_pointer_global(mouse_pos)
 	drag_offset = mouse_pos - global_position
 	original_position = global_position
 
@@ -311,7 +391,12 @@ func _start_drag(mouse_pos: Vector2) -> void:
 		_set_preview_slot(null)
 
 func _end_drag() -> void:
+	if not _is_drag_in_progress():
+		return
+
 	dragging = false
+	_active_pointer_id = POINTER_ID_NONE
+	_drag_started_frame = -1
 	
 	# Reset preview card
 	_set_preview_card(null)
@@ -323,21 +408,46 @@ func _end_drag() -> void:
 		_rollback_drag()
 		return
 
-	if _current_preview_slot != null:
-		var to_slot_id := ""
-		if _current_preview_slot.has_method("get_slot_id"):
-			to_slot_id = String(_current_preview_slot.call("get_slot_id"))
-		else:
-			to_slot_id = String(_current_preview_slot.get("slot_id"))
-
-		_send_move_if_valid(to_slot_id)
-	else:
+	if _current_preview_slot == null:
 		_rollback_drag()
+		return
+
+	var to_slot_id := ""
+	if _current_preview_slot.has_method("get_slot_id"):
+		to_slot_id = String(_current_preview_slot.call("get_slot_id"))
+	else:
+		to_slot_id = String(_current_preview_slot.get("slot_id"))
+
+	if not _send_move_if_valid(to_slot_id):
+		_rollback_drag()
+		return
 
 	set_state(CardState.DROP)
 	_set_preview_slot(null)
 
+func _cancel_drag() -> void:
+	if not _is_drag_in_progress():
+		return
+	_drag_canceled_frame = get_tree().get_frame()
+	dragging = false
+	_rollback_drag()
+
+func _try_cancel_drag_on_click(pointer_id: int) -> bool:
+	if not _is_drag_in_progress():
+		return false
+	# Ignore le clic/tap qui vient juste de démarrer le drag.
+	if pointer_id == _active_pointer_id and get_tree().get_frame() == _drag_started_frame:
+		return false
+	_cancel_drag()
+	return true
+
+func _is_mouse_click_button(button_index: int) -> bool:
+	return button_index == MOUSE_BUTTON_LEFT or button_index == MOUSE_BUTTON_RIGHT or button_index == MOUSE_BUTTON_MIDDLE
+
 func _rollback_drag() -> void:
+	dragging = false
+	_active_pointer_id = POINTER_ID_NONE
+	_drag_started_frame = -1
 	_set_preview_card(null)  # ← Reset card preview aussi
 	_leave_drag_layer_to_original()
 	global_position = original_position
@@ -539,10 +649,9 @@ func get_card_id() -> String:
 		return String(get_meta("card_id"))
 	return String(name)
 
-func _send_move_if_valid(to_slot_id: String) -> void:
+func _send_move_if_valid(to_slot_id: String) -> bool:
 	if not _can_interact():
-		_rollback_drag()
-		return
+		return false
 
 	var from_slot_id := ""
 	if slot != null:
@@ -552,13 +661,11 @@ func _send_move_if_valid(to_slot_id: String) -> void:
 			from_slot_id = String(slot.slot_id)
 
 	if from_slot_id == "" or to_slot_id == "":
-		_rollback_drag()
-		return
+		return false
 
 	if from_slot_id == to_slot_id:
 		print("[MOVE] Ignoring same slot drop: %s → %s" % [from_slot_id, to_slot_id])
-		_rollback_drag()
-		return
+		return false
 
 	var card_id := get_card_id()
 	print("[MOVE] Sending move: %s from %s to %s" % [card_id, from_slot_id, to_slot_id])
@@ -568,3 +675,4 @@ func _send_move_if_valid(to_slot_id: String) -> void:
 		"from_slot_id": from_slot_id,
 		"to_slot_id": to_slot_id
 	})
+	return true

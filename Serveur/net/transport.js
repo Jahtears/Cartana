@@ -75,7 +75,7 @@ export function createTransport({ wsByUser, onSend }) {
    * @param {Object} payload - Données ou erreur
    */
   function sendRes(ws, req, ok, payload) {
-    const base = { v: 1, kind: "res", type: req.type, rid: req.rid, ok: !!ok };
+    const base = { kind: "res", type: req.type, rid: req.rid, ok: !!ok };
     if (ok) return safeSend(ws, { ...base, data: payload ?? {} }, onSend);
     const error = normalizeErrorPayload(payload);
     return safeSend(ws, {
@@ -91,7 +91,7 @@ export function createTransport({ wsByUser, onSend }) {
    * @param {Object} data - Données de l'événement
    */
   function sendEvtSocket(ws, type, data) {
-    return safeSend(ws, { v: 1, kind: "evt", type, data: data ?? {} }, onSend);
+    return safeSend(ws, { kind: "evt", type, data: data ?? {} }, onSend);
   }
 
   /**
@@ -126,7 +126,7 @@ export function createTransport({ wsByUser, onSend }) {
 
 /* -------------------------------------------------------
    Error Helpers
-   Conventions: retournent true (pratique: `return resNotFound(...)`)
+   Conventions: retournent true (pratique: `return resError(...)`)
 -------------------------------------------------------- */
 
 /**
@@ -142,32 +142,4 @@ export function resError(sendRes, ws, req, message_code, details) {
   if (details && typeof details === "object") error.details = details;
   sendRes(ws, req, false, error);
   return true;
-}
-
-export function resBadRequest(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_BAD_REQUEST, details) {
-  return resError(sendRes, ws, req, message_code, details);
-}
-
-export function resNotFound(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_NOT_FOUND, details) {
-  return resError(sendRes, ws, req, message_code, details);
-}
-
-export function resForbidden(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_FORBIDDEN, details) {
-  return resError(sendRes, ws, req, message_code, details);
-}
-
-export function resBadState(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_BAD_STATE, details) {
-  return resError(sendRes, ws, req, message_code, details);
-}
-
-export function resGameEnd(sendRes, ws, req, message_code = POPUP_MESSAGE.GAME_ENDED, details) {
-  return resError(sendRes, ws, req, message_code, details);
-}
-
-export function resNotImplemented(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_NOT_IMPLEMENTED, details) {
-  return resError(sendRes, ws, req, message_code, details);
-}
-
-export function resServerError(sendRes, ws, req, message_code = POPUP_MESSAGE.TECH_INTERNAL_ERROR, details) {
-  return resError(sendRes, ws, req, message_code, details);
 }

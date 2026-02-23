@@ -10,8 +10,7 @@ import {
   putBottom,
   removeCardFromSlot,
 } from "./helpers/slotStackHelpers.js";
-import { SLOT_TYPES } from "./constants/slots.js";
-import { parseSlotId } from "./helpers/slotHelpers.js";
+import { SlotId, SLOT_TYPES } from "./constants/slots.js";
 import { debugLog, debugWarn } from "./helpers/debugHelpers.js";
 
 /* =========================
@@ -32,31 +31,28 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
     actor,
   });
 
-  // Minimal slot-id validation to prevent ghost slots.
-  const fromParsed = parseSlotId(fromSlotId);
-  const toParsed = parseSlotId(toSlotId);
-
-  if (!fromParsed || !toParsed) {
+  // Internal engine expects canonical SlotId objects at this stage.
+  if (!(fromSlotId instanceof SlotId) || !(toSlotId instanceof SlotId)) {
     debugWarn("[APPLY] MOVE_DENIED_INVALID_SLOT", {
       from_slot_id: fromSlotId,
       to_slot_id: toSlotId,
       actor,
-      fromParsed: !!fromParsed,
-      toParsed: !!toParsed,
+      fromIsSlotId: fromSlotId instanceof SlotId,
+      toIsSlotId: toSlotId instanceof SlotId,
     });
     return null;
   }
 
   // Ownership guard: player slots must belong to actor.
-  if (fromParsed.playerIndex !== 0) {
+  if (fromSlotId.player !== 0) {
     const actorArrayIndex = game.players.indexOf(actor); // 0 or 1
     const actorPlayerIndex = actorArrayIndex + 1; // 1 or 2
     
-    if (fromParsed.playerIndex !== actorPlayerIndex) {
+    if (fromSlotId.player !== actorPlayerIndex) {
       debugWarn("[APPLY] MOVE_DENIED_NOT_OWNER", {
         actor,
         from_slot_id: fromSlotId,
-        fromPlayerIndex: fromParsed.playerIndex,
+        fromPlayerIndex: fromSlotId.player,
         actorPlayerIndex,
         actorArrayIndex,
       });
@@ -80,20 +76,20 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
   // Convention: bottom = index 0, top = last index.
   // - Table/Bench => push on top
   // - Other slots => push at bottom
-  if (toParsed.type === SLOT_TYPES.TABLE || toParsed.type === SLOT_TYPES.BENCH) {
+  if (toSlotId.type === SLOT_TYPES.TABLE || toSlotId.type === SLOT_TYPES.BENCH) {
     putTop(game, toSlotId, card.id);
   } else {
     putBottom(game, toSlotId, card.id);
   }
 
   // Ensure there is an empty table slot available.
-  if (toParsed.type === SLOT_TYPES.TABLE) {
+  if (toSlotId.type === SLOT_TYPES.TABLE) {
     const ensured = ensureEmptyTableSlot(game);
     createdTableSlotId = ensured.created ? ensured.slotId : null;
   }
 
   // +10s bonus on non TABLE->TABLE moves to TABLE (cap at TURN_MS).
-  if (toParsed.type === SLOT_TYPES.TABLE && fromParsed.type !== SLOT_TYPES.TABLE) {
+  if (toSlotId.type === SLOT_TYPES.TABLE && fromSlotId.type !== SLOT_TYPES.TABLE) {
     if (game.turn && game.turn.current === actor) {
       addBonusToTurnClock(game.turn, 10000, Date.now(), TURN_MS);
     }
