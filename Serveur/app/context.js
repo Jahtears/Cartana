@@ -13,7 +13,8 @@ import { mapSlotFromClientToServer, mapSlotForClient } from "../game/helpers/slo
 import { getTableSlots } from "../game/helpers/tableHelper.js";
 import { applyMove } from "../game/MoveApplier.js";
 import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot, hasLoseByEmptyPileSlot } from "../game/Regles.js";
-import { TURN_FLOW_MESSAGES, initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../game/helpers/turnFlowHelpers.js";
+import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../game/helpers/turnFlowHelpers.js";
+import { INGAME_MESSAGE } from "../game/constants/ingameMessages.js";
 import { saveGameState, loadGameState, deleteGameState } from "../domain/session/Saves.js";
 import { verifyOrCreateUser } from "../handlers/auth/usersStore.js";
 import { createStateManager } from "./stateManager.js";
@@ -164,14 +165,14 @@ export function createServerContext({ onTransportSend } = {}) {
       emitGameMessage(
         sendEvtUser,
         prev,
-        { message_code: TURN_FLOW_MESSAGES.TIMEOUT }
+        { message_code: INGAME_MESSAGE.TURN_TIMEOUT }
       );
     }
     if (next) {
       emitGameMessage(
         sendEvtUser,
         next,
-        { message_code: TURN_FLOW_MESSAGES.TURN_START }
+        { message_code: INGAME_MESSAGE.TURN_START }
       );
     }
 

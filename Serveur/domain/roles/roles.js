@@ -128,7 +128,7 @@ export function createRoles(ctx) {
       pendingInviteTo.delete(username);
       if (inv?.from) inviteFrom.delete(inv.from);
       if (inv?.from) {
-        sendEvtUser(inv.from, "invite_cancelled", { to: username, reason: "offline" });
+        sendEvtUser(inv.from, "invite_cancelled", { name: username, reason: "offline" });
       }
     }
 
@@ -137,7 +137,7 @@ export function createRoles(ctx) {
     if (to) {
       pendingInviteTo.delete(to);
       inviteFrom.delete(username);
-      sendEvtUser(to, "invite_cancelled", { from: username, reason: "offline" });
+      sendEvtUser(to, "invite_cancelled", { name: username, reason: "offline" });
     }
   }
 

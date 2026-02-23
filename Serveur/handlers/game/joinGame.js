@@ -1,6 +1,5 @@
 // handlers/joinGame.js
 import { ensureGameMeta } from "../../game/meta.js";
-import { TURN_FLOW_MESSAGES } from "../../game/helpers/turnFlowHelpers.js";
 import { emitGameMessage } from "../../shared/uiMessage.js";
 import { requireParam, getExistingGameOrRes } from "../../net/guards.js";
 import { resError } from "../../net/transport.js";
@@ -73,7 +72,7 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
 
   if (starter) {
     emitGameMessage(sendEvtUser, starter, {
-      message_code: reason || TURN_FLOW_MESSAGES.START,
+      message_code: reason,
     });
   }
 

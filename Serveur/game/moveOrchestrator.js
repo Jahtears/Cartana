@@ -5,10 +5,7 @@ import { SLOT_TYPES, SlotId } from "./constants/slots.js";
 import { DEFAULT_HAND_SIZE } from "./constants/turnFlow.js";
 import { isTableSlot } from "./helpers/slotHelpers.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
-
-function technicalDenied(debugReason) {
-  return { valid: false, kind: "technical", debug_reason: debugReason };
-}
+import { technicalDenied } from "./helpers/deniedHelpers.js";
 
 /**
  * Orchestrate a complete move: validate -> apply -> refill -> track updates -> check win.

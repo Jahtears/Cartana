@@ -3,7 +3,7 @@
 import crypto from "crypto";
 import { SlotId, SLOT_CONFIG, SLOT_TYPES } from "../constants/slots.js";
 import { DEFAULT_HAND_SIZE } from "../constants/turnFlow.js";
-import { NEVER_DRAGGABLE_SLOT_TYPES } from "../constants/slotView.js";
+import { NEVER_DRAGGABLE_SLOT_TYPES } from "../helpers/slotViewHelpers.js";
 import { shuffle } from "../helpers/cardHelpers.js";
 import { debugLog } from "../helpers/debugHelpers.js";
 import { getSlotType, slotIdToString } from "../helpers/slotHelpers.js";

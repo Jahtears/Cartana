@@ -1,8 +1,19 @@
-import {
-  NEVER_DRAGGABLE_SLOT_TYPES,
-  TOP_ONLY_DRAGGABLE_SLOT_TYPES,
-  TOP_ONLY_VISIBLE_SLOT_TYPES,
-} from "../constants/slotView.js";
+import { SLOT_TYPES } from "../constants/slots.js";
+
+const TOP_ONLY_VISIBLE_SLOT_TYPES = new Set([
+  SLOT_TYPES.PILE,
+  SLOT_TYPES.DECK,
+  SLOT_TYPES.TABLE,
+]);
+
+const NEVER_DRAGGABLE_SLOT_TYPES = new Set([
+  SLOT_TYPES.PILE,
+  SLOT_TYPES.TABLE,
+]);
+
+const TOP_ONLY_DRAGGABLE_SLOT_TYPES = new Set([
+  SLOT_TYPES.BENCH,
+]);
 
 function toSlotStack(slotValue) {
   if (Array.isArray(slotValue)) {
@@ -35,5 +46,8 @@ function applySlotDragPolicy(slotType, stack, cardId, isDraggable) {
 export {
   applySlotDragPolicy,
   getVisibleCardIdsForSlot,
+  NEVER_DRAGGABLE_SLOT_TYPES,
+  TOP_ONLY_DRAGGABLE_SLOT_TYPES,
+  TOP_ONLY_VISIBLE_SLOT_TYPES,
   toSlotStack,
 };

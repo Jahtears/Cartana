@@ -149,9 +149,7 @@ static func normalize_invite_response_ui(data: Dictionary) -> Dictionary:
 	return normalize_popup_message(ui_payload)
 
 static func invite_cancelled_ui(data: Dictionary) -> Dictionary:
-	var name := String(data.get("from", "")).strip_edges()
-	if name == "":
-		name = String(data.get("to", "")).strip_edges()
+	var name := String(data.get("name", "")).strip_edges()
 	if name == "":
 		name = "Utilisateur"
 
@@ -178,17 +176,14 @@ static func invite_action_request(action_id: String, payload: Dictionary) -> Dic
 	return {}
 
 static func game_end_popup_message(data: Dictionary, username: String, is_spectator: bool) -> Dictionary:
-	var server_popup_code := _safe_text(data.get("message_code", ""))
-	var server_params_val = data.get("message_params", {})
-	var server_params: Dictionary = server_params_val if server_params_val is Dictionary else {}
 	var winner := _safe_text(data.get("winner", ""))
-	var reason := _game_end_reason_from_payload(data, server_popup_code)
+	var reason := _safe_text(data.get("reason", "")).to_lower()
+	if reason == "":
+		reason = GAME_END_REASON_ABANDON
 
 	if is_spectator:
-		var spectator_code := server_popup_code if server_popup_code.begins_with(POPUP_PREFIX) else _game_end_code_from_reason(reason)
-		var spectator_params := server_params
-		if spectator_params.is_empty():
-			spectator_params = {"name": winner if winner != "" else "-"}
+		var spectator_code := _game_end_code_from_reason(reason)
+		var spectator_params := {"name": winner if winner != "" else "-"}
 		return {
 			"message_code": spectator_code,
 			"message_params": spectator_params,
@@ -227,21 +222,6 @@ static func _game_end_code_from_reason(reason: String) -> String:
 			return POPUP_GAME_END_PILE_EMPTY
 		_:
 			return POPUP_GAME_ENDED
-
-static func _game_end_reason_from_payload(data: Dictionary, server_popup_code: String) -> String:
-	var explicit_reason := _safe_text(data.get("reason", "")).to_lower()
-	if explicit_reason != "":
-		return explicit_reason
-
-	match server_popup_code:
-		POPUP_GAME_END_ABANDON:
-			return GAME_END_REASON_ABANDON
-		POPUP_GAME_END_DECK_EMPTY:
-			return GAME_END_REASON_DECK_EMPTY
-		POPUP_GAME_END_PILE_EMPTY:
-			return GAME_END_REASON_PILE_EMPTY
-		_:
-			return ""
 
 static func _safe_text(value: Variant) -> String:
 	if value == null:

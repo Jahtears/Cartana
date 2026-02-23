@@ -6,9 +6,8 @@ import { getTableSlots } from "../../game/helpers/tableHelper.js";
 import { getSlotContent, getSlotType, isTableSlot, slotIdToString } from "../../game/helpers/slotHelpers.js";
 import { applySlotDragPolicy, getVisibleCardIdsForSlot, toSlotStack } from "../../game/helpers/slotViewHelpers.js";
 import { getCardById } from "../../game/helpers/cardHelpers.js";
-import { getSlotCount } from "../../game/helpers/slotStackHelpers.js";
+import { getSlotCount } from "../../game/helpers/slotHelpers.js";
 import { buildTurnPayload } from "../../game/helpers/turnPayloadHelpers.js";
-import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 /* =========================
    HELPERS FOR SLOT STATE
@@ -50,21 +49,13 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
   return { slot_id: clientSlot, cards, count };
 }
 
-function gameEndPopupCode(reason) {
-  const raw = String(reason ?? "").trim().toLowerCase();
-  if (raw === GAME_END_REASONS.ABANDON) return POPUP_MESSAGE.GAME_END_ABANDON;
-  if (raw === GAME_END_REASONS.DECK_EMPTY) return POPUP_MESSAGE.GAME_END_DECK_EMPTY;
-  if (raw === GAME_END_REASONS.PILE_EMPTY) return POPUP_MESSAGE.GAME_END_PILE_EMPTY;
-  return POPUP_MESSAGE.GAME_ENDED;
-}
-
 function publicGameEndResult(result) {
   if (!result || typeof result !== "object") {
     return {
       winner: null,
       reason: GAME_END_REASONS.ABANDON,
-      message_code: POPUP_MESSAGE.GAME_END_ABANDON,
-      message_params: { name: "-" },
+      by: "",
+      at: 0,
     };
   }
 
@@ -72,13 +63,20 @@ function publicGameEndResult(result) {
     typeof result.winner === "string" && result.winner.trim()
       ? result.winner
       : null;
-  const reason = String(result.reason ?? "").trim().toLowerCase() || GAME_END_REASONS.ABANDON;
+  const rawReason = String(result.reason ?? "").trim().toLowerCase();
+  const reason = rawReason === GAME_END_REASONS.ABANDON
+    || rawReason === GAME_END_REASONS.DECK_EMPTY
+    || rawReason === GAME_END_REASONS.PILE_EMPTY
+    ? rawReason
+    : GAME_END_REASONS.ABANDON;
+  const by = typeof result.by === "string" ? result.by : "";
+  const at = typeof result.at === "number" && Number.isFinite(result.at) ? result.at : 0;
 
   return {
     winner,
     reason,
-    message_code: gameEndPopupCode(reason),
-    message_params: { name: winner || "-" },
+    by,
+    at,
   };
 }
 
@@ -118,7 +116,7 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
     slots, // { "1:HAND:1":[...], "0:PILE:1":[...], ... }
     slot_counts, // { "1:HAND:1": 5, "1:DECK:1": 26, ... }
     turn, // { current, turnNumber } | null
-    result, // { winner } | null
+    result, // { winner, reason, by, at } | null
   };
 }
 

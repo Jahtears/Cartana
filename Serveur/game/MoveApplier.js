@@ -9,7 +9,7 @@ import {
   putTop,
   putBottom,
   removeCardFromSlot,
-} from "./helpers/slotStackHelpers.js";
+} from "./helpers/slotHelpers.js";
 import { SlotId, SLOT_TYPES } from "./constants/slots.js";
 import { debugLog, debugWarn } from "./helpers/debugHelpers.js";
 

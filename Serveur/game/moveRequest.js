@@ -7,6 +7,7 @@ import { ensureGameMeta } from "./meta.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
 import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 import { POPUP_MESSAGE } from "../shared/popupMessages.js";
+import { deniedTracePayload, technicalDenied } from "./helpers/deniedHelpers.js";
 
 function safeObject(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -47,19 +48,6 @@ function buildMoveClientErrorPayload({ moveError, cardId, fromSlotId }) {
   if (Object.keys(details).length > 0) payload.details = details;
 
   return payload;
-}
-
-function deniedTracePayload(moveError) {
-  const kind = String(moveError?.kind ?? "").trim();
-  if (kind === "user") {
-    return {
-      reason_code: String(moveError?.code ?? ""),
-    };
-  }
-
-  return {
-    reason_debug: String(moveError?.debug_reason ?? "unknown"),
-  };
 }
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
@@ -110,11 +98,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   });
 
   if (!from_slot_id || !to_slot_id) {
-    const moveError = {
-      valid: false,
-      kind: "technical",
-      debug_reason: "invalid_client_slot",
-    };
+    const moveError = technicalDenied("invalid_client_slot");
     const errorPayload = buildMoveClientErrorPayload({
       moveError,
       cardId: card_id,
