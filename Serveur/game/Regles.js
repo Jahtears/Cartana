@@ -3,28 +3,10 @@ import { SlotId, SLOT_TYPES } from "./constants/slots.js";
 import { refillHandIfEmpty } from "./helpers/pileFlowHelpers.js";
 import { slotTopHasAce, slotAnyHasAce } from "./helpers/cardHelpers.js";
 import { hasCardInSlot, isBenchSlot, isDeckSlot, getSlotContent, getPlayerFromSlotId, isTableSlot } from "./helpers/slotHelpers.js";
-import {  getSlotValidator } from "./slotValidators.js";
+import { getSlotValidator } from "./slotValidators.js";
 import { debugLog } from "./helpers/debugHelpers.js";
+import { deniedTracePayload, technicalDenied, userDenied } from "./helpers/deniedHelpers.js";
 import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
-
-function userDenied(code, params = null) {
-  const denied = { valid: false, kind: "user", code };
-  if (params && typeof params === "object" && !Array.isArray(params) && Object.keys(params).length > 0) {
-    denied.params = params;
-  }
-  return denied;
-}
-
-function technicalDenied(debugReason) {
-  return { valid: false, kind: "technical", debug_reason: debugReason };
-}
-
-function deniedTracePayload(result) {
-  if (String(result?.kind) === "user") {
-    return { kind: "user", code: String(result?.code ?? "") };
-  }
-  return { kind: "technical", reason_debug: String(result?.debug_reason ?? "") };
-}
 
 function hasWonByEmptyDeckSlot(game, player) {
   if (!player || !game) return false;

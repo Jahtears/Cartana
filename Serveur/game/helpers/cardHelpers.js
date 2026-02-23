@@ -1,8 +1,25 @@
 // helpers/cardHelpers.js - Card helper utilities
 
-import { ACE_VALUES, TURN_VALUE_RANK } from "../constants/cards.js";
 import { DEFAULT_HAND_SIZE } from "../constants/turnFlow.js";
-import { getSlotStack } from "./slotStackHelpers.js";
+import { getSlotStack } from "./slotHelpers.js";
+
+const TURN_VALUE_RANK = {
+  "A": 13,
+  "R": 12,
+  "D": 11,
+  "V": 10,
+  "10": 9,
+  "9": 8,
+  "8": 7,
+  "7": 6,
+  "6": 5,
+  "5": 4,
+  "4": 3,
+  "3": 2,
+  "2": 1,
+};
+
+const ACE_VALUES = new Set(["A", "1"]);
 
 function getCardById(game, id) {
   if (!game || !id) return null;

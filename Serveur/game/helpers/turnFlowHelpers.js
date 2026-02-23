@@ -22,19 +22,13 @@ import {
   getSlotStack,
   putTop,
   removeCardFromSlot,
-} from "./slotStackHelpers.js";
+} from "./slotHelpers.js";
 import {
   recycleFullTableSlotsToPile,
   refillEmptyHandSlotsFromPile,
 } from "./pileFlowHelpers.js";
 import { debugLog } from "./debugHelpers.js";
 import { INGAME_MESSAGE } from "../constants/ingameMessages.js";
-
-const TURN_FLOW_MESSAGES = {
-  START: INGAME_MESSAGE.TURN_START_FIRST,
-  TIMEOUT: INGAME_MESSAGE.TURN_TIMEOUT,
-  TURN_START: INGAME_MESSAGE.TURN_START,
-};
 
 function initTurnForGame(game) {
   const p1 = game.players[0];
@@ -71,7 +65,7 @@ function initTurnForGame(game) {
     p2_top: top2 ? top2.value : null,
   });
 
-  return { starter, reason: TURN_FLOW_MESSAGES.START };
+  return { starter, reason: INGAME_MESSAGE.TURN_START_FIRST };
 }
 
 function endTurnAfterBenchPlay(game, actor) {
@@ -160,6 +154,5 @@ function tryExpireTurn(game, now = Date.now()) {
 export {
   endTurnAfterBenchPlay,
   initTurnForGame,
-  TURN_FLOW_MESSAGES,
   tryExpireTurn,
 };

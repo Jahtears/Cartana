@@ -13,8 +13,8 @@ import {
   getSlotStack,
   putBottom,
   putTop,
-} from "./slotStackHelpers.js";
-import { getHandSize } from "./slotHelpers.js";
+  getHandSize,
+} from "./slotHelpers.js";
 import { debugLog } from "./debugHelpers.js";
 
 function refillEmptyHandSlotsFromPile(game, player, maxCards = DEFAULT_HAND_SIZE) {

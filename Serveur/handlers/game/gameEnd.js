@@ -91,6 +91,60 @@ function endGame(ctx, game_id, result, { exclude = [] } = {}) {
   return res;
 }
 
+function resolveAckGameId(ctx, ws, req, data, actor) {
+  return (
+    getGameIdFromDataOrMapping(ctx, ws, req, data, actor, {
+      required: false,
+      preferMapping: true,
+      allowedKeys: ["game_id"],
+    }) ?? ""
+  );
+}
+
+function getAckMembership(state, game_id, actor) {
+  const { gameSpectators, userToGame, userToSpectate } = state;
+  const wasPlayer = !!(game_id && userToGame.get(actor) === game_id);
+  const wasSpec = !!(
+    game_id &&
+    (userToSpectate.get(actor) === game_id || (gameSpectators.get(game_id)?.has(actor) ?? false))
+  );
+  return { wasPlayer, wasSpec };
+}
+
+function sendAckResponse(refreshLobby, sendRes, ws, req, payload) {
+  refreshLobby();
+  sendRes(ws, req, true, payload);
+  return true;
+}
+
+function handleAlreadyGoneAck(games, gameMeta, game_id) {
+  if (game_id && games.has(game_id)) return false;
+  if (gameMeta.has(game_id)) {
+    const meta = gameMeta.get(game_id);
+    clearCleanupTimer(meta);
+    gameMeta.delete(game_id);
+  }
+  return true;
+}
+
+function maybeEndByAckAsAbandon(ctx, game_id, game, actor, wasPlayer, meta) {
+  if (!wasPlayer || meta.result) return;
+  const winner = game.players.find((p) => p !== actor) ?? null;
+  endGame(
+    ctx,
+    game_id,
+    { winner, reason: GAME_END_REASONS.ABANDON, by: actor, at: Date.now() },
+    { exclude: [actor] }
+  );
+}
+
+function recordAckAndSchedule(ctx, meta, game_id, actor) {
+  meta.acks.add(actor);
+  meta.lastAckAt = Date.now();
+  if (meta.result && !meta.endedAt) meta.endedAt = Date.now();
+  if (meta.result && !meta.cleanupTimer) scheduleCleanup(ctx, game_id, "ack");
+}
+
 export function handleLeaveGame(ctx, ws, req, data, actor) {
   const {
     setUserActivity,
@@ -140,76 +194,51 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
     sendRes,
     refreshLobby,
   } = ctx;
-  const { games, gameMeta, gameSpectators, userToGame, userToSpectate } = state;
-
-  const game_id =
-    getGameIdFromDataOrMapping(ctx, ws, req, data, actor, {
-      required: false,
-      preferMapping: true,
-      allowedKeys: ["game_id"],
-  }) ?? "";
+  const { games, gameMeta } = state;
+  const game_id = resolveAckGameId(ctx, ws, req, data, actor);
 
   // idempotent: sans game_id -> OK
   if (!game_id) {
-    refreshLobby();
-    sendRes(ws, req, true, { ack: true, game_id: "", alreadyGone: true });
-    return true;
+    return sendAckResponse(refreshLobby, sendRes, ws, req, {
+      ack: true,
+      game_id: "",
+      alreadyGone: true,
+    });
   }
 
-
   // déterminer l’appartenance AVANT detach
-  const wasPlayer = !!(game_id && userToGame.get(actor) === game_id);
-  const wasSpec = !!(
-    game_id &&
-    (userToSpectate.get(actor) === game_id || (gameSpectators.get(game_id)?.has(actor) ?? false))
-  );
+  const { wasPlayer, wasSpec } = getAckMembership(state, game_id, actor);
 
   // ✅ detach idempotent (joueur + spectateur)
   setUserActivity(actor, Activity.LOBBY, null);
 
   // ✅ ACK idempotent : si game inexistante => OK
-  if (!game_id || !games.has(game_id)) {
-    if (gameMeta.has(game_id)) {
-      const meta = gameMeta.get(game_id);
-      clearCleanupTimer(meta);
-      gameMeta.delete(game_id);
-    }
-    refreshLobby();
-    sendRes(ws, req, true, { ack: true, game_id, alreadyGone: true });
-    return true;
+  if (handleAlreadyGoneAck(games, gameMeta, game_id)) {
+    return sendAckResponse(refreshLobby, sendRes, ws, req, {
+      ack: true,
+      game_id,
+      alreadyGone: true,
+    });
   }
 
   const game = games.get(game_id);
 
   // si pas concerné: OK mais pas de cleanup
   if (!wasPlayer && !wasSpec) {
-    refreshLobby();
-    sendRes(ws, req, true, { ack: true, game_id, ignored: true });
-    return true;
+    return sendAckResponse(refreshLobby, sendRes, ws, req, {
+      ack: true,
+      game_id,
+      ignored: true,
+    });
   }
 
   const meta = ensureGameEndMeta(gameMeta, game_id, { initialSent: true });
 
   // ✅ si un joueur ACK alors que la partie n'est pas finie => traiter comme abandon
-  if (wasPlayer && !meta.result) {
-    const winner = game.players.find((p) => p !== actor) ?? null;
-    endGame(
-      ctx,
-      game_id,
-      { winner, reason: GAME_END_REASONS.ABANDON, by: actor, at: Date.now() },
-      { exclude: [actor] }
-    );
-  }
-
-  meta.acks.add(actor);
-  meta.lastAckAt = Date.now();
-  if (meta.result && !meta.endedAt) meta.endedAt = Date.now();
-
-  if (meta.result && !meta.cleanupTimer) scheduleCleanup(ctx, game_id, "ack");
+  maybeEndByAckAsAbandon(ctx, game_id, game, actor, wasPlayer, meta);
+  recordAckAndSchedule(ctx, meta, game_id, actor);
 
   cleanupIfOrphaned(ctx, game_id, { reason: "ack" });
 
-  refreshLobby();
-  sendRes(ws, req, true, { ack: true, game_id });
-  return true;
+  return sendAckResponse(refreshLobby, sendRes, ws, req, { ack: true, game_id });
 }
