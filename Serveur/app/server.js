@@ -2,6 +2,8 @@
 
 import { WebSocketServer } from "ws";
 import http from "http";
+import https from "https";
+import fs from "fs";
 
 // ============= IMPORTS HANDLERS =============
 import { handleLogin } from '../handlers/auth/login.js';
@@ -22,6 +24,14 @@ import { stopHeartbeatManager } from '../net/heartbeat.js';
 import { metrics, createMetricsMiddleware } from '../net/monitoring.js';
 
 const DEBUG_TRACE_ENABLED = process.env.DEBUG_TRACE === "1";
+const SERVER_MODE = String(process.env.SERVER_MODE ?? "tls_direct").trim().toLowerCase();
+const BACKEND_HTTP_MODE = SERVER_MODE === "backend_http";
+const TLS_CERT_PATH = String(process.env.TLS_CERT_PATH ?? "").trim();
+const TLS_KEY_PATH = String(process.env.TLS_KEY_PATH ?? "").trim();
+
+if (!BACKEND_HTTP_MODE && (TLS_CERT_PATH === "" || TLS_KEY_PATH === "")) {
+  throw new Error("TLS required: set both TLS_CERT_PATH and TLS_KEY_PATH");
+}
 
 // ============= INITIALISATION =============
 
@@ -30,8 +40,7 @@ const { baseCtx, loginCtx, onSocketClose } = createServerContext({
   onTransportSend: () => metrics.recordMessageSent(),
 });
 
-// 2️⃣ Créer le HTTP server (pour metrics + WebSocket)
-const httpServer = http.createServer((req, res) => {
+function requestHandler(req, res) {
   // Health check + Metrics endpoint
   if (req.method === 'GET' && req.url === '/metrics') {
     const snapshot = metrics.getSnapshot();
@@ -50,10 +59,29 @@ const httpServer = http.createServer((req, res) => {
   // 404 pour tout le reste
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not found' }));
-});
+}
 
-// 3️⃣ Créer le websocket server attaché au HTTP server
-const wss = new WebSocketServer({ server: httpServer });
+// 2️⃣ Créer le serveur de transport (HTTP local backend, ou HTTPS direct)
+let transportServer;
+if (BACKEND_HTTP_MODE) {
+  transportServer = http.createServer(requestHandler);
+} else {
+  try {
+    transportServer = https.createServer(
+      {
+        cert: fs.readFileSync(TLS_CERT_PATH),
+        key: fs.readFileSync(TLS_KEY_PATH),
+      },
+      requestHandler
+    );
+  } catch (err) {
+    console.error("[TLS_CONFIG_ERROR]", err?.message ?? String(err));
+    process.exit(1);
+  }
+}
+
+// 3️⃣ Créer le websocket server attaché au server de transport
+const wss = new WebSocketServer({ server: transportServer });
 
 // 4️⃣ Créer le wsManager
 const wsManager = createWSManager({ wss, trace: console.log });
@@ -139,7 +167,7 @@ process.on('SIGINT', () => {
   stopHeartbeatManager(heartbeatTimer);
   clearInterval(turnExpiryTimer);
   wss.close(() => {
-    httpServer.close(() => {
+    transportServer.close(() => {
       console.log('Server closed');
       process.exit(0);
     });
@@ -147,13 +175,23 @@ process.on('SIGINT', () => {
 });
 
 // ============= DÉMARRAGE =============
-const PORT = process.env.WSS_PORT || 3000;
-const HOST = "0.0.0.0";
+const PORT = BACKEND_HTTP_MODE
+  ? Number(process.env.BACKEND_PORT ?? 3001)
+  : Number(process.env.WSS_PORT ?? 3000);
+const HOST = BACKEND_HTTP_MODE ? "127.0.0.1" : "0.0.0.0";
 
-httpServer.listen(PORT, HOST, () => {
-  console.log(`🚀 Server listening on http://${HOST}:${PORT}`);
-  console.log(`📊 Metrics available at http://${HOST}:${PORT}/metrics`);
-  console.log(`❤️ Health check at http://${HOST}:${PORT}/health`);
+transportServer.listen(PORT, HOST, () => {
+  if (BACKEND_HTTP_MODE) {
+    console.log(`🚀 Backend listening on http://${HOST}:${PORT}`);
+    console.log(`🔌 Internal WebSocket endpoint ws://${HOST}:${PORT}`);
+    console.log(`📊 Internal metrics at http://${HOST}:${PORT}/metrics`);
+    console.log(`❤️ Internal health at http://${HOST}:${PORT}/health`);
+  } else {
+    console.log(`🚀 Server listening on https://${HOST}:${PORT}`);
+    console.log(`🔌 WebSocket endpoint wss://${HOST}:${PORT}`);
+    console.log(`📊 Metrics available at https://${HOST}:${PORT}/metrics`);
+    console.log(`❤️ Health check at https://${HOST}:${PORT}/health`);
+  }
   if (DEBUG_TRACE_ENABLED || process.env.GAME_DEBUG === "1") {
     console.log(`🧪 Debug flags: DEBUG_TRACE=${DEBUG_TRACE_ENABLED ? "1" : "0"} GAME_DEBUG=${process.env.GAME_DEBUG === "1" || DEBUG_TRACE_ENABLED ? "1" : "0"}`);
   }

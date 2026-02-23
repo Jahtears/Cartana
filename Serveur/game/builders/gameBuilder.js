@@ -1,4 +1,4 @@
-// builders/gameBuilder.js - Game and deck builders
+// builders/gameBuilder.js - Game and source builders
 
 import crypto from "crypto";
 import { SlotId, SLOT_CONFIG, SLOT_TYPES } from "../constants/slots.js";
@@ -6,16 +6,16 @@ import { DEFAULT_HAND_SIZE } from "../constants/turnFlow.js";
 import { NEVER_DRAGGABLE_SLOT_TYPES } from "../constants/slotView.js";
 import { shuffle } from "../helpers/cardHelpers.js";
 import { debugLog } from "../helpers/debugHelpers.js";
-import { parseSlotId, slotIdToString } from "../helpers/slotHelpers.js";
+import { getSlotType, slotIdToString } from "../helpers/slotHelpers.js";
 
 const CARD_VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "V", "D", "R"];
-const CARD_COLORS = ["coeur", "carreau", "pique", "trefle"];
+const CARD_COLORS = ["H", "C", "P", "S"];
 
 const INITIAL_DISTRIBUTION = {
-  HAND: { player: null, source: "deckA", count: (cfg) => cfg.handSize },
-  DECK: { player: null, source: "deckB", count: (cfg) => cfg.personalDeckSize },
+  HAND: { player: null, source: "sourceA", count: (cfg) => cfg.handSize },
+  DECK: { player: null, source: "sourceB", count: (cfg) => cfg.personalDeckSize },
   BENCH: { player: null, source: null, count: () => 0 },
-  PILE: { player: 0, source: "deckA", count: "ALL" },
+  PILE: { player: 0, source: "sourceA", count: "ALL" },
   TABLE: { player: 0, source: null, count: () => 0 },
 };
 
@@ -39,33 +39,33 @@ function createEmptySlots() {
   return slots;
 }
 
-function createCard(value, color, deckSource) {
+function createCard(value, color, source) {
   return {
     id: crypto.randomUUID(),
     value,
     color,
-    deckSource,
+    source,
   };
 }
 
-function generateCards(deckSource, copies = 1) {
-  const deck = [];
+function generateCards(source, copies = 1) {
+  const cards = [];
   for (let d = 0; d < copies; d++) {
     for (const value of CARD_VALUES) {
       for (const color of CARD_COLORS) {
-        deck.push(createCard(value, color, deckSource));
+        cards.push(createCard(value, color, source));
       }
     }
   }
-  return deck;
+  return cards;
 }
 
-function createShuffledDecks() {
-  const deckA = generateCards("A");
-  const deckB = generateCards("B");
-  shuffle(deckA);
-  shuffle(deckB);
-  return { deckA, deckB };
+function createShuffledSources() {
+  const sourceA  = generateCards("A");
+  const sourceB  = generateCards("B");
+  shuffle(sourceA);
+  shuffle(sourceB);
+  return { sourceA , sourceB };
 }
 
 function resolveRuleCardCount(rule, ctx) {
@@ -81,9 +81,9 @@ function takeCardsForRule(rule, ctx) {
   return source.splice(0, cardCount);
 }
 
-function distributeInitialSlots(slots, deckA, deckB, config = {}) {
+function distributeInitialSlots(slots, sourceA, sourceB, config = {}) {
   const { handSize = DEFAULT_HAND_SIZE, personalDeckSize = 26 } = config;
-  const ctx = { deckA, deckB, handSize, personalDeckSize };
+  const ctx = { sourceA, sourceB, handSize, personalDeckSize };
 
   const allCards = [];
 
@@ -148,10 +148,10 @@ function createGame(player1, player2) {
   game.slots = createEmptySlots();
 
   // 3) Generate and shuffle physical decks.
-  const { deckA, deckB } = createShuffledDecks();
+  const { sourceA, sourceB } = createShuffledSources();
 
   // 4) Deal cards into existing slots.
-  const { allCards } = distributeInitialSlots(game.slots, deckA, deckB, {
+  const { allCards } = distributeInitialSlots(game.slots, sourceA, sourceB, {
     handSize: DEFAULT_HAND_SIZE,
     personalDeckSize: 26,
   });
@@ -165,8 +165,7 @@ function createGame(player1, player2) {
 
 function buildCardData(card, slotId, isOwner, disableDrag = false) {
   const normalizedSlotId = slotIdToString(slotId);
-  const parsed = parseSlotId(normalizedSlotId);
-  const slotType = parsed?.type ?? null;
+  const slotType = getSlotType(slotId);
 
   const isFaceDown = slotType === SLOT_TYPES.PILE
     || (slotType === SLOT_TYPES.HAND && !isOwner);
@@ -184,7 +183,7 @@ function buildCardData(card, slotId, isOwner, disableDrag = false) {
     valeur: isFaceDown ? "" : card.value,
     couleur: isFaceDown ? "" : card.color,
     dos: isFaceDown,
-    decksColor: card.deckSource,
+    decksColor: card.source,
     draggable,
     slot_id: normalizedSlotId,
   };

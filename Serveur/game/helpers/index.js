@@ -9,6 +9,7 @@ export {
   shuffle,
 } from "./cardHelpers.js";
 export {
+  getSlotType,
   getHandSize,
   hasCardInSlot,
   isSlotIdPresent,

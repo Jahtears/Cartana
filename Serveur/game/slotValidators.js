@@ -1,7 +1,7 @@
 // game/slotValidators.js - Slot-specific validators extracted from Regles.js
 
 import { SLOT_TYPES } from "./constants/slots.js";
-import { getSlotContent, isSlotIdPresent, parseSlotId } from "./helpers/slotHelpers.js";
+import { getSlotContent, getSlotType, isSlotIdPresent } from "./helpers/slotHelpers.js";
 import { debugLog } from "./helpers/debugHelpers.js";
 import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
 
@@ -100,8 +100,8 @@ export function validateDrawPileSlot(game, card, fromSlotId, toSlotId) {
 }
 
 function normalizeSlotType(slotType) {
-  const parsed = parseSlotId(slotType);
-  if (parsed) return parsed.type;
+  const resolvedType = getSlotType(slotType);
+  if (resolvedType) return resolvedType;
 
   if (typeof slotType === "string") {
     return slotType;

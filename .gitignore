@@ -59,6 +59,18 @@ Thumbs.db
 ############################
 
 .old/
+# Caddy (garder hors repo les materiaux sensibles)
+.caddy/
+/certs/
+*.key
+*.pem
+*.p12
+*.pfx
+/scripts
+# Cote client: n'autoriser que le certificat racine public
+Client/certs/*
+!Client/certs/
+!Client/certs/caddy-root.crt
 *.tmp
 *.temp
 *.bak

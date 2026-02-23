@@ -46,6 +46,15 @@ function parseSlotId(slotId) {
   };
 }
 
+function getSlotType(slotId) {
+  if (slotId instanceof SlotId) {
+    if (!isValidSlotShape(slotId.player, slotId.type, slotId.index)) return null;
+    return slotId.type;
+  }
+
+  return parseSlotId(slotId)?.type ?? null;
+}
+
 function getSlotContent(game, slotId) {
   if (!game?.slots) return [];
 
@@ -74,23 +83,23 @@ function getPlayerFromSlotId(slotId) {
 }
 
 function isTableSlot(slotId) {
-  return parseSlotId(slotId)?.type === SLOT_TYPES.TABLE;
+  return getSlotType(slotId) === SLOT_TYPES.TABLE;
 }
 
 function isPileSlot(slotId) {
-  return parseSlotId(slotId)?.type === SLOT_TYPES.PILE;
+  return getSlotType(slotId) === SLOT_TYPES.PILE;
 }
 
 function isBenchSlot(slotId) {
-  return parseSlotId(slotId)?.type === SLOT_TYPES.BENCH;
+  return getSlotType(slotId) === SLOT_TYPES.BENCH;
 }
 
 function isDeckSlot(slotId) {
-  return parseSlotId(slotId)?.type === SLOT_TYPES.DECK;
+  return getSlotType(slotId) === SLOT_TYPES.DECK;
 }
 
 function isHandSlot(slotId) {
-  return parseSlotId(slotId)?.type === SLOT_TYPES.HAND;
+  return getSlotType(slotId) === SLOT_TYPES.HAND;
 }
 
 function getHandSize(game, playerIndex) {
@@ -179,6 +188,7 @@ function slotIdToString(slotId) {
 }
 
 export {
+  getSlotType,
   getHandSize,
   hasCardInSlot,
   getSlotContent,

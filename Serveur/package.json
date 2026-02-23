@@ -4,8 +4,11 @@
   "type": "module",
   "main": "app/server.js",
   "scripts": {
-    "start": "node app/server.js",
-    "start:trace": "node -e \"process.env.DEBUG_TRACE='1'; import('./app/server.js')\"",
+    "start": "npm run start:backend",
+    "start:backend": "node -e \"process.env.SERVER_MODE='backend_http'; process.env.BACKEND_PORT=process.env.BACKEND_PORT||'3001'; import('./app/server.js')\"",
+    "start:http": "npm run start:backend",
+    "start:https": "node -e \"process.env.SERVER_MODE='tls_direct'; process.env.TLS_CERT_PATH=process.env.TLS_CERT_PATH||'../certs/cartana.pem'; process.env.TLS_KEY_PATH=process.env.TLS_KEY_PATH||'../certs/cartana-key.pem'; import('./app/server.js')\"",
+    "start:trace": "node -e \"process.env.SERVER_MODE='backend_http'; process.env.BACKEND_PORT=process.env.BACKEND_PORT||'3001'; process.env.DEBUG_TRACE='1'; import('./app/server.js')\"",
     "test": "jest"
   },
   "dependencies": {
@@ -14,8 +17,8 @@
   },
   "devDependencies": {
     "@babel/preset-env": "^7.29.0",
+    "@jest/globals": "^30.2.0",
     "babel-jest": "^30.2.0",
     "jest": "^30.2.0"
   }
-  
 }

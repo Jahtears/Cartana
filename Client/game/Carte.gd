@@ -43,6 +43,8 @@ var _drag_original_z := 0
 var _pointer_global_pos := Vector2.ZERO
 var _pointer_valid := false
 var _active_pointer_id := POINTER_ID_NONE
+var _drag_started_frame := -1
+var _drag_canceled_frame := -1
 
 # ============= PREVIEW & SLOT =============
 var _current_preview_slot: Node2D = null
@@ -173,6 +175,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		_update_pointer_from_viewport(mb.position)
+		if mb.pressed and _is_mouse_click_button(mb.button_index) and _try_cancel_drag_on_click(POINTER_ID_MOUSE):
+			return
 		if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
 			if _active_pointer_id == POINTER_ID_MOUSE and _is_drag_in_progress():
 				_end_drag()
@@ -187,6 +191,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
 		_update_pointer_from_viewport(st.position)
+		if st.pressed and _try_cancel_drag_on_click(st.index):
+			return
 		if not st.pressed and st.index == _active_pointer_id and _is_drag_in_progress():
 			_end_drag()
 
@@ -274,13 +280,13 @@ func update_card() -> void:
 	_show_front()
 
 	var symboles := {
-		"coeur": "♥",
-		"carreau": "♦",
-		"pique": "♠",
-		"trefle": "♣"
+		"H": "♥",
+		"C": "♦",
+		"P": "♠",
+		"S": "♣"
 	}
 
-	var texte_couleur := Color.RED if (couleur == "coeur" or couleur == "carreau") else Color.BLACK
+	var texte_couleur := Color.RED if (couleur == "H" or couleur == "C") else Color.BLACK
 
 	$Front/Top/ValeurT.text = valeur
 	$Front/Top/ValeurT.modulate = texte_couleur
@@ -346,6 +352,8 @@ func _on_area_2d_input_event(_viewport: Node, event: InputEvent, _shape_idx: int
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		_update_pointer_from_viewport(mb.position)
+		if mb.pressed and _is_mouse_click_button(mb.button_index) and _try_cancel_drag_on_click(POINTER_ID_MOUSE):
+			return
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
 			_try_start_drag(POINTER_ID_MOUSE)
 		return
@@ -353,10 +361,14 @@ func _on_area_2d_input_event(_viewport: Node, event: InputEvent, _shape_idx: int
 	if event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
 		_update_pointer_from_viewport(st.position)
+		if st.pressed and _try_cancel_drag_on_click(st.index):
+			return
 		if st.pressed:
 			_try_start_drag(st.index)
 
 func _try_start_drag(pointer_id: int) -> void:
+	if get_tree().get_frame() == _drag_canceled_frame:
+		return
 	if not _is_topmost_card_at_mouse():
 		return
 	if not _can_drag():
@@ -367,6 +379,7 @@ func _try_start_drag(pointer_id: int) -> void:
 func _start_drag(mouse_pos: Vector2, pointer_id: int = POINTER_ID_MOUSE) -> void:
 	dragging = true
 	_active_pointer_id = pointer_id
+	_drag_started_frame = get_tree().get_frame()
 	_update_pointer_global(mouse_pos)
 	drag_offset = mouse_pos - global_position
 	original_position = global_position
@@ -383,6 +396,7 @@ func _end_drag() -> void:
 
 	dragging = false
 	_active_pointer_id = POINTER_ID_NONE
+	_drag_started_frame = -1
 	
 	# Reset preview card
 	_set_preview_card(null)
@@ -411,8 +425,29 @@ func _end_drag() -> void:
 	set_state(CardState.DROP)
 	_set_preview_slot(null)
 
+func _cancel_drag() -> void:
+	if not _is_drag_in_progress():
+		return
+	_drag_canceled_frame = get_tree().get_frame()
+	dragging = false
+	_rollback_drag()
+
+func _try_cancel_drag_on_click(pointer_id: int) -> bool:
+	if not _is_drag_in_progress():
+		return false
+	# Ignore le clic/tap qui vient juste de démarrer le drag.
+	if pointer_id == _active_pointer_id and get_tree().get_frame() == _drag_started_frame:
+		return false
+	_cancel_drag()
+	return true
+
+func _is_mouse_click_button(button_index: int) -> bool:
+	return button_index == MOUSE_BUTTON_LEFT or button_index == MOUSE_BUTTON_RIGHT or button_index == MOUSE_BUTTON_MIDDLE
+
 func _rollback_drag() -> void:
+	dragging = false
 	_active_pointer_id = POINTER_ID_NONE
+	_drag_started_frame = -1
 	_set_preview_card(null)  # ← Reset card preview aussi
 	_leave_drag_layer_to_original()
 	global_position = original_position

@@ -60,10 +60,10 @@ function findAceCardInHand(game, handSlotId, handSize = DEFAULT_HAND_SIZE) {
   return null;
 }
 
-function shuffle(deck) {
-  for (let i = deck.length - 1; i > 0; i--) {
+function shuffle(cards) {
+  for (let i = cards.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
+    [cards[i], cards[j]] = [cards[j], cards[i]];
   }
 }
 
