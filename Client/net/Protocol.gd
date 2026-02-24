@@ -169,10 +169,21 @@ static func invite_action_request(action_id: String, payload: Dictionary) -> Dic
 	if from_user == "":
 		return {}
 
+	var req := {}
+	req["to"] = from_user
+	var context := String(payload.get("context", "")).strip_edges()
+	var source_game_id := String(payload.get("source_game_id", "")).strip_edges()
+	if context != "":
+		req["context"] = context
+	if source_game_id != "":
+		req["source_game_id"] = source_game_id
+
 	if action_id == String(POPUP_ACTION["CONFIRM_YES"]):
-		return {"to": from_user, "accepted": true}
+		req["accepted"] = true
+		return req
 	if action_id == String(POPUP_ACTION["CONFIRM_NO"]):
-		return {"to": from_user, "accepted": false}
+		req["accepted"] = false
+		return req
 	return {}
 
 static func game_end_popup_message(data: Dictionary, username: String, is_spectator: bool) -> Dictionary:

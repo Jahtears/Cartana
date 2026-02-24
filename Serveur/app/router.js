@@ -4,9 +4,12 @@ import { POPUP_MESSAGE } from "../shared/popupMessages.js";
 const DEV_TRACE = process.env.DEBUG_TRACE === "1";
 const RID_CACHE_LIMIT = 200;
 
-function withTrace(baseCtx, req) {
+function withTrace(baseCtx, req, actor = null) {
   if (!DEV_TRACE) return baseCtx;
-  const traceId = `${req.type}#${req.rid}`;
+  const actorTag = typeof actor === "string" && actor.trim()
+    ? `@${actor.trim()}`
+    : "";
+  const traceId = `${req.type}#${req.rid}${actorTag}`;
   const ctx = Object.create(baseCtx);
   ctx.traceId = traceId;
   ctx.trace = (...args) => console.log("[TRACE]", traceId, ...args);
@@ -147,7 +150,7 @@ export function createRouter({
       const actor = requireAuth(ws, req, { state, sendRes: sendResWithRidCache });
       if (!actor) return;
 
-      const ctx = withTrace(baseCtx, req);
+      const ctx = withTrace(baseCtx, req, actor);
       ctx.sendRes = sendResWithRidCache;
 
       // ✅ Routes mapping (handlers externes)

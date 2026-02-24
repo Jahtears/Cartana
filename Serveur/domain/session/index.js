@@ -80,6 +80,28 @@ function publicGameEndResult(result) {
   };
 }
 
+function resolvePlayerOpponent(game, username) {
+  if (!game || !Array.isArray(game.players)) return "";
+  const players = game.players.filter((p) => typeof p === "string" && p.trim());
+  if (!players.includes(username)) return "";
+  return players.find((p) => p !== username) ?? "";
+}
+
+function isSocketOpen(ws) {
+  return !!ws && ws.readyState === 1;
+}
+
+function isRematchAllowedForPlayer(game, game_id, meta, wsByUser, userToGame, username) {
+  const opponent = resolvePlayerOpponent(game, username);
+  if (!opponent) return false;
+  if (!wsByUser || typeof wsByUser.get !== "function") return false;
+  if (!userToGame || typeof userToGame.get !== "function") return false;
+  if (String(userToGame.get(opponent) ?? "") !== String(game_id ?? "")) return false;
+  if (!isSocketOpen(wsByUser.get(opponent))) return false;
+  if (meta?.disconnected instanceof Set && meta.disconnected.has(opponent)) return false;
+  return true;
+}
+
 function buildStateSnapshotForUser(game, username, view, { result = null, forceDisableDrag = false } = {}) {
   const tableSlotIds = getTableSlots(game);
 
@@ -146,7 +168,19 @@ export function emitFullState(game, username, wsByUser, sendEvtSocket, { view = 
   let forceDisableDrag = !!game?.turn?.paused;
   if (gameMeta && game_id) {
     const meta = gameMeta.get(game_id) || {};
-    result = meta.result ? publicGameEndResult(meta.result) : null;
+    if (meta.result) {
+      result = publicGameEndResult(meta.result);
+      if (view === "player") {
+        result.rematch_allowed = isRematchAllowedForPlayer(
+          game,
+          game_id,
+          meta,
+          wsByUser,
+          userToGame,
+          username
+        );
+      }
+    }
   }
 
   const snapshot = buildStateSnapshotForUser(game, username, view, { result, forceDisableDrag });
@@ -166,6 +200,7 @@ export function createGameNotifier({
   gameMeta = state?.gameMeta,
   gameSpectators = state?.gameSpectators,
   wsByUser = state?.wsByUser,
+  userToGame = state?.userToGame,
   sendEvtSocket,
   sendEvtUser,
 }) {
@@ -265,13 +300,25 @@ export function createGameNotifier({
     const excludeSet = new Set((exclude || []).filter(Boolean));
 
     for (const p of game.players) {
-      if (!excludeSet.has(p)) sendEvtUser(p, "game_end", payload);
+      if (excludeSet.has(p)) continue;
+      sendEvtUser(p, "game_end", {
+        ...payload,
+        rematch_allowed: isRematchAllowedForPlayer(
+          game,
+          game_id,
+          meta,
+          wsByUser,
+          userToGame,
+          p
+        ),
+      });
     }
 
     const specs = gameSpectators.get(game_id);
     if (specs && specs.size) {
       for (const s of specs) {
-        if (!excludeSet.has(s)) sendEvtUser(s, "game_end", payload);
+        if (excludeSet.has(s)) continue;
+        sendEvtUser(s, "game_end", { ...payload, rematch_allowed: false });
       }
     }
 

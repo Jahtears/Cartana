@@ -7,12 +7,27 @@ import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 const CLEANUP_TTL_MS = 2 * 60 * 1000;
+const ACK_INTENT_REMATCH = "rematch";
 
-function ensureGameEndMeta(gameMeta, game_id, { initialSent = true } = {}) {
+export const POST_GAME_STATES = Object.freeze({
+  ENDED: "ended",
+  REMATCH_PENDING: "rematch_pending",
+  RESOLVED: "resolved",
+  EXPIRED: "expired",
+});
+
+function isPostGameState(value) {
+  return Object.values(POST_GAME_STATES).includes(value);
+}
+
+export function ensureGameEndMeta(gameMeta, game_id, { initialSent = true } = {}) {
   const meta = ensureGameMeta(gameMeta, game_id, { initialSent });
   if (!(meta.acks instanceof Set)) meta.acks = new Set();
   if (typeof meta.endedAt !== "number" || !Number.isFinite(meta.endedAt)) meta.endedAt = 0;
   if (typeof meta.lastAckAt !== "number" || !Number.isFinite(meta.lastAckAt)) meta.lastAckAt = 0;
+  if (!isPostGameState(meta.post_game_state)) {
+    meta.post_game_state = meta.result ? POST_GAME_STATES.ENDED : "";
+  }
   return meta;
 }
 
@@ -23,7 +38,7 @@ function clearCleanupTimer(meta) {
   }
 }
 
-function cleanupIfOrphaned(ctx, game_id, { reason = "" } = {}) {
+export function cleanupIfOrphaned(ctx, game_id, { reason = "", allowPending = false } = {}) {
   const {
     state,
     deleteGameState,
@@ -47,6 +62,11 @@ function cleanupIfOrphaned(ctx, game_id, { reason = "" } = {}) {
   if (stillPlayersAttached || spectatorsCount > 0) return false;
 
   const meta = gameMeta.get(game_id);
+  if (meta?.post_game_state === POST_GAME_STATES.REMATCH_PENDING && !allowPending) return false;
+
+  if (reason === "ttl" && meta?.post_game_state === POST_GAME_STATES.REMATCH_PENDING) {
+    meta.post_game_state = POST_GAME_STATES.EXPIRED;
+  }
   clearCleanupTimer(meta);
   readyPlayers.delete(game_id);
   state.deleteGame(game_id);
@@ -65,7 +85,11 @@ function scheduleCleanup(ctx, game_id, reason) {
 
   meta.cleanupTimer = setTimeout(() => {
     meta.cleanupTimer = null;
-    cleanupIfOrphaned(ctx, game_id, { reason: reason || "ttl" });
+    const liveMeta = gameMeta.get(game_id);
+    if (liveMeta?.post_game_state === POST_GAME_STATES.REMATCH_PENDING) {
+      liveMeta.post_game_state = POST_GAME_STATES.EXPIRED;
+    }
+    cleanupIfOrphaned(ctx, game_id, { reason: reason || "ttl", allowPending: true });
   }, CLEANUP_TTL_MS);
 
   if (typeof meta.cleanupTimer?.unref === "function") meta.cleanupTimer.unref();
@@ -83,6 +107,7 @@ function endGame(ctx, game_id, result, { exclude = [] } = {}) {
   if (res.created) {
     meta.acks = new Set();
     meta.endedAt = Date.now();
+    meta.post_game_state = POST_GAME_STATES.ENDED;
   }
 
   emitSnapshotsToAudience(game_id, { reason: "game_end" });
@@ -196,6 +221,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
   } = ctx;
   const { games, gameMeta } = state;
   const game_id = resolveAckGameId(ctx, ws, req, data, actor);
+  const ackIntent = String(data?.intent ?? "").trim().toLowerCase();
 
   // idempotent: sans game_id -> OK
   if (!game_id) {
@@ -236,6 +262,9 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
 
   // ✅ si un joueur ACK alors que la partie n'est pas finie => traiter comme abandon
   maybeEndByAckAsAbandon(ctx, game_id, game, actor, wasPlayer, meta);
+  if (ackIntent === ACK_INTENT_REMATCH && wasPlayer && meta.result) {
+    meta.post_game_state = POST_GAME_STATES.REMATCH_PENDING;
+  }
   recordAckAndSchedule(ctx, meta, game_id, actor);
 
   cleanupIfOrphaned(ctx, game_id, { reason: "ack" });

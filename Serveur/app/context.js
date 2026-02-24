@@ -120,7 +120,6 @@ export function createServerContext({ onTransportSend } = {}) {
       },
 
       syncTable(tableSlots) {
-        game.tableSlots = tableSlots;
         fl.syncTable(tableSlots);
       },
 

@@ -86,13 +86,20 @@ func _on_evt(type: String, data: Dictionary) -> void:
 		"invite_request":
 			var from_user := String(data.get("from", ""))
 			if from_user != "":
+				var popup_payload := {
+					"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST_FALLBACK),
+					"from": from_user
+				}
+				var context := String(data.get("context", "")).strip_edges()
+				var source_game_id := String(data.get("source_game_id", "")).strip_edges()
+				if context != "":
+					popup_payload["context"] = context
+				if source_game_id != "":
+					popup_payload["source_game_id"] = source_game_id
 				_show_confirm_code(
 					Protocol.POPUP_INVITE_RECEIVED,
 					{"from": from_user},
-					{
-						"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST_FALLBACK),
-						"from": from_user
-					},
+					popup_payload,
 					{"yes_label_key": "accept", "no_label_key": "refuse"}
 				)
 

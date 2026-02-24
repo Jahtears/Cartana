@@ -109,20 +109,23 @@ export function orchestrateMove(params) {
 
   // ========================
   // 7) TRACK GAME UPDATES (standard move)
+  //    Bench move without immediate game end is flushed once after turn switch.
   // ========================
-  const tableSlots = getTableSlots(game);
-
-  withGameUpdate(gameId, (fx) => {
-    if (moveResult.createdTableSlotId) {
-      fx.syncTable(tableSlots);
-      fx.touch(moveResult.createdTableSlotId);
-    }
-    fx.touch(fromSlotId);
-    if (toSlotId !== moveResult.createdTableSlotId) fx.touch(toSlotId);
-    for (const refill of selfRefill) fx.touch(refill.slotId);
-    if (selfRefill.length) fx.touch(pileSlotId);
-    if (!endsTurn) fx.turn();
-  }, ctx?.trace);
+  const shouldFlushBeforeTurnSwitch = !endsTurn || !!gameEnd;
+  if (shouldFlushBeforeTurnSwitch) {
+    const tableSlots = getTableSlots(game);
+    withGameUpdate(gameId, (fx) => {
+      if (moveResult.createdTableSlotId) {
+        fx.syncTable(tableSlots);
+        fx.touch(moveResult.createdTableSlotId);
+      }
+      fx.touch(fromSlotId);
+      if (toSlotId !== moveResult.createdTableSlotId) fx.touch(toSlotId);
+      for (const refill of selfRefill) fx.touch(refill.slotId);
+      if (selfRefill.length) fx.touch(pileSlotId);
+      if (!endsTurn) fx.turn();
+    }, ctx?.trace);
+  }
 
   // ========================
   // 8) IF WINNER, STOP HERE

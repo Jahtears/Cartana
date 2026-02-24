@@ -16,6 +16,7 @@ const DEFAULT_TIMEOUT_SEC = 10.0
 const MAX_RETRIES = 3
 const MAX_QUEUE_SIZE = 100
 const PENDING_ACTIVITY_TIMEOUT_MS = 15000
+const PENDING_ACTIVITY_PROBE_TIMEOUT_MS = 4000
 const PENDING_ACTIVITY_TIMEOUT_REASON = "Connection lost (no server response)"
 
 # ✅ NOUVEAU: Reconnexion automatique
@@ -61,6 +62,10 @@ var _allow_reconnect: bool = true
 var _disconnect_reason: String = ""
 var _client_connection_lost: bool = false
 var _connection_state: int = ConnectionState.IDLE
+var _activity_probe_in_flight: bool = false
+var _activity_probe_started_ms: int = 0
+var _activity_probe_rid: String = ""
+var _activity_probe_ignore_rid: String = ""
 
 # ============= LIFECYCLE =============
 
@@ -127,6 +132,7 @@ func close(code: int = 1000, reason: String = "") -> void:
 	_request_queue.clear()
 	_pending_requests.clear()
 	_pending_results.clear()
+	_clear_activity_probe()
 	_cancel_reconnect_timer()
 	_is_authenticated = false
 	_login_in_flight = false
@@ -220,25 +226,72 @@ func _on_reconnect_timeout() -> void:
 	_reconnect_timer = null
 	connect_to_server(_url, false)
 
+func _clear_activity_probe(keep_rid_for_late_response: bool = false) -> void:
+	if keep_rid_for_late_response and _activity_probe_rid != "":
+		_activity_probe_ignore_rid = _activity_probe_rid
+	_activity_probe_in_flight = false
+	_activity_probe_started_ms = 0
+	_activity_probe_rid = ""
+
+func _has_effective_pending_requests() -> bool:
+	for rid in _pending_requests:
+		if rid == _activity_probe_rid or rid == _activity_probe_ignore_rid:
+			continue
+		return true
+	return false
+
+func _send_activity_probe(now_ms: int) -> bool:
+	_rid_counter += 1
+	var rid := str(_rid_counter)
+	if not _send_request_packet(rid, "ping", {}):
+		return false
+	_activity_probe_in_flight = true
+	_activity_probe_started_ms = now_ms
+	_activity_probe_rid = rid
+	return true
+
 func _check_pending_activity_timeout(now_ms: int) -> void:
 	if not _allow_reconnect:
 		return
 	if not is_open():
 		return
-	if _pending_requests.is_empty():
+	if not _has_effective_pending_requests():
+		_clear_activity_probe(true)
 		return
-	if now_ms - _last_rx_ms < PENDING_ACTIVITY_TIMEOUT_MS:
+	var silence_ms := now_ms - _last_rx_ms
+	if silence_ms < PENDING_ACTIVITY_TIMEOUT_MS:
+		_clear_activity_probe(true)
+		return
+
+	if _activity_probe_in_flight:
+		var probe_wait_ms := now_ms - _activity_probe_started_ms
+		if probe_wait_ms < PENDING_ACTIVITY_PROBE_TIMEOUT_MS:
+			return
+		push_warning(
+			"[NET] No inbound traffic for %dms with %d pending request(s) and ping probe unanswered for %dms, forcing reconnect"
+			% [silence_ms, _pending_requests.size(), probe_wait_ms]
+		)
+		_clear_activity_probe()
+		_mark_client_connection_lost(PENDING_ACTIVITY_TIMEOUT_REASON)
+		return
+
+	if not _send_activity_probe(now_ms):
+		push_warning(
+			"[NET] No inbound traffic for %dms with %d pending request(s); ping probe send failed, forcing reconnect"
+			% [silence_ms, _pending_requests.size()]
+		)
+		_mark_client_connection_lost(PENDING_ACTIVITY_TIMEOUT_REASON)
 		return
 
 	push_warning(
-		"[NET] No inbound traffic for %dms with %d pending request(s), forcing reconnect"
-		% [now_ms - _last_rx_ms, _pending_requests.size()]
+		"[NET] No inbound traffic for %dms with %d pending request(s), sending ping probe before reconnect"
+		% [silence_ms, _pending_requests.size()]
 	)
-	_mark_client_connection_lost(PENDING_ACTIVITY_TIMEOUT_REASON)
 
 func _mark_client_connection_lost(reason: String) -> void:
 	if _connection_state == ConnectionState.RECOVERING and _client_connection_lost:
 		return
+	_clear_activity_probe()
 	_was_open = false
 	_connect_in_flight = false
 	_is_authenticated = false
@@ -263,6 +316,7 @@ func _process(_delta: float) -> void:
 			var was_recovering := _connection_state == ConnectionState.RECOVERING and _client_connection_lost
 			_was_open = true
 			_connect_in_flight = false
+			_clear_activity_probe()
 			_last_rx_ms = Time.get_ticks_msec()
 			_reset_reconnect_state()  # ✅ Reset backoff on success
 			_connection_state = ConnectionState.CONNECTED
@@ -279,6 +333,7 @@ func _process(_delta: float) -> void:
 		if _was_open or _connect_in_flight:
 			_was_open = false
 			_connect_in_flight = false
+			_clear_activity_probe()
 			_is_authenticated = false
 			_login_in_flight = false
 			var close_code := _ws.get_close_code()
@@ -423,6 +478,8 @@ func _check_request_timeouts() -> void:
 
 func _handle_packet(pkt: String) -> void:
 	_last_rx_ms = Time.get_ticks_msec()
+	if _activity_probe_in_flight:
+		_clear_activity_probe(true)
 	var json = JSON.new()
 	var error = json.parse(pkt)
 	
@@ -449,6 +506,9 @@ func _handle_packet(pkt: String) -> void:
 
 	if kind == "res":
 		var rid := String(env.get("rid", ""))
+		if rid != "" and rid == _activity_probe_ignore_rid:
+			_activity_probe_ignore_rid = ""
+			return
 		var ok := bool(env.get("ok", false))
 		var data := env.get("data", {}) as Dictionary
 		var err := env.get("error", {}) as Dictionary

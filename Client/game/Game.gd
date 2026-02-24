@@ -19,6 +19,8 @@ const DeckCountUtil = preload("res://Client/game/helpers/DeckCount.gd")
 # ============= CONSTANTS =============
 const POPUP_PREFIX := "POPUP_"
 const FLOW_INVITE_REQUEST_FALLBACK := "invite_request"
+const REMATCH_CONTEXT := "rematch"
+const ACK_INTENT_REMATCH := "rematch"
 const REQ_JOIN_GAME := "join_game"
 const REQ_SPECTATE_GAME := "spectate_game"
 const REQ_INVITE := "invite"
@@ -28,6 +30,7 @@ const REQ_LEAVE_GAME := "leave_game"
 
 const ACTION_GAME_END_LEAVE := "game_end_leave"
 const ACTION_GAME_END_REVANGE := "game_end_revange"
+const ACTION_REMATCH_DECLINED_LEAVE := "rematch_declined_leave"
 const ACTION_QUIT_CANCEL := "quit_cancel"
 const ACTION_QUIT_CONFIRM := "quit_confirm"
 const ACTION_PAUSE_WAIT := "pause_wait"
@@ -318,17 +321,26 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			_handle_invite_response(data)
 		"invite_cancelled":
 			_handle_invite_cancelled(data)
+		"rematch_declined":
+			_handle_rematch_declined(data)
 
 func _handle_invite_request(data: Dictionary) -> void:
 	var from_user := String(data.get("from", ""))
 	if from_user != "":
+		var popup_payload := {
+			"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST_FALLBACK),
+			"from": from_user
+		}
+		var context := String(data.get("context", "")).strip_edges()
+		var source_game_id := String(data.get("source_game_id", "")).strip_edges()
+		if context != "":
+			popup_payload["context"] = context
+		if source_game_id != "":
+			popup_payload["source_game_id"] = source_game_id
 		PopupUi.show_confirm_code(
 			Protocol.POPUP_INVITE_RECEIVED,
 			{"from": from_user},
-			{
-				"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST_FALLBACK),
-				"from": from_user
-			},
+			popup_payload,
 			{"yes_label_key": "accept", "no_label_key": "refuse"}
 		)
 
@@ -342,6 +354,21 @@ func _handle_invite_cancelled(data: Dictionary) -> void:
 	if String(ui.get("text", "")).strip_edges() == "":
 		return
 	_show_popup_normalized(ui)
+
+func _handle_rematch_declined(data: Dictionary) -> void:
+	var context := String(data.get("context", "")).strip_edges().to_lower()
+	if context != REMATCH_CONTEXT:
+		return
+	var ui := Protocol.normalize_invite_response_ui(data)
+	_show_popup_normalized(
+		ui,
+		{
+			"ok_action_id": ACTION_REMATCH_DECLINED_LEAVE,
+			"context": context,
+			"source_game_id": String(data.get("source_game_id", "")).strip_edges(),
+		},
+		{"ok_label_key": "back_lobby"}
+	)
 
 func _handle_start_game(data: Dictionary) -> void:
 	Global.current_game_id = String(data.get("game_id", ""))
@@ -466,13 +493,13 @@ func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: St
 func _show_popup_code(message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
 	PopupUi.show_info_code(message_code, params, payload, options)
 
-func _show_popup_normalized(normalized: Dictionary, payload: Dictionary = {}) -> void:
+func _show_popup_normalized(normalized: Dictionary, payload: Dictionary = {}, popup_options: Dictionary = {}) -> void:
 	var message_code := String(normalized.get("message_code", "")).strip_edges()
 	if message_code == "":
 		return
 	var params_val = normalized.get("message_params", {})
 	var params: Dictionary = params_val if params_val is Dictionary else {}
-	var options: Dictionary = {}
+	var options: Dictionary = popup_options.duplicate(true)
 	var text_override := String(normalized.get("text_override", "")).strip_edges()
 	if text_override != "":
 		options["text_override"] = text_override
@@ -593,7 +620,10 @@ func _on_game_end(data: Dictionary) -> void:
 		return
 	_game_end_prompted = true
 	var popup_msg := Protocol.game_end_popup_message(data, String(Global.username), bool(Global.is_spectator))
-	if bool(Global.is_spectator):
+	var rematch_allowed := bool(data.get("rematch_allowed", true))
+	if _opponent_disconnected:
+		rematch_allowed = false
+	if bool(Global.is_spectator) or not rematch_allowed:
 		PopupUi.show_info_code(
 			String(popup_msg.get("message_code", "")),
 			popup_msg.get("message_params", {}) as Dictionary,
@@ -644,9 +674,17 @@ func _resolve_revenge_target_username() -> String:
 
 func _ack_end_invite_revenge_in_game() -> void:
 	var gid := String(Global.current_game_id)
+	var source_game_id := gid
 	var opponent_name := _resolve_revenge_target_username()
 	if gid != "":
-		var ack_res := await NetworkManager.request_async(REQ_ACK_GAME_END, {"game_id": gid}, 6.0)
+		var ack_res := await NetworkManager.request_async(
+			REQ_ACK_GAME_END,
+			{
+				"game_id": gid,
+				"intent": ACK_INTENT_REMATCH,
+			},
+			6.0
+		)
 		if not bool(ack_res.get("ok", false)):
 			var err_val = ack_res.get("error", {})
 			var err: Dictionary = err_val if err_val is Dictionary else {}
@@ -663,7 +701,11 @@ func _ack_end_invite_revenge_in_game() -> void:
 	Global.result = {}
 	_reset_board_state()
 
-	NetworkManager.request(REQ_INVITE, {"to": opponent_name})
+	var invite_payload := {"to": opponent_name}
+	if source_game_id != "":
+		invite_payload["context"] = REMATCH_CONTEXT
+		invite_payload["source_game_id"] = source_game_id
+	NetworkManager.request(REQ_INVITE, invite_payload)
 
 # ============= SLOT STATE =============
 
@@ -823,6 +865,8 @@ func _on_popup_action(action_id: String, payload: Dictionary) -> void:
 			await _ack_end_and_go_lobby()
 		ACTION_GAME_END_REVANGE:
 			await _ack_end_invite_revenge_in_game()
+		ACTION_REMATCH_DECLINED_LEAVE:
+			await _ack_end_and_go_lobby()
 		_:
 			pass
 
