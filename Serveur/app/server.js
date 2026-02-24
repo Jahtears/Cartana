@@ -35,9 +35,14 @@ if (!BACKEND_HTTP_MODE && (TLS_CERT_PATH === "" || TLS_KEY_PATH === "")) {
 
 // ============= INITIALISATION =============
 
+let wsManager = null;
+
 // 1️⃣ Créer le contexte (état + helpers)
 const { baseCtx, loginCtx, onSocketClose } = createServerContext({
-  onTransportSend: () => metrics.recordMessageSent(),
+  onTransportSend: (ws) => {
+    metrics.recordMessageSent();
+    wsManager?.markActivity(ws, "outbound");
+  },
 });
 
 function requestHandler(req, res) {
@@ -84,7 +89,7 @@ if (BACKEND_HTTP_MODE) {
 const wss = new WebSocketServer({ server: transportServer });
 
 // 4️⃣ Créer le wsManager
-const wsManager = createWSManager({ wss, trace: console.log });
+wsManager = createWSManager({ wss, trace: console.log });
 
 // 5️⃣ Créer le router (avec contexte + handlers)
 const router = createRouter({
@@ -122,6 +127,7 @@ wss.on("connection", async (ws) => {
 
   ws.on("message", async (msg) => {
     try {
+      wsManager.markActivity(ws, "inbound");
       await onMessageWithMetrics(ws, msg.toString());
     } catch (err) {
       console.error("[MESSAGE_ERROR]", err);

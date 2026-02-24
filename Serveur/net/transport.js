@@ -54,7 +54,7 @@ function safeSend(ws, envelope, onSend) {
   if (!wsIsOpen(ws)) return false;
   try {
     ws.send(JSON.stringify(envelope));
-    if (typeof onSend === "function") onSend(envelope);
+    if (typeof onSend === "function") onSend(ws, envelope);
     return true;
   } catch {
     return false;
