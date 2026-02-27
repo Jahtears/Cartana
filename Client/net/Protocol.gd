@@ -1,7 +1,6 @@
 # Protocol.gd
 extends Node
 
-const GameMessage = preload("res://Client/game/helpers/GameMessage.gd")
 const LanguageManager = preload("res://Client/Lang/LanguageManager.gd")
 
 const POPUP_PREFIX := "POPUP_"
@@ -58,17 +57,20 @@ const POPUP_OPPONENT_DISCONNECTED_CHOICE := "POPUP_OPPONENT_DISCONNECTED_CHOICE"
 
 const DEFAULT_ERROR_FALLBACK := POPUP_UI_ACTION_IMPOSSIBLE
 
+const POPUP_FLOW_INVITE_REQUEST := "invite_request"
+const POPUP_ACTION_CONFIRM_YES := "confirm_yes"
+const POPUP_ACTION_CONFIRM_NO := "confirm_no"
+const POPUP_ACTION_INFO_OK := "info_ok"
+
 const POPUP_FLOW := {
-	"INVITE_REQUEST": "invite_request",
+	"INVITE_REQUEST": POPUP_FLOW_INVITE_REQUEST,
 }
 
 const POPUP_ACTION := {
-	"CONFIRM_YES": "confirm_yes",
-	"CONFIRM_NO": "confirm_no",
+	"CONFIRM_YES": POPUP_ACTION_CONFIRM_YES,
+	"CONFIRM_NO": POPUP_ACTION_CONFIRM_NO,
+	"INFO_OK": POPUP_ACTION_INFO_OK,
 }
-
-static func normalize_ingame_message(payload: Dictionary) -> Dictionary:
-	return GameMessage.normalize_ingame_message(payload)
 
 static func normalize_popup_message(payload: Dictionary) -> Dictionary:
 	var params := _extract_message_params(payload)
@@ -98,12 +100,6 @@ static func normalize_popup_message(payload: Dictionary) -> Dictionary:
 	if text_override != "" and text_override != message_code:
 		normalized["text_override"] = text_override
 	return normalized
-
-static func normalize_game_message(payload: Dictionary) -> Dictionary:
-	var ingame := normalize_ingame_message(payload)
-	if not ingame.is_empty():
-		return ingame
-	return normalize_popup_message(payload)
 
 static func normalize_popup_error(error: Dictionary, fallback_message := DEFAULT_ERROR_FALLBACK) -> Dictionary:
 	var top_params_val = error.get("message_params", {})
@@ -163,7 +159,7 @@ static func invite_cancelled_ui(data: Dictionary) -> Dictionary:
 
 static func invite_action_request(action_id: String, payload: Dictionary) -> Dictionary:
 	var flow := String(payload.get("flow", ""))
-	if flow != String(POPUP_FLOW["INVITE_REQUEST"]):
+	if flow != POPUP_FLOW_INVITE_REQUEST:
 		return {}
 
 	var from_user := String(payload.get("from", ""))
@@ -179,10 +175,10 @@ static func invite_action_request(action_id: String, payload: Dictionary) -> Dic
 	if source_game_id != "":
 		req["source_game_id"] = source_game_id
 
-	if action_id == String(POPUP_ACTION["CONFIRM_YES"]):
+	if action_id == POPUP_ACTION_CONFIRM_YES:
 		req["accepted"] = true
 		return req
-	if action_id == String(POPUP_ACTION["CONFIRM_NO"]):
+	if action_id == POPUP_ACTION_CONFIRM_NO:
 		req["accepted"] = false
 		return req
 	return {}

@@ -6,16 +6,16 @@ import { DEFAULT_HAND_SIZE } from "../constants/turnFlow.js";
 import { NEVER_DRAGGABLE_SLOT_TYPES } from "../helpers/slotViewHelpers.js";
 import { shuffle } from "../helpers/cardHelpers.js";
 import { debugLog } from "../helpers/debugHelpers.js";
-import { getSlotType, slotIdToString } from "../helpers/slotHelpers.js";
+import { slotIdToString } from "../helpers/slotHelpers.js";
 
 const CARD_VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "V", "D", "R"];
 const CARD_COLORS = ["H", "C", "P", "S"];
 
 const INITIAL_DISTRIBUTION = {
-  HAND: { player: null, source: "sourceA", count: (cfg) => cfg.handSize },
-  DECK: { player: null, source: "sourceB", count: (cfg) => cfg.personalDeckSize },
+  HAND: { player: null, source: "A", count: (cfg) => cfg.handSize },
+  DECK: { player: null, source: "B", count: (cfg) => cfg.personalDeckSize },
   BENCH: { player: null, source: null, count: () => 0 },
-  PILE: { player: 0, source: "sourceA", count: "ALL" },
+  PILE: { player: 0, source: "A", count: "ALL" },
   TABLE: { player: 0, source: null, count: () => 0 },
 };
 
@@ -61,29 +61,32 @@ function generateCards(source, copies = 1) {
 }
 
 function createShuffledSources() {
-  const sourceA  = generateCards("A");
-  const sourceB  = generateCards("B");
-  shuffle(sourceA);
-  shuffle(sourceB);
-  return { sourceA , sourceB };
+  const sources = {
+    A: generateCards("A"),
+    B: generateCards("B"),
+  };
+  shuffle(sources.A);
+  shuffle(sources.B);
+  return sources;
 }
 
 function resolveRuleCardCount(rule, ctx) {
-  if (rule.count === "ALL") return ctx[rule.source].length;
+  if (rule.count === "ALL") return ctx.sources[rule.source].length;
   if (typeof rule.count === "function") return rule.count(ctx);
   return rule.count;
 }
 
 function takeCardsForRule(rule, ctx) {
   if (!rule.source) return [];
-  const source = ctx[rule.source];
+  const source = ctx.sources[rule.source];
+  if (!Array.isArray(source)) return [];
   const cardCount = resolveRuleCardCount(rule, ctx);
   return source.splice(0, cardCount);
 }
 
-function distributeInitialSlots(slots, sourceA, sourceB, config = {}) {
+function distributeInitialSlots(slots, sources, config = {}) {
   const { handSize = DEFAULT_HAND_SIZE, personalDeckSize = 26 } = config;
-  const ctx = { sourceA, sourceB, handSize, personalDeckSize };
+  const ctx = { sources, handSize, personalDeckSize };
 
   const allCards = [];
 
@@ -148,10 +151,10 @@ function createGame(player1, player2) {
   game.slots = createEmptySlots();
 
   // 3) Generate and shuffle physical decks.
-  const { sourceA, sourceB } = createShuffledSources();
+  const sources = createShuffledSources();
 
   // 4) Deal cards into existing slots.
-  const { allCards } = distributeInitialSlots(game.slots, sourceA, sourceB, {
+  const { allCards } = distributeInitialSlots(game.slots, sources, {
     handSize: DEFAULT_HAND_SIZE,
     personalDeckSize: 26,
   });
@@ -163,9 +166,9 @@ function createGame(player1, player2) {
   return game;
 }
 
-function buildCardData(card, slotId, isOwner, disableDrag = false) {
-  const normalizedSlotId = slotIdToString(slotId);
-  const slotType = getSlotType(slotId);
+function buildCardData(card, slotId, isOwner, disableDrag = false, slotIdForClient = null) {
+  const normalizedSlotId = slotIdToString(slotIdForClient ?? slotId);
+  const slotType = slotId instanceof SlotId ? slotId.type : null;
 
   const isFaceDown = slotType === SLOT_TYPES.PILE
     || (slotType === SLOT_TYPES.HAND && !isOwner);
@@ -183,7 +186,7 @@ function buildCardData(card, slotId, isOwner, disableDrag = false) {
     valeur: isFaceDown ? "" : card.value,
     couleur: isFaceDown ? "" : card.color,
     dos: isFaceDown,
-    decksColor: card.source,
+    source: card.source,
     draggable,
     slot_id: normalizedSlotId,
   };

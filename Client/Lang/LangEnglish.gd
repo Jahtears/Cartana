@@ -81,7 +81,7 @@ const UI_LABELS = {
 	"quit": "Quit",
 	"wait": "Wait",
 	"stay": "Stay",
-	"revange": "Rematch",
+	"rematch": "Rematch",
 	"back_lobby": "Back to lobby",
 	"retry": "Reconnect",
 }

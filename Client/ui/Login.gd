@@ -12,6 +12,7 @@ const REMEMBER_CHECKBOX_GAP := 12.0
 var _login_pending := false
 var _last_username: String = ""
 var _loading_preferences := false
+var _network_disconnected := false
 
 @onready var _username_input: LineEdit = $CenterContainer/VBoxContainer/Username_input
 @onready var _pin_input: LineEdit = $CenterContainer/VBoxContainer/Pin_input
@@ -27,6 +28,8 @@ func _ready() -> void:
 		NetworkManager.response.connect(_on_response)
 	if not NetworkManager.disconnected.is_connected(_on_network_disconnected):
 		NetworkManager.disconnected.connect(_on_network_disconnected)
+	if not NetworkManager.connection_restored.is_connected(_on_connection_restored):
+		NetworkManager.connection_restored.connect(_on_connection_restored)
 	PopupUi.hide_and_reset()
 	_setup_language_option_button()
 	_load_login_preferences()
@@ -51,14 +54,18 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 func _on_network_disconnected(_code: int, reason: String) -> void:
 	if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
 		return
-	_show_popup_code(Protocol.POPUP_AUTH_CONNECTION_ERROR)
+	_network_disconnected = true
+	PopupUi.show_code(PopupUi.MODE_PASSIVE, Protocol.POPUP_AUTH_CONNECTION_ERROR)
 
-func _show_popup_code(message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
-	PopupUi.show_info_code(message_code, params, payload, options)
+func _on_connection_restored() -> void:
+	if not _network_disconnected:
+		return
+	_network_disconnected = false
+	PopupUi.hide_and_reset()
 
 func _show_login_error(error: Dictionary) -> void:
 	var popup := _normalize_login_error(error)
-	_show_popup_normalized(popup)
+	PopupUi.show_normalized(PopupUi.MODE_INFO, popup)
 
 func _normalize_login_error(error: Dictionary) -> Dictionary:
 	var normalized := Protocol.normalize_popup_error(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
@@ -81,18 +88,6 @@ func _normalize_login_error(error: Dictionary) -> Dictionary:
 	normalized["message_params"] = params
 	return normalized
 
-func _show_popup_normalized(normalized: Dictionary, payload: Dictionary = {}) -> void:
-	var message_code := String(normalized.get("message_code", "")).strip_edges()
-	if message_code == "":
-		return
-	var params_val = normalized.get("message_params", {})
-	var params: Dictionary = params_val if params_val is Dictionary else {}
-	var options: Dictionary = {}
-	var text_override := String(normalized.get("text_override", "")).strip_edges()
-	if text_override != "":
-		options["text_override"] = text_override
-	PopupUi.show_info_code(message_code, params, payload, options)
-
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept"):
 		_on_login_button_pressed()
@@ -105,7 +100,7 @@ func _on_login_button_pressed() -> void:
 	var pin: String = _pin_input.text.strip_edges()
 
 	if username == "" or pin == "":
-		_show_popup_code(Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
+		PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
 		return
 
 	_last_username = username
@@ -224,3 +219,5 @@ func _exit_tree() -> void:
 		NetworkManager.response.disconnect(_on_response)
 	if NetworkManager.disconnected.is_connected(_on_network_disconnected):
 		NetworkManager.disconnected.disconnect(_on_network_disconnected)
+	if NetworkManager.connection_restored.is_connected(_on_connection_restored):
+		NetworkManager.connection_restored.disconnect(_on_connection_restored)

@@ -12,8 +12,7 @@ const REQ_LOGOUT := "logout"
 
 const FLOW_SPECTATE_GAME := REQ_SPECTATE_GAME
 const FLOW_LOGOUT := REQ_LOGOUT
-const FLOW_INVITE_REQUEST_FALLBACK := "invite_request"
-const ACTION_CONFIRM_YES_FALLBACK := "confirm_yes"
+const FLOW_INVITE_REQUEST := Protocol.POPUP_FLOW_INVITE_REQUEST
 const ACTION_NETWORK_RETRY := "network_retry"
 
 var _is_changing_scene := false
@@ -60,7 +59,7 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 
 		REQ_INVITE:
 			if ok:
-				_show_popup_code(Protocol.POPUP_INVITE_SENT)
+				PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_INVITE_SENT)
 			else:
 				_show_error_popup(error, Protocol.POPUP_INVITE_FAILED)
 
@@ -87,7 +86,7 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			var from_user := String(data.get("from", ""))
 			if from_user != "":
 				var popup_payload := {
-					"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST_FALLBACK),
+					"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST),
 					"from": from_user
 				}
 				var context := String(data.get("context", "")).strip_edges()
@@ -96,7 +95,8 @@ func _on_evt(type: String, data: Dictionary) -> void:
 					popup_payload["context"] = context
 				if source_game_id != "":
 					popup_payload["source_game_id"] = source_game_id
-				_show_confirm_code(
+				PopupUi.show_code(
+					PopupUi.MODE_CONFIRM,
 					Protocol.POPUP_INVITE_RECEIVED,
 					{"from": from_user},
 					popup_payload,
@@ -106,29 +106,30 @@ func _on_evt(type: String, data: Dictionary) -> void:
 		REQ_INVITE_RESPONSE:
 			var ui := Protocol.normalize_invite_response_ui(data)
 			if String(ui.get("text", "")) != "":
-				_show_popup_normalized(ui)
+				PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
 
 		"invite_cancelled":
 			_handle_invite_cancelled(data)
 
 func _show_error_popup(error: Dictionary, fallback_message: String) -> void:
 	var popup := Protocol.normalize_popup_error(error, fallback_message)
-	_show_popup_normalized(popup)
+	PopupUi.show_normalized(PopupUi.MODE_INFO, popup)
 
 func _on_connection_lost() -> void:
 	_network_disconnected = true
-	_show_popup_code(Protocol.POPUP_PLAYER_DISCONNECTED)
+	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_DISCONNECTED)
 
 func _on_connection_restored() -> void:
 	if not _network_disconnected:
 		return
 	_network_disconnected = false
-	_show_popup_code(Protocol.POPUP_PLAYER_RECONNECTED)
+	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_RECONNECTED)
 
 func _on_reconnect_failed() -> void:
 	if not _network_disconnected:
 		return
-	_show_popup_code(
+	PopupUi.show_code(
+		PopupUi.MODE_INFO,
 		Protocol.POPUP_PLAYER_RECONNECT_FAIL,
 		{},
 		{"ok_action_id": ACTION_NETWORK_RETRY},
@@ -137,31 +138,13 @@ func _on_reconnect_failed() -> void:
 
 func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
 	_network_disconnected = false
-	_show_popup_code(Protocol.POPUP_TECH_INTERNAL_ERROR)
+	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_TECH_INTERNAL_ERROR)
 
 func _handle_invite_cancelled(data: Dictionary) -> void:
 	var ui := Protocol.invite_cancelled_ui(data)
 	if String(ui.get("text", "")).strip_edges() == "":
 		return
-	_show_popup_normalized(ui)
-
-func _show_popup_code(message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
-	PopupUi.show_info_code(message_code, params, payload, options)
-
-func _show_confirm_code(message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
-	PopupUi.show_confirm_code(message_code, params, payload, options)
-
-func _show_popup_normalized(normalized: Dictionary, payload: Dictionary = {}) -> void:
-	var message_code := String(normalized.get("message_code", "")).strip_edges()
-	if message_code == "":
-		return
-	var params_val = normalized.get("message_params", {})
-	var params: Dictionary = params_val if params_val is Dictionary else {}
-	var options: Dictionary = {}
-	var text_override := String(normalized.get("text_override", "")).strip_edges()
-	if text_override != "":
-		options["text_override"] = text_override
-	_show_popup_code(message_code, params, payload, options)
+	PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
 
 # --------------------
 # UI / LOGIC
@@ -245,7 +228,8 @@ func _on_game_clicked(game_id: String, players: Array) -> void:
 	if game_id == "":
 		return
 
-	_show_confirm_code(
+	PopupUi.show_code(
+		PopupUi.MODE_CONFIRM,
 		Protocol.POPUP_SPECTATE_CONFIRM,
 		{
 			"game_id": game_id,
@@ -270,7 +254,8 @@ func _do_spectate_game(game_id: String) -> void:
 # Déconnexion (bouton Lobby)
 # --------------------
 func _on_deconnexion_pressed() -> void:
-	_show_confirm_code(
+	PopupUi.show_code(
+		PopupUi.MODE_CONFIRM,
 		Protocol.POPUP_LOGOUT_CONFIRM,
 		{},
 		{"flow": FLOW_LOGOUT}
@@ -289,10 +274,10 @@ func _on_popup_action(action_id: String, payload: Dictionary) -> void:
 	var flow := String(payload.get("flow", ""))
 	match flow:
 		FLOW_SPECTATE_GAME:
-			if action_id == Protocol.popup_action("CONFIRM_YES", ACTION_CONFIRM_YES_FALLBACK):
+			if action_id == Protocol.popup_action("CONFIRM_YES", Protocol.POPUP_ACTION_CONFIRM_YES):
 				_do_spectate_game(String(payload.get("game_id", "")))
 		FLOW_LOGOUT:
-			if action_id == Protocol.popup_action("CONFIRM_YES", ACTION_CONFIRM_YES_FALLBACK):
+			if action_id == Protocol.popup_action("CONFIRM_YES", Protocol.POPUP_ACTION_CONFIRM_YES):
 				await _do_logout()
 
 func _do_logout() -> void:

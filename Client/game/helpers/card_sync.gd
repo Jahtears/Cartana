@@ -11,7 +11,7 @@ const KEY_SLOT_ID := "slot_id"
 const KEY_VALUE := "valeur"
 const KEY_SUIT := "couleur"
 const KEY_BACK := "dos"
-const KEY_DECKS_COLOR := "decksColor"
+const KEY_DECKS_COLOR := "source"
 const KEY_DRAGGABLE := "draggable"
 
 const KEY_ORDER_ARRAY := "_array_order"

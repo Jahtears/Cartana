@@ -42,19 +42,22 @@ static func normalize_language(language_code: String) -> String:
 	return LANG_FR
 
 static func popup_text(message_code: String, params: Dictionary = {}) -> String:
-	var text := _popup_text_for_language(_current_language, message_code, params)
+	var language_pack = _language_pack(_current_language)
+	var text :Variant= language_pack.popup_text(message_code, params)
 	if text != "":
 		return text
 	return LangFR.popup_text(message_code, params)
 
 static func ingame_text(message_code: String, params: Dictionary = {}) -> String:
-	var text := _ingame_text_for_language(_current_language, message_code, params)
+	var language_pack = _language_pack(_current_language)
+	var text :Variant= language_pack.ingame_text(message_code, params)
 	if text != "":
 		return text
 	return LangFR.ingame_text(message_code, params)
 
 static func label(label_key: String, fallback := "") -> String:
-	var value := _label_for_language(_current_language, label_key, "")
+	var language_pack = _language_pack(_current_language)
+	var value :Variant= language_pack.label(label_key, "")
 	if value != "":
 		return value
 	return LangFR.label(label_key, fallback)
@@ -74,23 +77,7 @@ static func language_display_name(language_code: String) -> String:
 	var key := "language_%s" % normalized
 	return ui_text(key, normalized)
 
-static func _popup_text_for_language(language: String, message_code: String, params: Dictionary) -> String:
-	match normalize_language(language):
-		LANG_EN:
-			return LangEnglish.popup_text(message_code, params)
-		_:
-			return LangFR.popup_text(message_code, params)
-
-static func _ingame_text_for_language(language: String, message_code: String, params: Dictionary) -> String:
-	match normalize_language(language):
-		LANG_EN:
-			return LangEnglish.ingame_text(message_code, params)
-		_:
-			return LangFR.ingame_text(message_code, params)
-
-static func _label_for_language(language: String, label_key: String, fallback: String) -> String:
-	match normalize_language(language):
-		LANG_EN:
-			return LangEnglish.label(label_key, fallback)
-		_:
-			return LangFR.label(label_key, fallback)
+static func _language_pack(language: String):
+	if normalize_language(language) == LANG_EN:
+		return LangEnglish
+	return LangFR

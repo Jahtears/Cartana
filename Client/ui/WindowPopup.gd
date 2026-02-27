@@ -5,17 +5,21 @@ const Protocol = preload("res://Client/net/Protocol.gd")
 
 signal action_selected(action_id: String, payload: Dictionary)
 
-const ACTION_CONFIRM_YES := "confirm_yes"
-const ACTION_CONFIRM_NO := "confirm_no"
-const ACTION_INFO_OK := "info_ok"
+const ACTION_CONFIRM_YES := Protocol.POPUP_ACTION_CONFIRM_YES
+const ACTION_CONFIRM_NO := Protocol.POPUP_ACTION_CONFIRM_NO
+const ACTION_INFO_OK := Protocol.POPUP_ACTION_INFO_OK
+
+const MODE_PASSIVE := 0
+const MODE_INFO := 1
+const MODE_CONFIRM := 2
+const MODE_NONE := -1
 
 const OPTION_TEXT_OVERRIDE := "text_override"
 const OPTION_YES_LABEL_KEY := "yes_label_key"
 const OPTION_NO_LABEL_KEY := "no_label_key"
 const OPTION_OK_LABEL_KEY := "ok_label_key"
 
-enum Mode { NONE, INFO, CONFIRM }
-var _mode: int = Mode.NONE
+var _mode: int = MODE_NONE
 var _payload: Dictionary = {}
 var _action_accept: String = ACTION_CONFIRM_YES
 var _action_refuse: String = ACTION_CONFIRM_NO
@@ -31,24 +35,35 @@ func _ready() -> void:
 		close_requested.connect(_on_close_requested)
 	hide_and_reset()
 
-func show_info_code(message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
-	var normalized := _normalize_popup_payload(message_code, params, options)
-	var actions := {
-		"ok": String(payload.get("ok_action_id", ACTION_INFO_OK)),
-	}
-	_show_mode(Mode.INFO, normalized, payload, options, actions)
+func show_code(mode: int, message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
+	var safe_mode := mode
+	if safe_mode != MODE_PASSIVE and safe_mode != MODE_INFO and safe_mode != MODE_CONFIRM:
+		safe_mode = MODE_INFO
 
-func show_confirm_code(message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
 	var normalized := _normalize_popup_payload(message_code, params, options)
-	var actions := {
-		"yes": String(payload.get("yes_action_id", _popup_action_id("CONFIRM_YES", ACTION_CONFIRM_YES))),
-		"no": String(payload.get("no_action_id", _popup_action_id("CONFIRM_NO", ACTION_CONFIRM_NO))),
-	}
-	_show_mode(Mode.CONFIRM, normalized, payload, options, actions)
+	var actions := {}
+	if safe_mode == MODE_INFO:
+		actions["ok"] = String(payload.get("ok_action_id", _popup_action_id("INFO_OK", ACTION_INFO_OK)))
+	elif safe_mode == MODE_CONFIRM:
+		actions["yes"] = String(payload.get("yes_action_id", _popup_action_id("CONFIRM_YES", ACTION_CONFIRM_YES)))
+		actions["no"] = String(payload.get("no_action_id", _popup_action_id("CONFIRM_NO", ACTION_CONFIRM_NO)))
+	_show_mode(safe_mode, normalized, payload, options, actions)
+
+func show_normalized(mode: int, normalized: Dictionary, payload: Dictionary = {}, options: Dictionary = {}) -> void:
+	var message_code := String(normalized.get("message_code", "")).strip_edges()
+	if message_code == "":
+		return
+	var params_val = normalized.get("message_params", {})
+	var params: Dictionary = params_val if params_val is Dictionary else {}
+	var merged_options: Dictionary = options.duplicate(true)
+	var text_override := String(normalized.get("text_override", "")).strip_edges()
+	if text_override != "":
+		merged_options[OPTION_TEXT_OVERRIDE] = text_override
+	show_code(mode, message_code, params, payload, merged_options)
 
 func hide_and_reset() -> void:
 	hide()
-	_mode = Mode.NONE
+	_mode = MODE_NONE
 	_payload.clear()
 	_action_accept = ACTION_CONFIRM_YES
 	_action_refuse = ACTION_CONFIRM_NO
@@ -62,7 +77,11 @@ func _show_mode(mode: int, normalized: Dictionary, payload: Dictionary, options:
 
 	_label.text = _resolve_message_text(normalized, options)
 
-	if mode == Mode.INFO:
+	if mode == MODE_PASSIVE:
+		_btn_accept.visible = false
+		_btn_refuse.visible = false
+		_btn_ok.visible = false
+	elif mode == MODE_INFO:
 		_action_ok = String(actions.get("ok", ACTION_INFO_OK))
 		_btn_ok.text = _resolve_label(options, OPTION_OK_LABEL_KEY, "ok")
 		_btn_accept.visible = false
@@ -103,17 +122,17 @@ func _popup_action_id(key: String, fallback: String) -> String:
 	return Protocol.popup_action(key, fallback)
 
 func _on_button_accept_pressed() -> void:
-	if _mode == Mode.CONFIRM:
+	if _mode == MODE_CONFIRM:
 		action_selected.emit(_action_accept, _payload.duplicate(true))
 	hide_and_reset()
 
 func _on_button_refuse_pressed() -> void:
-	if _mode == Mode.CONFIRM:
+	if _mode == MODE_CONFIRM:
 		action_selected.emit(_action_refuse, _payload.duplicate(true))
 	hide_and_reset()
 
 func _on_button_ok_pressed() -> void:
-	if _mode == Mode.INFO:
+	if _mode == MODE_INFO:
 		action_selected.emit(_action_ok, _payload.duplicate(true))
 	hide_and_reset()
 
