@@ -1,7 +1,6 @@
 // net/broadcast.js v1.1
 import { ensureGameMeta } from "../game/meta.js";
-import { SLOT_TYPES } from "../game/constants/slots.js";
-import { getSlotContent, parseSlotId, slotIdToString } from "../game/helpers/slotHelpers.js";
+import { getSlotStack, slotIdToString } from "../game/helpers/slotHelpers.js";
 import { buildTurnPayload } from "../game/helpers/turnPayloadHelpers.js";
 import { toUiMessage } from "../shared/uiMessage.js";
 const GAME_MESSAGE_EVENT = "show_game_message";
@@ -11,12 +10,12 @@ function slotKey(slot_id) {
 }
 
 function isTableKey(slotKeyValue) {
-  return parseSlotId(slotKeyValue)?.type === SLOT_TYPES.TABLE;
+  return /^\d+:TABLE:\d+$/.test(String(slotKeyValue ?? ""));
 }
 
 
 function computeSlotSig(game, slot_id) {
-  const v = getSlotContent(game, slot_id);
+  const v = getSlotStack(game, slot_id);
   if (!v || v.length === 0) return "";
   if (Array.isArray(v)) return v.join("|");
   return String(v);

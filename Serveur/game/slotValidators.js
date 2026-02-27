@@ -1,7 +1,7 @@
 // game/slotValidators.js - Slot-specific validators extracted from Regles.js
 
-import { SLOT_TYPES } from "./constants/slots.js";
-import { getSlotContent, getSlotType, isSlotIdPresent } from "./helpers/slotHelpers.js";
+import { SlotId, SLOT_TYPES } from "./constants/slots.js";
+import { getSlotStack } from "./helpers/slotHelpers.js";
 import { debugLog } from "./helpers/debugHelpers.js";
 import { technicalDenied, userDenied } from "./helpers/deniedHelpers.js";
 import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
@@ -11,11 +11,15 @@ import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
  * Rules: empty=[A,R], count=1=[2,R], count=2=[3,R], ... count=9=[10,R], count=10=[D]
  */
 export function validateTableSlot(game, card, fromSlotId, toSlotId) {
-  if (!isSlotIdPresent(game, toSlotId)) {
+  if (!(toSlotId instanceof SlotId)) {
+    return technicalDenied("slot_id_not_canonical");
+  }
+
+  if (!(game?.slots instanceof Map) || !game.slots.has(toSlotId)) {
     return technicalDenied("table_slot_not_found");
   }
 
-  const slot = getSlotContent(game, toSlotId);
+  const slot = getSlotStack(game, toSlotId);
   const count = slot.length;
 
   const allowedByCount = [
@@ -82,24 +86,14 @@ export function validateBenchSlot(game, card, fromSlotId, toSlotId) {
  */
 export const validateDrawPileSlot = staticDeny(INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DRAWPILE);
 
-function normalizeSlotType(slotType) {
-  const resolvedType = getSlotType(slotType);
-  if (resolvedType) return resolvedType;
-
-  if (typeof slotType === "string") {
-    return slotType;
-  }
-
-  return null;
-}
-
 /**
  * Get appropriate validator for slot type
- * @param {string|SlotId} slotType - Slot type or SlotId
+ * @param {SlotId} slotId - Canonical SlotId
  * @returns {Function|null} Validator function or null
  */
-export function getSlotValidator(slotType) {
-  const normalized = normalizeSlotType(slotType);
+export function getSlotValidator(slotId) {
+  if (!(slotId instanceof SlotId)) return null;
+
   const validators = {
     [SLOT_TYPES.TABLE]: validateTableSlot,
     [SLOT_TYPES.DECK]: validateDeckSlot,
@@ -107,5 +101,5 @@ export function getSlotValidator(slotType) {
     [SLOT_TYPES.BENCH]: validateBenchSlot,
     [SLOT_TYPES.PILE]: validateDrawPileSlot,
   };
-  return validators[normalized] ?? null;
+  return validators[slotId.type] ?? null;
 }

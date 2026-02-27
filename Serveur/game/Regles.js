@@ -2,7 +2,10 @@
 import { SlotId, SLOT_TYPES } from "./constants/slots.js";
 import { refillHandIfEmpty } from "./helpers/pileFlowHelpers.js";
 import { slotTopHasAce, slotAnyHasAce } from "./helpers/cardHelpers.js";
-import { hasCardInSlot, isBenchSlot, isDeckSlot, getSlotContent, getPlayerFromSlotId, isTableSlot } from "./helpers/slotHelpers.js";
+import {
+  hasCardInSlot,
+  getSlotStack,
+} from "./helpers/slotHelpers.js";
 import { getSlotValidator } from "./slotValidators.js";
 import { debugLog } from "./helpers/debugHelpers.js";
 import { deniedTracePayload, technicalDenied, userDenied } from "./helpers/deniedHelpers.js";
@@ -16,9 +19,9 @@ function hasWonByEmptyDeckSlot(game, player) {
 
   const playerIndex = playerArrayIndex + 1;
   const deckSlot = SlotId.create(playerIndex, SLOT_TYPES.DECK, 1);
-  const deckStack = getSlotContent(game, deckSlot);
+  const deckStack = getSlotStack(game, deckSlot);
 
-  return Array.isArray(deckStack) ? deckStack.length === 0 : !deckStack;
+  return deckStack.length === 0;
 }
 
 function hasLoseByEmptyPileSlot(game, player) {
@@ -26,9 +29,9 @@ function hasLoseByEmptyPileSlot(game, player) {
   if (player && !game.players.includes(player)) return false;
 
   const pileSlot = SlotId.create(0, SLOT_TYPES.PILE, 1);
-  const pileStack = getSlotContent(game, pileSlot);
+  const pileStack = getSlotStack(game, pileSlot);
 
-  return Array.isArray(pileStack) ? pileStack.length === 0 : !pileStack;
+  return pileStack.length === 0;
 }
 
 function ruleCardMustBeInFromSlot(game, player, card, fromSlotId, toSlotId) {
@@ -37,7 +40,7 @@ function ruleCardMustBeInFromSlot(game, player, card, fromSlotId, toSlotId) {
   }
   if (!hasCardInSlot(game, fromSlotId, card.id)) {
     // Debug helper: log effective slot state.
-    const slotContent = getSlotContent(game, fromSlotId);
+    const slotContent = getSlotStack(game, fromSlotId);
     const allSlots = game?.slots instanceof Map
       ? Array.from(game.slots.keys()).map((k) => k.toString())
       : [];
@@ -54,9 +57,49 @@ function ruleCardMustBeInFromSlot(game, player, card, fromSlotId, toSlotId) {
   return { valid: true };
 }
 
+function ruleFromMustBeClientPlayableSource(game, player, card, fromSlotId, toSlotId) {
+  if (
+    fromSlotId.type === SLOT_TYPES.HAND
+    || fromSlotId.type === SLOT_TYPES.DECK
+    || fromSlotId.type === SLOT_TYPES.BENCH
+  ) {
+    return { valid: true };
+  }
+
+  if (fromSlotId.type === SLOT_TYPES.PILE || fromSlotId.type === SLOT_TYPES.TABLE) {
+    return technicalDenied("source_shared_forbidden");
+  }
+
+  return technicalDenied("invalid_from_slot_type");
+}
+
+function ruleFromAndToMustDiffer(game, player, card, fromSlotId, toSlotId) {
+  if (String(fromSlotId) === String(toSlotId)) {
+    return technicalDenied("same_slot_forbidden");
+  }
+  return { valid: true };
+}
+
+function ruleTopOnlyForDeckAndBenchSource(game, player, card, fromSlotId, toSlotId) {
+  if (fromSlotId.type !== SLOT_TYPES.DECK && fromSlotId.type !== SLOT_TYPES.BENCH) {
+    return { valid: true };
+  }
+
+  const sourceStack = getSlotStack(game, fromSlotId);
+  const topCardId = sourceStack.length
+    ? sourceStack[sourceStack.length - 1]
+    : null;
+
+  if (!topCardId || topCardId !== card.id) {
+    return technicalDenied("source_card_not_top");
+  }
+
+  return { valid: true };
+}
+
 function ruleNotOnOpponentSide(game, player, card, fromSlotId, toSlotId) {
-  const fromPlayer = getPlayerFromSlotId(fromSlotId);
-  const toPlayer = getPlayerFromSlotId(toSlotId);
+  const fromPlayer = fromSlotId.player;
+  const toPlayer = toSlotId.player;
   if (fromPlayer === 0 || toPlayer === 0) {
     return { valid: true };
   }
@@ -84,8 +127,8 @@ function ruleNotOnOpponentSide(game, player, card, fromSlotId, toSlotId) {
 }
 
 function ruleDeckMustPlayOnTable(game, player, card, fromSlotId, toSlotId) {
-  const fromIsDeck = isDeckSlot(fromSlotId);
-  const toIsTable = isTableSlot(toSlotId);
+  const fromIsDeck = fromSlotId.type === SLOT_TYPES.DECK;
+  const toIsTable = toSlotId.type === SLOT_TYPES.TABLE;
 
   if (fromIsDeck && !toIsTable) {
     return userDenied(INGAME_MESSAGE.RULE_DECK_ONLY_TO_TABLE);
@@ -104,8 +147,8 @@ function ruleIsPlayersTurn(game, player, card, fromSlotId, toSlotId) {
 
 function ruleBenchMustPlayOnTable(game, player, card, fromSlotId, toSlotId) {
   // BENCH can only play to TABLE.
-  const fromIsBench = isBenchSlot(fromSlotId);
-  const toIsTable = isTableSlot(toSlotId);
+  const fromIsBench = fromSlotId.type === SLOT_TYPES.BENCH;
+  const toIsTable = toSlotId.type === SLOT_TYPES.TABLE;
 
   if (fromIsBench && !toIsTable) {
     return userDenied(INGAME_MESSAGE.RULE_BENCH_ONLY_TO_TABLE);
@@ -115,7 +158,7 @@ function ruleBenchMustPlayOnTable(game, player, card, fromSlotId, toSlotId) {
 
 // If an Ace is on top (deck) or in hand, BENCH play is blocked.
 function ruleAceMustBePlayed(game, player, card, fromSlotId, toSlotId) {
-  if (!isBenchSlot(toSlotId)) return { valid: true };
+  if (toSlotId.type !== SLOT_TYPES.BENCH) return { valid: true };
 
   const playerIndex = game.players.indexOf(player);
   if (playerIndex === -1) {
@@ -150,9 +193,15 @@ function validateMove(game, player, card, fromSlotId, toSlotId) {
     debugLog("[RULES] Carte inconnue", { player, from_slot_id: fromSlotId, to_slot_id: toSlotId });
     return technicalDenied("card_unknown");
   }
+  if (!(fromSlotId instanceof SlotId) || !(toSlotId instanceof SlotId)) {
+    return technicalDenied("slot_id_not_canonical");
+  }
 
   const globalRules = [
+    ruleFromMustBeClientPlayableSource,
+    ruleFromAndToMustDiffer,
     ruleCardMustBeInFromSlot,
+    ruleTopOnlyForDeckAndBenchSource,
     ruleIsPlayersTurn,
     ruleNotOnOpponentSide,
     ruleDeckMustPlayOnTable,
@@ -206,7 +255,6 @@ function validateMove(game, player, card, fromSlotId, toSlotId) {
 
 export {
   validateMove,
-  isBenchSlot,
   refillHandIfEmpty,
   hasWonByEmptyDeckSlot,
   hasLoseByEmptyPileSlot,

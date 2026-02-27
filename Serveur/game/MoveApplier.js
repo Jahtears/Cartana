@@ -6,8 +6,8 @@ import {
   ensureEmptyTableSlot,
 } from "./helpers/tableHelper.js";
 import {
-  putTop,
-  putBottom,
+  drawCardFromHand,
+  getSlotStack,
   removeCardFromSlot,
 } from "./helpers/slotHelpers.js";
 import { SlotId, SLOT_TYPES } from "./constants/slots.js";
@@ -61,7 +61,9 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
   }
 
   // Remove card from source slot.
-  const removed = removeCardFromSlot(game, fromSlotId, card.id);
+  const removed = fromSlotId.type === SLOT_TYPES.HAND
+    ? drawCardFromHand(game, fromSlotId, card.id) === card.id
+    : removeCardFromSlot(game, fromSlotId, card.id);
   if (!removed) {
     debugWarn("[APPLY] MOVE_SOURCE_MISSING_CARD", {
       actor,
@@ -75,11 +77,12 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
 
   // Convention: bottom = index 0, top = last index.
   // - Table/Bench => push on top
-  // - Other slots => push at bottom
+  // - Other slots => unshift at bottom
+  const targetStack = getSlotStack(game, toSlotId);
   if (toSlotId.type === SLOT_TYPES.TABLE || toSlotId.type === SLOT_TYPES.BENCH) {
-    putTop(game, toSlotId, card.id);
+    targetStack.push(card.id);
   } else {
-    putBottom(game, toSlotId, card.id);
+    targetStack.unshift(card.id);
   }
 
   // Ensure there is an empty table slot available.

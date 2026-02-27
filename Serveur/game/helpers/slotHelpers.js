@@ -1,6 +1,7 @@
 import { SlotId, SLOT_TYPES } from "../constants/slots.js";
 
 const SLOT_TYPE_SET = new Set(Object.values(SLOT_TYPES));
+const HAND_FIXED_SIZE = 5;
 
 function isCardId(value) {
   return typeof value === "string" && value.length > 0;
@@ -24,6 +25,7 @@ function findFirstEmptyHandCell(stack) {
   for (let i = 0; i < stack.length; i++) {
     if (!isCardId(stack[i])) return i;
   }
+  if (stack.length < HAND_FIXED_SIZE) return stack.length;
   return -1;
 }
 
@@ -33,6 +35,10 @@ function fillFirstEmptyHandCell(stack, cardId) {
   stack[emptyIndex] = cardId;
   return true;
 }
+
+/* =========================
+   RUNTIME (SlotId canonique)
+========================= */
 
 function ensureSlotStorage(game, initSlotsFactory = null) {
   if (!game) return null;
@@ -57,32 +63,19 @@ function getSlotStack(game, slotId, initSlotsFactory = null) {
   return slots.get(slotId) || [];
 }
 
-function putTop(game, slotId, cardId, initSlotsFactory = null) {
-  if (!isCardId(cardId)) return;
+function drawCardFromHand(game, slotId, cardId, initSlotsFactory = null) {
+  if (!isHandSlotId(slotId) || !isCardId(cardId)) return null;
   const stack = getSlotStack(game, slotId, initSlotsFactory);
-  if (isHandSlotId(slotId) && fillFirstEmptyHandCell(stack, cardId)) return;
-  stack.push(cardId);
+  const idx = stack.indexOf(cardId);
+  if (idx === -1) return null;
+  stack[idx] = "";
+  return cardId;
 }
 
-function putBottom(game, slotId, cardId, initSlotsFactory = null) {
-  if (!isCardId(cardId)) return;
+function putCardtoHandFromPile(game, slotId, cardId, initSlotsFactory = null) {
+  if (!isHandSlotId(slotId) || !isCardId(cardId)) return false;
   const stack = getSlotStack(game, slotId, initSlotsFactory);
-  if (isHandSlotId(slotId) && fillFirstEmptyHandCell(stack, cardId)) return;
-  stack.unshift(cardId);
-}
-
-function drawTop(game, slotId, initSlotsFactory = null) {
-  const stack = getSlotStack(game, slotId, initSlotsFactory);
-  if (isHandSlotId(slotId)) {
-    for (let i = stack.length - 1; i >= 0; i--) {
-      if (!isCardId(stack[i])) continue;
-      const cardId = stack[i];
-      stack[i] = null;
-      return cardId;
-    }
-    return null;
-  }
-  return stack.length ? stack.pop() : null;
+  return fillFirstEmptyHandCell(stack, cardId);
 }
 
 function removeCardFromSlot(game, slotId, cardId, initSlotsFactory = null) {
@@ -90,7 +83,7 @@ function removeCardFromSlot(game, slotId, cardId, initSlotsFactory = null) {
   const idx = stack.indexOf(cardId);
   if (idx === -1) return false;
   if (isHandSlotId(slotId)) {
-    stack[idx] = null;
+    stack[idx] = "";
     return true;
   }
   stack.splice(idx, 1);
@@ -112,6 +105,10 @@ function isValidSlotShape(player, type, index) {
   if (!Number.isInteger(index) || index < 1) return false;
   return true;
 }
+
+/* =========================
+   BOUNDARY (client <-> serveur)
+========================= */
 
 function parseStringSlotId(value) {
   if (!value) return null;
@@ -148,62 +145,6 @@ function parseSlotId(slotId) {
   };
 }
 
-function getSlotType(slotId) {
-  if (slotId instanceof SlotId) {
-    if (!isValidSlotShape(slotId.player, slotId.type, slotId.index)) return null;
-    return slotId.type;
-  }
-
-  return parseSlotId(slotId)?.type ?? null;
-}
-
-function getSlotContent(game, slotId) {
-  if (!game?.slots) return [];
-
-  if (game.slots instanceof Map) {
-    return game.slots.get(slotId) || [];
-  }
-
-  return game.slots[slotId] || [];
-}
-
-function getPlayerFromSlotId(slotId) {
-  if (slotId instanceof SlotId) {
-    if (slotId.player === 0) return 0;
-    if (slotId.player === 1 || slotId.player === 2) return slotId.player;
-    return null;
-  }
-
-  const parsed = parseSlotId(slotId);
-  if (parsed) {
-    if (parsed.playerIndex === 0) return 0;
-    if (parsed.playerIndex === 1 || parsed.playerIndex === 2) return parsed.playerIndex;
-    return null;
-  }
-
-  return null;
-}
-
-function isTableSlot(slotId) {
-  return getSlotType(slotId) === SLOT_TYPES.TABLE;
-}
-
-function isPileSlot(slotId) {
-  return getSlotType(slotId) === SLOT_TYPES.PILE;
-}
-
-function isBenchSlot(slotId) {
-  return getSlotType(slotId) === SLOT_TYPES.BENCH;
-}
-
-function isDeckSlot(slotId) {
-  return getSlotType(slotId) === SLOT_TYPES.DECK;
-}
-
-function isHandSlot(slotId) {
-  return getSlotType(slotId) === SLOT_TYPES.HAND;
-}
-
 function getHandSize(game, playerIndex) {
   const handSlot = SlotId.create(playerIndex, SLOT_TYPES.HAND, 1);
   return getSlotCount(game, handSlot);
@@ -211,8 +152,7 @@ function getHandSize(game, playerIndex) {
 
 function hasCardInSlot(game, slotId, cardId) {
   if (!game || !game.slots) return false;
-  const slotContent = getSlotContent(game, slotId);
-  if (!Array.isArray(slotContent)) return slotContent === cardId;
+  const slotContent = getSlotStack(game, slotId);
   return slotContent.includes(cardId);
 }
 
@@ -246,14 +186,9 @@ function isOwnerForSlot(game, slotId, username) {
 
   const userPlayerIndex = userArrayIndex + 1;
 
-  if (slotId instanceof SlotId) {
-    if (slotId.player === 0) return false;
-    return slotId.player === userPlayerIndex;
-  }
-
-  const parsed = parseSlotId(String(slotId));
-  if (!parsed || parsed.playerIndex === 0) return false;
-  return parsed.playerIndex === userPlayerIndex;
+  if (!(slotId instanceof SlotId)) return false;
+  if (slotId.player === 0) return false;
+  return slotId.player === userPlayerIndex;
 }
 
 function mapSlotFromClientToServer(slotId, username, game) {
@@ -264,7 +199,7 @@ function mapSlotFromClientToServer(slotId, username, game) {
 
   if (parsedClientSlot.playerIndex === 0) {
     const serverSlot = SlotId.create(0, parsedClientSlot.type, parsedClientSlot.number);
-    if (!isPileSlot(serverSlot) && !isTableSlot(serverSlot)) return null;
+    if (parsedClientSlot.type !== SLOT_TYPES.PILE && parsedClientSlot.type !== SLOT_TYPES.TABLE) return null;
     return isSlotIdPresent(game, serverSlot) ? serverSlot : null;
   }
 
@@ -290,28 +225,19 @@ function slotIdToString(slotId) {
 }
 
 export {
-  drawTop,
+  drawCardFromHand,
   ensureSlotStorage,
   getSlotCount,
   getSlotStack,
-  getSlotType,
   getHandSize,
   hasCardInSlot,
-  getSlotContent,
-  getPlayerFromSlotId,
   isSlotIdPresent,
   isOwnerForSlot,
-  isBenchSlot,
-  isDeckSlot,
-  isHandSlot,
-  isPileSlot,
   isSlotEmpty,
-  isTableSlot,
   mapSlotForClient,
   mapSlotFromClientToServer,
   parseSlotId,
-  putBottom,
-  putTop,
+  putCardtoHandFromPile,
   removeCardFromSlot,
   slotIdToString,
 };

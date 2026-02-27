@@ -1,9 +1,10 @@
 import { ensureGameMeta, ensureGameResult } from "../../game/meta.js";
 import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
+import { SLOT_TYPES } from "../../game/constants/slots.js";
 import { mapSlotForClient, isOwnerForSlot } from "../../game/helpers/slotHelpers.js";
 import { buildCardData } from "../../game/builders/gameBuilder.js";
 import { getTableSlots } from "../../game/helpers/tableHelper.js";
-import { getSlotContent, getSlotType, isTableSlot, slotIdToString } from "../../game/helpers/slotHelpers.js";
+import { getSlotStack, slotIdToString } from "../../game/helpers/slotHelpers.js";
 import { applySlotDragPolicy, getVisibleCardIdsForSlot, toSlotStack } from "../../game/helpers/slotViewHelpers.js";
 import { getCardById } from "../../game/helpers/cardHelpers.js";
 import { getSlotCount } from "../../game/helpers/slotHelpers.js";
@@ -27,20 +28,19 @@ function buildSlotStateForUser(game, username, slot_id, view, { forceDisableDrag
 
   const cards = [];
 
-  const slotValue = getSlotContent(game, slot_id);
-  const stack = toSlotStack(slotValue);
+  const stack = toSlotStack(getSlotStack(game, slot_id));
   const count = getSlotCount(game, slot_id);
 
   if (!stack.length) return { slot_id: clientSlot, cards, count };
 
-  const slotType = getSlotType(slot_id);
+  const slotType = slot_id?.type ?? null;
   const ids = getVisibleCardIdsForSlot(slotType, stack);
 
   for (let i = 0; i < ids.length; i++) {
     const card = getCardById(game, ids[i]);
     if (!card) continue;
 
-    const payload = buildCardData(card, clientSlot, isOwner, disableDrag);
+    const payload = buildCardData(card, slot_id, isOwner, disableDrag, clientSlot);
     payload.draggable = applySlotDragPolicy(slotType, stack, ids[i], payload.draggable);
 
     cards.push(payload);
@@ -118,7 +118,7 @@ function buildStateSnapshotForUser(game, username, view, { result = null, forceD
   // Ordre stable (non-table puis table)
   const allSlots = game?.slots instanceof Map ? Array.from(game.slots.keys()) : [];
 
-  const nonTable = allSlots.filter((s) => !isTableSlot(s));
+  const nonTable = allSlots.filter((s) => s?.type !== SLOT_TYPES.TABLE);
   const orderedTable = tableSlotIds;
 
   for (const slot_id of nonTable) {

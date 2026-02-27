@@ -19,9 +19,8 @@ import {
   ensureEmptyTableSlot,
 } from "./tableHelper.js";
 import {
+  drawCardFromHand,
   getSlotStack,
-  putTop,
-  removeCardFromSlot,
 } from "./slotHelpers.js";
 import {
   recycleFullTableSlotsToPile,
@@ -109,9 +108,10 @@ function tryExpireTurn(game, now = Date.now()) {
   const ace = handSlot ? findAceCardInHand(game, handSlot, DEFAULT_HAND_SIZE) : null;
   if (ace) {
     const { slotId: tableSlot, created } = ensureEmptyTableSlot(game);
-    const removed = removeCardFromSlot(game, ace.slotId, ace.cardId);
+    const removed = drawCardFromHand(game, ace.slotId, ace.cardId);
     if (removed) {
-      putTop(game, tableSlot, ace.cardId);
+      const tableStack = getSlotStack(game, tableSlot);
+      tableStack.push(ace.cardId);
       playedAce = true;
       aceFrom = ace.slotId;
       aceTo = tableSlot;

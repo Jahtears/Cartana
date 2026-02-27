@@ -20,7 +20,7 @@
 ## 3. Stockage des cartes
 
 - `game.slots` : `Map<SlotId, string[]>`.
-- Les stacks contiennent uniquement des `card_id`. **Jamais de `null`.**
+- Les stacks contiennent uniquement des `card_id`.
 - **Exception `HAND` :** le stack est toujours de taille fixe 5. `""` représente une position libre.
 - Les cartes sont indexées dans `game.cardsById[card_id]`.
 
@@ -41,6 +41,9 @@ Tous les slots — sauf `HAND` — utilisent la convention dense :
 ## 5. Mapping client/serveur des slots
 
 - Le client voit toujours son propre côté en `playerIndex=1`.
+- Le parsing des `slot_id` string est limité à la frontière réseau (`move_request`).
+- Après mapping, le moteur (`Serveur/game`) manipule uniquement des `SlotId` canoniques.
+- Les checks runtime se font en accès direct (`slotId.type`, `slotId.player`, `slotId.index`) avec `SLOT_TYPES.*`.
 
 ---
 
@@ -59,7 +62,7 @@ Modèle interne serveur :
 | `color`  | `H C P S`                                 |
 | `source` | `A` ou `B` (identifie le paquet physique) |
 
-**Génération initiale :** 2 paquets physiques mélangés séparément : `sourceA` et `sourceB`, chacun contenant `13 valeurs × 4 couleurs = 52 cartes`.
+**Génération initiale :** 2 paquets physiques mélangés séparément : `A` et `B`, chacun contenant `13 valeurs × 4 couleurs = 52 cartes`.
 
 ---
 
@@ -89,7 +92,7 @@ Modèle interne serveur :
 
 | Slot    | Cartes visibles              | Draggable                          | Droppable    |
 |---------|------------------------------|------------------------------------|--------------|
-| `DECK`  | top + top-1 (en dos)         | top uniquement ¹                   | non          |
+| `DECK`  | top + top-1 (en dos)   (todo)| top uniquement ¹                   | non          |
 | `HAND`  | toutes (owner) / dos (adv.)  | toutes (owner) ¹                   | non          |
 | `BENCH` | toutes                       | top uniquement ¹                   | cf. §12.2    |
 | `TABLE` | top uniquement               | non                                | cf. §11.1    |
@@ -103,13 +106,13 @@ Modèle interne serveur :
 
 | Slot         | Contenu                                      |
 |--------------|----------------------------------------------|
-| `1:HAND:1`   | 5 cartes depuis `sourceA`                    |
-| `2:HAND:1`   | 5 cartes depuis `sourceA`                    |
-| `1:DECK:1`   | 26 cartes depuis `sourceB`                   |
-| `2:DECK:1`   | 26 cartes depuis `sourceB`                   |
+| `1:HAND:1`   | 5 cartes depuis `A`                    |
+| `2:HAND:1`   | 5 cartes depuis `A`                    |
+| `1:DECK:1`   | 26 cartes depuis `B`                   |
+| `2:DECK:1`   | 26 cartes depuis `B`                   |
 | `1:BENCH:1-4`| 4 slots vides                                |
 | `2:BENCH:1-4`| 4 slots vides                                |
-| `0:PILE:1`   | reste de `sourceA` (42 cartes)               |
+| `0:PILE:1`   | reste de `A` (42 cartes)               |
 | `0:TABLE:1`  | vide                                         |
 
 ---
@@ -134,7 +137,10 @@ Modèle interne serveur :
 - Seul le joueur courant peut jouer.
 - Aucun slot adverse autorisé en `from`/`to` (sauf slots partagés `player=0`).
 - Les slots joueurs en `from` doivent appartenir à l'acteur.
-- si from_slot_id = to_slot_id move interdit
+- `from_slot_id` et `to_slot_id` doivent être différents.
+- Si `from_slot_id` est `DECK` ou `BENCH`, seule la carte top est autorisée.
+- Les slots partagés (`PILE`, `TABLE`) sont interdits en `from_slot_id` côté client.
+- Toute violation technique (anti-bug/anti-hack) est refusée avec `RULE_MOVE_DENIED`.
 
 ---
 
@@ -178,7 +184,7 @@ Le slot `TABLE` cible doit exister.
 
 ### 12.1 Démarrage de partie
 
-Le tour démarre dès que les 2 joueurs ont rejoint. Le starter est désigné en comparant le top de `DECK` de chaque joueur selon l'ordre : `A > R > D > V > 10 > … > 2`. En cas d'égalité, on compare top-1. En cas d'égalité, on compare top-1-1 ect.
+Le tour démarre dès que les 2 joueurs ont rejoint. Le starter est désigné en comparant le top de `DECK` de chaque joueur selon l'ordre : `A > R > D > V > 10 > … > 2`. En cas d'égalité, on compare top-1. En cas d'égalité, on compare top-1-1 ect.(todo)
 
 Le tour initial est numéroté `1`, et le timer est fixé à `TURN_MS = 20 000 ms`.
 
@@ -224,41 +230,15 @@ Le serveur vérifie les expirations toutes les `250 ms`. À l'expiration :
 | Cause | `winner` |
 |-------|----------|----------|
 | Deck de l'acteur vide après un move `DECK → TABLE` | acteur |
-| Pile partagée vide en fin de tour|  `null` (nul) |
-| 3 timeouts consécutifs d'un joueur | adversaire |
-| le joueur quiite la partie avec le bouton | adversaire |
+| Pile partagée vide en fin de tour|  `null` (nul) | (todo)
+| 3 timeouts consécutifs d'un joueur | adversaire |(todo)
+| le joueur quitte la partie avec le bouton | adversaire |
 | le joueur quitte la partie en fermant la fenetre | adversaire |
 
 
 
 ---
 
-## 14. Convention de nommage
-
-### 14.1 Format cible
-
-`domaine_action_objet`
-
-- **domaine** : `slot`, `card`, `move`, `table`, `hand`, `turn`, `game_end`, `payload`
-- **action** : `parse`, `format`, `get`, `build`, `validate`, `apply`, `ensure`, `recycle`, `init`, `end`, `expire`, `pause`, `resume`, `emit`, `count`, `refill`
-- **objet** : nom métier (`id`, `type`, `state`, `snapshot`…)
-
-Toute exception doit être documentée explicitement dans la section concernée.
-
-### 14.2 Noms cibles par domaine
-
-| Domaine    | Noms cibles                                                                       |
-|------------|-----------------------------------------------------------------------------------|
-| `slot`     | `slot_parse_id`, `slot_format_id`, `slot_map_client_server`                       |
-| `card`     | `card_get_by_id`, `card_rank_turn`, `card_compare_turn`                           |
-| `move`     | `move_validate`, `move_apply`                                                     |
-| `table`    | `table_validate`, `table_get_allowed`, `table_ensure_empty`, `table_recycle`      |
-| `hand`     | `hand_refill`                                                                     |
-| `turn`     | `turn_init`, `turn_end`, `turn_expire`, `turn_pause`, `turn_resume`, `turn_count_timeout` |
-| `game_end` | `game_end_resolve`, `game_end_snapshot`                                           |
-| `payload`  | `payload_build_card`, `payload_build_slot`, `payload_build_snapshot`              |
-
-> Le mapping vers les noms legacy est maintenu dans `MIGRATION.md`, pas ici.
 
 ---
 
@@ -279,3 +259,8 @@ Payload standard : `{ message_code, details? }`
 | Refus métier  | `RULE_DECK_TO_TABLE`, `RULE_NOT_YOUR_TURN`, `RULE_BENCH_TO_TABLE`, `RULE_ACE_DECK`, `RULE_ACE_HAND`, `RULE_TABLE_ALLOWED` ¹                  |
 
 ¹ `RULE_TABLE_ALLOWED` inclut `allowed_values` dans `details`.
+
+### 15.3 Taxonomie des refus
+
+- **Refus métier (`kind=user`)** : move légal côté protocole mais interdit par les règles de jeu. Le serveur renvoie un code métier dédié.
+- **Refus technique / anti-hack (`kind=technical`)** : move invalide côté protocole (slot source partagé, `from=to`, carte non-top sur source top-only, etc.). Le serveur renvoie `RULE_MOVE_DENIED` sans exposer le `debug_reason`.

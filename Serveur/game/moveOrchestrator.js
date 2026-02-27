@@ -3,7 +3,6 @@
 
 import { SLOT_TYPES, SlotId } from "./constants/slots.js";
 import { DEFAULT_HAND_SIZE } from "./constants/turnFlow.js";
-import { isTableSlot } from "./helpers/slotHelpers.js";
 import { GAME_END_REASONS } from "./constants/gameEnd.js";
 import { technicalDenied } from "./helpers/deniedHelpers.js";
 
@@ -35,7 +34,6 @@ export function orchestrateMove(params) {
     validateMove,
     applyMove,
     getCardById,
-    isBenchSlot,
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
     hasLoseByEmptyPileSlot,
@@ -59,6 +57,9 @@ export function orchestrateMove(params) {
   if (!card) {
     return technicalDenied("card_not_found");
   }
+  if (!(fromSlotId instanceof SlotId) || !(toSlotId instanceof SlotId)) {
+    return technicalDenied("slot_id_not_canonical");
+  }
 
   // ========================
   // 2) VALIDATE MOVE
@@ -80,7 +81,7 @@ export function orchestrateMove(params) {
   // ========================
   // 4) DETERMINE IF BENCH PLAY (ends turn)
   // ========================
-  const endsTurn = isBenchSlot(toSlotId);
+  const endsTurn = toSlotId.type === SLOT_TYPES.BENCH;
 
   // ========================
   // 5) REFILL HAND IF NEEDED (only if not ending turn)
@@ -163,7 +164,7 @@ export function orchestrateMove(params) {
       fx.syncTable(freshTableSlots);
     }
 
-    if (!isTableSlot(fromSlotId) || fromExists) fx.touch(fromSlotId);
+    if (fromSlotId.type !== SLOT_TYPES.TABLE || fromExists) fx.touch(fromSlotId);
     fx.touch(toSlotId);
     for (const refill of given) fx.touch(refill.slotId);
     fx.touch(pileSlotId);
