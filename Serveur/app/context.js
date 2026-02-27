@@ -54,6 +54,7 @@ export function createServerContext({ onTransportSend } = {}) {
     wsByUser: state.wsByUser,
     userToGame: state.userToGame,
     userToSpectate: state.userToSpectate,
+    userToEndGame: state.userToEndGame,
     gameSpectators: state.gameSpectators,
     pendingInviteTo: state.pendingInviteTo,
     inviteFrom: state.inviteFrom,

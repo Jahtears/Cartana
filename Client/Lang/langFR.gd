@@ -14,6 +14,7 @@ const POPUP_TEXT_BY_CODE = {
 
 	"POPUP_AUTH_REQUIRED": "Authentification requise",
 	"POPUP_AUTH_BAD_PIN": "PIN incorrect",
+	"POPUP_AUTH_MAX_TRY": "Trop de tentatives. Réessaie dans {retry_after_s}s",
 	"POPUP_AUTH_ALREADY_CONNECTED": "Utilisateur déjà connecté",
 	"POPUP_AUTH_MISSING_CREDENTIALS": "Identifiant ou PIN manquant",
 	"POPUP_AUTH_CONNECTION_ERROR": "Erreur de connexion",
@@ -104,5 +105,5 @@ static func label(key: String, fallback := "") -> String:
 static func format_template(template: String, params: Dictionary) -> String:
 	var out := String(template)
 	for key in params.keys():
-		out = out.replace("{%s}" % String(key), String(params[key]))
+		out = out.replace("{%s}" % str(key), str(params[key]))
 	return out

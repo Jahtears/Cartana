@@ -46,19 +46,40 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 		Global.username = u
 		get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
 	else:
-		var popup := Protocol.normalize_popup_error(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
-		_show_popup_normalized(popup)
+		_show_login_error(error)
 
 func _on_network_disconnected(_code: int, reason: String) -> void:
 	if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
 		return
 	_show_popup_code(Protocol.POPUP_AUTH_CONNECTION_ERROR)
 
-func _show_message_code(message_code: String, params: Dictionary = {}) -> void:
-	_show_popup_code(message_code, params)
-
 func _show_popup_code(message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
 	PopupUi.show_info_code(message_code, params, payload, options)
+
+func _show_login_error(error: Dictionary) -> void:
+	var popup := _normalize_login_error(error)
+	_show_popup_normalized(popup)
+
+func _normalize_login_error(error: Dictionary) -> Dictionary:
+	var normalized := Protocol.normalize_popup_error(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
+	var message_code := String(normalized.get("message_code", "")).strip_edges()
+	if message_code != Protocol.POPUP_AUTH_MAX_TRY:
+		return normalized
+
+	var params_val = normalized.get("message_params", {})
+	var params: Dictionary = params_val if params_val is Dictionary else {}
+	if params.has("retry_after_s"):
+		return normalized
+
+	var details_val = error.get("details", {})
+	var details: Dictionary = details_val if details_val is Dictionary else {}
+	var retry_after_ms := int(details.get("retry_after_ms", 0))
+	if retry_after_ms <= 0:
+		return normalized
+
+	params["retry_after_s"] = int((retry_after_ms + 999) / 1000)
+	normalized["message_params"] = params
+	return normalized
 
 func _show_popup_normalized(normalized: Dictionary, payload: Dictionary = {}) -> void:
 	var message_code := String(normalized.get("message_code", "")).strip_edges()
@@ -84,7 +105,7 @@ func _on_login_button_pressed() -> void:
 	var pin: String = _pin_input.text.strip_edges()
 
 	if username == "" or pin == "":
-		_show_message_code(Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
+		_show_popup_code(Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
 		return
 
 	_last_username = username

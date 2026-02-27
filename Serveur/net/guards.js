@@ -111,8 +111,9 @@ export function rejectIfBusyOrRes(ctx, ws, req, username, message = POPUP_MESSAG
   const state = ctx.state;
 
   const inGame = !!state.userToGame.get(username);
+  const inEndGame = !!state.userToEndGame?.get(username);
 
-  if (inGame) {
+  if (inGame || inEndGame) {
     resError(sendRes, ws, req, message);
     return true;
   }

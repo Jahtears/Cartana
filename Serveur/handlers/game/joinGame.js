@@ -21,7 +21,7 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
     setUserActivity,
     Activity,
   } = ctx;
-  const { userToGame, gameMeta, readyPlayers, wsByUser } = state;
+  const { userToGame, userToEndGame, gameMeta, readyPlayers, wsByUser } = state;
 
   const game_id = requireParam(sendRes, ws, req, data, "game_id");
   if (!game_id) return true;
@@ -53,7 +53,13 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
 
   // Resync/rejoin si la partie est déjà initialisée.
   if (meta.initialSent) {
-    emitFullState(game, actor, wsByUser, sendEvtSocket, { view: "player", gameMeta, game_id });
+    emitFullState(game, actor, wsByUser, sendEvtSocket, {
+      view: "player",
+      gameMeta,
+      game_id,
+      userToGame,
+      userToEndGame,
+    });
     sendRes(ws, req, true, { ok: true, game_id, players: game.players, rejoined: true });
     return true;
   }

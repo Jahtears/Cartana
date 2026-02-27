@@ -44,7 +44,7 @@ export function cleanupIfOrphaned(ctx, game_id, { reason = "", allowPending = fa
     deleteGameState,
     refreshLobby,
   } = ctx;
-  const { games, gameMeta, readyPlayers, gameSpectators, userToGame } = state;
+  const { games, gameMeta, readyPlayers, gameSpectators, userToGame, userToEndGame } = state;
 
   if (!games.has(game_id)) {
     if (gameMeta.has(game_id)) {
@@ -57,9 +57,10 @@ export function cleanupIfOrphaned(ctx, game_id, { reason = "", allowPending = fa
 
   const game = games.get(game_id);
   const stillPlayersAttached = game.players.some((p) => userToGame.get(p) === game_id);
+  const stillPlayersInEndGame = game.players.some((p) => userToEndGame?.get(p) === game_id);
   const spectatorsCount = gameSpectators.get(game_id)?.size ?? 0;
 
-  if (stillPlayersAttached || spectatorsCount > 0) return false;
+  if (stillPlayersAttached || stillPlayersInEndGame || spectatorsCount > 0) return false;
 
   const meta = gameMeta.get(game_id);
   if (meta?.post_game_state === POST_GAME_STATES.REMATCH_PENDING && !allowPending) return false;
@@ -219,12 +220,13 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
     sendRes,
     refreshLobby,
   } = ctx;
-  const { games, gameMeta } = state;
+  const { games, gameMeta, userToEndGame } = state;
   const game_id = resolveAckGameId(ctx, ws, req, data, actor);
   const ackIntent = String(data?.intent ?? "").trim().toLowerCase();
 
   // idempotent: sans game_id -> OK
   if (!game_id) {
+    userToEndGame?.delete(actor);
     return sendAckResponse(refreshLobby, sendRes, ws, req, {
       ack: true,
       game_id: "",
@@ -264,6 +266,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
   maybeEndByAckAsAbandon(ctx, game_id, game, actor, wasPlayer, meta);
   if (ackIntent === ACK_INTENT_REMATCH && wasPlayer && meta.result) {
     meta.post_game_state = POST_GAME_STATES.REMATCH_PENDING;
+    userToEndGame?.set(actor, game_id);
   }
   recordAckAndSchedule(ctx, meta, game_id, actor);
 

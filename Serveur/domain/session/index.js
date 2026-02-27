@@ -91,12 +91,15 @@ function isSocketOpen(ws) {
   return !!ws && ws.readyState === 1;
 }
 
-function isRematchAllowedForPlayer(game, game_id, meta, wsByUser, userToGame, username) {
+function isRematchAllowedForPlayer(game, game_id, meta, wsByUser, userToGame, userToEndGame, username) {
   const opponent = resolvePlayerOpponent(game, username);
   if (!opponent) return false;
   if (!wsByUser || typeof wsByUser.get !== "function") return false;
-  if (!userToGame || typeof userToGame.get !== "function") return false;
-  if (String(userToGame.get(opponent) ?? "") !== String(game_id ?? "")) return false;
+  const inSameGame = !!(userToGame && typeof userToGame.get === "function"
+    && String(userToGame.get(opponent) ?? "") === String(game_id ?? ""));
+  const inSameEndGame = !!(userToEndGame && typeof userToEndGame.get === "function"
+    && String(userToEndGame.get(opponent) ?? "") === String(game_id ?? ""));
+  if (!inSameGame && !inSameEndGame) return false;
   if (!isSocketOpen(wsByUser.get(opponent))) return false;
   if (meta?.disconnected instanceof Set && meta.disconnected.has(opponent)) return false;
   return true;
@@ -158,7 +161,19 @@ export function emitSlotState(game, recipients, wsByUser, sendEvtSocket, { slot_
   }
 }
 
-export function emitFullState(game, username, wsByUser, sendEvtSocket, { view = "player", gameMeta = null, game_id = "" } = {}) {
+export function emitFullState(
+  game,
+  username,
+  wsByUser,
+  sendEvtSocket,
+  {
+    view = "player",
+    gameMeta = null,
+    game_id = "",
+    userToGame = null,
+    userToEndGame = null,
+  } = {}
+) {
   if (!wsByUser || typeof wsByUser.get !== "function") return;
 
   const ws = wsByUser.get(username);
@@ -177,6 +192,7 @@ export function emitFullState(game, username, wsByUser, sendEvtSocket, { view = 
           meta,
           wsByUser,
           userToGame,
+          userToEndGame,
           username
         );
       }
@@ -201,6 +217,7 @@ export function createGameNotifier({
   gameSpectators = state?.gameSpectators,
   wsByUser = state?.wsByUser,
   userToGame = state?.userToGame,
+  userToEndGame = state?.userToEndGame,
   sendEvtSocket,
   sendEvtUser,
 }) {
@@ -267,14 +284,26 @@ export function createGameNotifier({
 
     // joueurs
     for (const p of game.players) {
-      emitFullState(game, p, wsByUser, sendEvtSocket, { view: "player", gameMeta, game_id });
+      emitFullState(game, p, wsByUser, sendEvtSocket, {
+        view: "player",
+        gameMeta,
+        game_id,
+        userToGame,
+        userToEndGame,
+      });
     }
 
     // spectateurs
     const specs = gameSpectators.get(game_id);
     if (specs && specs.size) {
       for (const s of specs) {
-        emitFullState(game, s, wsByUser, sendEvtSocket, { view: "spectator", gameMeta, game_id });
+        emitFullState(game, s, wsByUser, sendEvtSocket, {
+          view: "spectator",
+          gameMeta,
+          game_id,
+          userToGame,
+          userToEndGame,
+        });
       }
     }
 
@@ -301,6 +330,9 @@ export function createGameNotifier({
 
     for (const p of game.players) {
       if (excludeSet.has(p)) continue;
+      if (userToEndGame && typeof userToEndGame.set === "function") {
+        userToEndGame.set(p, game_id);
+      }
       sendEvtUser(p, "game_end", {
         ...payload,
         rematch_allowed: isRematchAllowedForPlayer(
@@ -309,6 +341,7 @@ export function createGameNotifier({
           meta,
           wsByUser,
           userToGame,
+          userToEndGame,
           p
         ),
       });

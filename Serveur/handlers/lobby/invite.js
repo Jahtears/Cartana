@@ -34,7 +34,7 @@ function resolveRematchOpponent(game, actor) {
 
 function validateRematchInviteOrRes(ctx, ws, req, actor, to, source_game_id) {
   const { state, sendRes } = ctx;
-  const { games, gameMeta, wsByUser } = state;
+  const { games, gameMeta, wsByUser, userToEndGame } = state;
 
   if (!source_game_id) {
     resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_REQUEST, {
@@ -58,6 +58,12 @@ function validateRematchInviteOrRes(ctx, ws, req, actor, to, source_game_id) {
 
   const sourceMeta = ensureGameEndMeta(gameMeta, source_game_id, { initialSent: true });
   if (!sourceMeta?.result) {
+    resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_STATE);
+    return null;
+  }
+
+  const actorInEndGame = String(userToEndGame?.get(actor) ?? "") === source_game_id;
+  if (!actorInEndGame) {
     resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_STATE);
     return null;
   }

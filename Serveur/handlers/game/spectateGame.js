@@ -13,7 +13,7 @@ export function handleSpectateGame(ctx, ws, req, data, actor) {
     sendEvtSocket,
     attachSpectator,
   } = ctx;
-  const { userToSpectate, wsByUser, gameMeta } = state;
+  const { userToSpectate, userToGame, userToEndGame, wsByUser, gameMeta } = state;
 
   const game_id = requireParam(sendRes, ws, req, data, "game_id");
   if (!game_id) return true;
@@ -39,7 +39,13 @@ export function handleSpectateGame(ctx, ws, req, data, actor) {
     alreadySpectatingThisGame &&
     meta.initialSent
   ) {
-    emitFullState(game, actor, wsByUser, sendEvtSocket, { view: "spectator", gameMeta, game_id });
+    emitFullState(game, actor, wsByUser, sendEvtSocket, {
+      view: "spectator",
+      gameMeta,
+      game_id,
+      userToGame,
+      userToEndGame,
+    });
   }
 
   if (!alreadySpectatingThisGame) refreshLobby();

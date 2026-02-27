@@ -100,10 +100,26 @@ function getRetryAfterMs(keys, nowMs = Date.now()) {
   return retryAfter;
 }
 
+function retryAfterSeconds(retryAfterMs) {
+  const safeMs = Math.max(0, Number(retryAfterMs) || 0);
+  return Math.max(1, Math.ceil(safeMs / 1000));
+}
+
+function buildMaxTryError(retryAfterMs) {
+  const safeMs = Math.max(0, Number(retryAfterMs) || 0);
+  const retryAfterS = retryAfterSeconds(safeMs);
+  return {
+    message_code: POPUP_MESSAGE.AUTH_MAX_TRY,
+    message_params: { retry_after_s: retryAfterS },
+    details: { retry_after_ms: safeMs },
+  };
+}
+
 function recordLoginFailure(keys, nowMs = Date.now()) {
-  if (!Array.isArray(keys) || keys.length === 0) return;
+  if (!Array.isArray(keys) || keys.length === 0) return 0;
   maybeSweepBuckets(nowMs);
 
+  let retryAfter = 0;
   for (const key of keys) {
     const bucket = getOrCreateBucket(key, nowMs);
     pruneFailures(bucket, nowMs);
@@ -112,8 +128,10 @@ function recordLoginFailure(keys, nowMs = Date.now()) {
     if (bucket.failures.length >= LOGIN_RATE_MAX_ATTEMPTS) {
       bucket.blockedUntil = Math.max(bucket.blockedUntil, nowMs + LOGIN_RATE_BLOCK_MS);
       bucket.failures.length = 0;
+      retryAfter = Math.max(retryAfter, bucket.blockedUntil - nowMs);
     }
   }
+  return retryAfter;
 }
 
 function clearLoginFailures(keys) {
@@ -151,20 +169,21 @@ export async function handleLogin(ctx, ws, req, data) {
 
   const retryAfterMs = getRetryAfterMs(rateLimitKeys);
   if (retryAfterMs > 0) {
-    sendRes(ws, req, false, {
-      message_code: POPUP_MESSAGE.AUTH_BAD_PIN,
-      details: { retry_after_ms: retryAfterMs },
-    });
+    sendRes(ws, req, false, buildMaxTryError(retryAfterMs));
     return true;
   }
 
   try {
     const ok = await verifyOrCreateUser(username, pin);
     if (!ok) {
-      recordLoginFailure(rateLimitKeys);
-      sendRes(ws, req, false, {
-        message_code: POPUP_MESSAGE.AUTH_BAD_PIN,
-      });
+      const blockedForMs = recordLoginFailure(rateLimitKeys);
+      if (blockedForMs > 0) {
+        sendRes(ws, req, false, buildMaxTryError(blockedForMs));
+      } else {
+        sendRes(ws, req, false, {
+          message_code: POPUP_MESSAGE.AUTH_BAD_PIN,
+        });
+      }
       return true;
     }
 

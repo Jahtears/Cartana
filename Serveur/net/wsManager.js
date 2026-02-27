@@ -82,30 +82,11 @@ export function createWSManager({ wss, trace }) {
     });
   }
 
-  /**
-   * Compter les clients actifs
-   * @returns {number} Nombre de clients
-   */
-  function getClientCount() {
-    return clientMeta.size;
-  }
-
-  /**
-   * Obtenir les métadonnées d'un client
-   * @param {WebSocket} ws - Client WebSocket
-   * @returns {Object} Métadonnées du client
-   */
-  function getClientMeta(ws) {
-    return clientMeta.get(ws);
-  }
-
   return {
     initClient,
     markActivity,
     registerUsername,
     unregisterClient,
     startHeartbeat,
-    getClientCount,
-    getClientMeta,
   };
 }

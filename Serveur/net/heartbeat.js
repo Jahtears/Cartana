@@ -109,14 +109,3 @@ export function stopHeartbeatManager(heartbeatTimer) {
     clearInterval(heartbeatTimer);
   }
 }
-
-/**
- * Obtenir les constantes par défaut (utile pour tests/config)
- */
-export function getHeartbeatConfig() {
-  return {
-    interval: DEFAULT_HEARTBEAT_CHECK_INTERVAL_MS,
-    timeout: DEFAULT_HEARTBEAT_TIMEOUT_MS,
-    idle_before_ping: DEFAULT_HEARTBEAT_IDLE_BEFORE_PING_MS,
-  };
-}

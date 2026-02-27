@@ -11,6 +11,7 @@ export function createRoles(ctx) {
     wsByUser,
     userToGame,
     userToSpectate,
+    userToEndGame = new Map(),
     gameSpectators,
     pendingInviteTo,
     inviteFrom,
@@ -47,6 +48,7 @@ export function createRoles(ctx) {
     if (activity === Activity.IN_GAME) {
       if (game_id) userToGame.set(username, game_id);
       else userToGame.delete(username);
+      userToEndGame.delete(username);
 
       // ✅ ex-spectateur -> clean
       userToSpectate.delete(username);
@@ -55,6 +57,7 @@ export function createRoles(ctx) {
 
     if (activity === Activity.SPECTATING) {
       userToGame.delete(username);
+      userToEndGame.delete(username);
 
       if (game_id) userToSpectate.set(username, game_id);
       else userToSpectate.delete(username);
@@ -69,6 +72,7 @@ export function createRoles(ctx) {
     // LOBBY
     userToGame.delete(username);
     userToSpectate.delete(username);
+    userToEndGame.delete(username);
   }
 
   /**
@@ -89,6 +93,11 @@ export function createRoles(ctx) {
         const meta = gameMeta.get(game_id);
         const result = !!meta?.result;
         activity = { type: Activity.IN_GAME, game_id, result };
+      } else {
+        const endGameId = userToEndGame.get(username);
+        if (endGameId) {
+          activity = { type: Activity.IN_GAME, game_id: endGameId, result: true, end_game: true };
+        }
       }
     }
 
@@ -114,10 +123,6 @@ export function createRoles(ctx) {
 
   function detachSpectator(_game_id, username) {
     setUserActivity(username, Activity.LOBBY, null);
-  }
-  
-  function isSpectator(game_id, username) {
-    return userToSpectate.get(username) === game_id;
   }
 
   // ✅ utile sur disconnect: évite “invites fantômes”
@@ -148,7 +153,6 @@ export function createRoles(ctx) {
     attachSpectator,
     detachSpectator,
     clearInvitesForUser,
-    isSpectator,
 
   };
 }
