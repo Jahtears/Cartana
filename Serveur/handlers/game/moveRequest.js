@@ -4,7 +4,6 @@ import { resError } from "../../net/transport.js";
 import { orchestrateMove } from "../../game/usecases/move/orchestrateMove.js";
 import { ensureGameMeta } from "../../game/meta.js";
 import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
-import { INGAME_MESSAGE } from "../../game/constants/ingameMessages.js";
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 import { deniedTracePayload, technicalDenied } from "../../game/helpers/deniedHelpers.js";
 import { mapSlotForClient, mapSlotFromClientToServer } from "../../game/boundary/slotIdMapper.js";
@@ -14,7 +13,20 @@ function safeObject(value) {
   return value;
 }
 
-const INGAME_MESSAGE_CODES = new Set(Object.values(INGAME_MESSAGE));
+const RULE_CODES = new Set([
+  "RULE_OK",
+  "RULE_MOVE_DENIED",
+  "RULE_DECK_TO_TABLE",
+  "RULE_NOT_YOUR_TURN",
+  "RULE_BENCH_TO_TABLE",
+  "RULE_ACE_IN_DECK",
+  "RULE_ACE_IN_HAND",
+  "RULE_ALLOWED_ON_TABLE",
+  "RULE_OPPONENT_SLOT_FORBIDDEN",
+  "RULE_TURN_START_FIRST",
+  "RULE_TURN_START",
+  "RULE_TURN_TIMEOUT",
+]);
 
 function buildMoveDetails(cardId, fromSlotId) {
   const details = {};
@@ -29,12 +41,12 @@ function buildMoveDetails(cardId, fromSlotId) {
 function buildMoveClientErrorPayload({ moveError, cardId, fromSlotId }) {
   const kind = String(moveError?.kind ?? "").trim();
   const payload = {
-    message_code: INGAME_MESSAGE.MOVE_DENIED,
+    message_code: "RULE_MOVE_DENIED",
   };
 
   if (kind === "user") {
     const userCode = String(moveError?.code ?? "").trim();
-    if (INGAME_MESSAGE_CODES.has(userCode)) {
+    if (RULE_CODES.has(userCode)) {
       payload.message_code = userCode;
     }
 
@@ -78,7 +90,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   if (typeof processTurnTimeout === "function") {
     const didExpire = processTurnTimeout(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
-      return resError(sendRes, ws, req, INGAME_MESSAGE.TURN_TIMEOUT, { game_id });
+      return resError(sendRes, ws, req, "RULE_TURN_TIMEOUT", { game_id });
     }
   }
 
@@ -109,7 +121,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
       fromSlotId: raw_from,
     });
 
-    ctx.trace?.("MOVE_DENIED", {
+    ctx.trace?.("RULE_MOVE_DENIED", {
       actor,
       card_id,
       from_slot_id: raw_from || null,
@@ -144,7 +156,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
       fromSlotId: client_from,
     });
 
-    ctx.trace?.("MOVE_DENIED", {
+    ctx.trace?.("RULE_MOVE_DENIED", {
       actor,
       card_id,
       from_slot_id: String(client_from),

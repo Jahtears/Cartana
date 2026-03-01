@@ -17,7 +17,7 @@ function safeObject(value) {
 function normalizeMessageCode(raw, fallback = POPUP_MESSAGE.TECH_ERROR_GENERIC) {
   const candidate = String(raw ?? "").trim();
   if (!candidate) return fallback;
-  if (candidate.startsWith("POPUP_") || candidate.startsWith("INGAME_")) {
+  if (candidate.startsWith("POPUP_") || candidate.startsWith("RULE_")) {
     return candidate;
   }
   return fallback;
@@ -134,7 +134,7 @@ export function createTransport({ wsByUser, onSend }) {
  * @param {Function} sendRes - Fonction sendRes
  * @param {WebSocket} ws - Client WebSocket
  * @param {Object} req - Requête originale
- * @param {string} message_code - Code de message UI (POPUP_* / INGAME_*)
+ * @param {string} message_code - Code de message UI (POPUP_* / RULE_*)
  * @param {Object} details - Détails additionnels
  */
 export function resError(sendRes, ws, req, message_code, details) {

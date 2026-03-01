@@ -453,10 +453,10 @@ func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error
 
 	if ok:
 		_show_game_feedback({
-			"message_code": GameMessage.INGAME_RULE_OK,
+			"message_code": GameMessage.RULE_OK,
 		})
 	else:
-		var ui := _normalize_move_error(error, GameMessage.INGAME_MOVE_DENIED)
+		var ui := _normalize_move_error(error, GameMessage.RULE_MOVE_DENIED)
 		var details_val = error.get("details", {})
 		var details: Dictionary = details_val if details_val is Dictionary else {}
 		_show_game_feedback(ui)
@@ -497,7 +497,7 @@ func _normalize_move_error(error: Dictionary, fallback_message_code: String) -> 
 	var text := String(error.get("text", "")).strip_edges()
 	var message_params := _merge_error_message_params(error)
 
-	var normalized := GameMessage.normalize_ingame_message({
+	var normalized := GameMessage.normalize_rule_message({
 		"message_code": message_code,
 		"text": text,
 		"message_params": message_params,
@@ -505,7 +505,7 @@ func _normalize_move_error(error: Dictionary, fallback_message_code: String) -> 
 	if not normalized.is_empty():
 		return normalized
 
-	return GameMessage.normalize_ingame_message({
+	return GameMessage.normalize_rule_message({
 		"message_code": fallback_message_code,
 		"message_params": message_params,
 	})
@@ -750,20 +750,20 @@ func _reset_board_state() -> void:
 
 func _show_game_feedback(ui_message: Dictionary) -> void:
 	"""Affiche un message de jeu"""
-	var ingame_msg := GameMessage.normalize_ingame_message(ui_message)
-	if not ingame_msg.is_empty():
-		_display_ingame_message(ingame_msg)
+	var rule_msg := GameMessage.normalize_rule_message(ui_message)
+	if not rule_msg.is_empty():
+		_display_rule_message(rule_msg)
 		return
 
 	var popup_msg := Protocol.normalize_popup_message(ui_message)
 	PopupUi.show_normalized(PopupUi.MODE_INFO, popup_msg)
 
-func _display_ingame_message(ui_message: Dictionary) -> void:
+func _display_rule_message(ui_message: Dictionary) -> void:
 	"""Affiche et anime le message"""
 	if _message_tween and is_instance_valid(_message_tween):
 		_message_tween.kill()
 	
-	GameMessage.show_ingame_message(ui_message, _game_message_state)
+	GameMessage.show_rule_message(ui_message, _game_message_state)
 	var label := GameMessage.get_label(_game_message_state)
 	if label != null:
 		label.modulate.a = 1.0

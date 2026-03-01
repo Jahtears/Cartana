@@ -2,7 +2,6 @@ import { SlotId, SLOT_TYPES } from "../constants/slots.js";
 import { getSlotStack } from "../state/slotStore.js";
 import { debugLog } from "../helpers/debugHelpers.js";
 import { technicalDenied, userDenied } from "../helpers/deniedHelpers.js";
-import { INGAME_MESSAGE } from "../constants/ingameMessages.js";
 
 /**
  * Validate placement on Table slot
@@ -50,7 +49,7 @@ export function validateTableSlot(game, card, fromSlotId, toSlotId) {
     return {
       valid: false,
       kind: "user",
-      code: INGAME_MESSAGE.RULE_CARD_NOT_ALLOWED_ON_TABLE,
+      code: "RULE_ALLOWED_ON_TABLE",
       params: { accepted: acceptedStr },
     };
   }
@@ -65,12 +64,12 @@ function staticDeny(code) {
   return () => userDenied(code);
 }
 
-export const validateDeckSlot = staticDeny(INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DECK);
+export const validateDeckSlot = staticDeny("RULE_MOVE_DENIED");
 
 /**
  * Validate placement on Hand slot (not allowed)
  */
-export const validateHandSlot = staticDeny(INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_HAND);
+export const validateHandSlot = staticDeny("RULE_MOVE_DENIED");
 
 /**
  * Validate placement on Bench slot (always allowed)
@@ -82,7 +81,7 @@ export function validateBenchSlot(game, card, fromSlotId, toSlotId) {
 /**
  * Validate placement on Draw Pile slot (not allowed)
  */
-export const validateDrawPileSlot = staticDeny(INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DRAWPILE);
+export const validateDrawPileSlot = staticDeny("RULE_MOVE_DENIED");
 
 /**
  * Get appropriate validator for slot type

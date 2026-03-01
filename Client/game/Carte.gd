@@ -12,6 +12,7 @@ const POINTER_ID_NONE := -2
 const POINTER_ID_MOUSE := -1
 const BACK_TEXTURE_DECK_A := preload("res://DosA.png")
 const BACK_TEXTURE_DECK_B := preload("res://DosB.png")
+const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
@@ -524,6 +525,8 @@ func _preview_slot_under_card(ignore_topmost: bool = false) -> void:
 	for s in _slot_cache:
 		if s == null or not is_instance_valid(s):
 			continue
+		if not _is_drop_target_allowed(s):
+			continue
 
 		var slot_rect: Rect2
 		if s.has_method("get_cached_rect"):
@@ -548,6 +551,26 @@ func _preview_slot_under_card(ignore_topmost: bool = false) -> void:
 		best_slot = null
 
 	_set_preview_slot(best_slot)
+
+func _is_drop_target_allowed(slot_node: Node) -> bool:
+	if slot_node == null:
+		return false
+
+	var target_slot_id := ""
+	if slot_node.has_method("get_slot_id"):
+		target_slot_id = String(slot_node.call("get_slot_id"))
+	else:
+		target_slot_id = String(slot_node.get("slot_id"))
+
+	if target_slot_id == "":
+		return false
+
+	var parsed := SlotIdHelper.parse_slot_id(target_slot_id)
+	var slot_type := String(parsed.get("type", ""))
+	if slot_type == "DECK" or slot_type == "PILE":
+		return false
+
+	return true
 
 func _set_preview_slot(new_slot: Node) -> void:
 	if _current_preview_slot == new_slot:
@@ -651,6 +674,12 @@ func get_card_id() -> String:
 
 func _send_move_if_valid(to_slot_id: String) -> bool:
 	if not _can_interact():
+		return false
+
+	var parsed_to := SlotIdHelper.parse_slot_id(to_slot_id)
+	var to_type := String(parsed_to.get("type", ""))
+	if to_type == "DECK" or to_type == "PILE":
+		print("[MOVE] Ignoring forbidden target slot type: %s" % to_type)
 		return false
 
 	var from_slot_id := ""

@@ -207,7 +207,7 @@ Chaque move vers `TABLE` ajoute `+10 000 ms` au timer courant, plafonné à `TUR
 Le serveur vérifie les expirations toutes les `250 ms`. À l'expiration :
 1. Tentative d'auto-play des `A` disponible en main vers `TABLE`.
 2. Exécution de la séquence de fin de tour (cf. §12.2).
-3. Notifications : `TURN_TIMEOUT` → joueur précédent, `TURN_START` → joueur suivant, puis snapshot.
+3. Notifications : `RULE_TURN_TIMEOUT` → joueur précédent, `RULE_TURN_START` → joueur suivant, puis snapshot.
 
 ### 12.5 Pause / reprise (présence)
 
@@ -271,9 +271,9 @@ Payload standard : `{ message_code, details? }`
 |---------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
 | Générique     | `RULE_MOVE_DENIED`                                                                                                                            |
 | Succès / tour | `RULE_OK`, `RULE_TURN_START_FIRST`, `RULE_TURN_START`, `RULE_TURN_TIMEOUT`                                                                   |
-| Refus métier  | `RULE_DECK_TO_TABLE`, `RULE_NOT_YOUR_TURN`, `RULE_BENCH_TO_TABLE`, `RULE_ACE_DECK`, `RULE_ACE_HAND`, `RULE_TABLE_ALLOWED` ¹                  |
+| Refus métier  | `RULE_DECK_TO_TABLE`, `RULE_NOT_YOUR_TURN`, `RULE_BENCH_TO_TABLE`, `RULE_ACE_IN_DECK`, `RULE_ACE_IN_HAND`, `RULE_OPPONENT_SLOT_FORBIDDEN` `RULE_ALLOWED_ON_TABLE` ¹                  |
 
-¹ `RULE_TABLE_ALLOWED` inclut `allowed_values` dans `details`.
+¹ `RULE_ALLOWED_ON_TABLE` inclut `allowed_values` dans `details`.
 
 ### 15.3 Taxonomie des refus
 

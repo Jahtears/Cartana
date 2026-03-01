@@ -44,8 +44,6 @@ const POPUP_TEXT_BY_CODE = {
 	"POPUP_GAME_END_PILE_EMPTY": "Match nul : pioche vide",
 	"POPUP_GAME_END_TIMEOUT_STREAK": "Fin de partie : 3 timeouts consécutifs. Gagnant : {name}",
 
-
-
 	"POPUP_SPECTATE_CONFIRM": "Regarder cette partie en spectateur ?\nJoueurs : {players}",
 	"POPUP_LOGOUT_CONFIRM": "Se déconnecter et revenir à l’écran de connexion ?",
 	"POPUP_OPPONENT_DISCONNECTED": "{name} s’est déconnecté",
@@ -54,23 +52,20 @@ const POPUP_TEXT_BY_CODE = {
 	"POPUP_OPPONENT_DISCONNECTED_CHOICE": "{name} s’est déconnecté.\nAttendre ou revenir au lobby ?",
 }
 
-const INGAME_TEXT_BY_CODE = {
-	"INGAME_MOVE_DENIED": "Déplacement refusé",
+const RULE_TEXT_BY_CODE = {
+	"RULE_MOVE_DENIED": "Déplacement refusé",
 
-	"INGAME_RULE_OK": "Valider",
-	"INGAME_RULE_DECK_ONLY_TO_TABLE": "Carte du deck uniquement sur un slot table",
-	"INGAME_RULE_NOT_YOUR_TURN": "Pas votre tour",
-	"INGAME_RULE_BENCH_ONLY_TO_TABLE": "Carte du banc uniquement sur un slot table",
-	"INGAME_RULE_ACE_BLOCKS_BENCH_DECK_TOP": "Banc interdit tant qu’un As est sur le dessus du deck",
-	"INGAME_RULE_ACE_BLOCKS_BENCH_HAND": "Banc interdit tant qu’un As est en main",
-	"INGAME_RULE_CARD_NOT_ALLOWED_ON_TABLE": "Carte interdite sur table attendu : {accepted}",
-	"INGAME_RULE_CANNOT_PLAY_ON_DECK": "Interdit de jouer sur un deck",
-	"INGAME_RULE_CANNOT_PLAY_ON_HAND": "Interdit de jouer sur la main",
-	"INGAME_RULE_CANNOT_PLAY_ON_DRAWPILE": "Interdit de jouer sur la pioche",
-	"INGAME_RULE_OPPONENT_SLOT_FORBIDDEN": "Slot adverse interdit",
-	"INGAME_TURN_START_FIRST": "À vous de commencer",
-	"INGAME_TURN_START": "À vous de jouer",
-	"INGAME_TURN_TIMEOUT": "Temps écoulé",
+	"RULE_OK": "Valider",
+	"RULE_NOT_YOUR_TURN": "Pas votre tour",
+	"RULE_DECK_TO_TABLE": "Carte du deck uniquement sur un slot table",
+	"RULE_BENCH_TO_TABLE": "Carte du banc uniquement sur un slot table",
+	"RULE_ACE_IN_DECK": "Banc interdit tant qu’un As est sur le dessus du deck",
+	"RULE_ACE_IN_HAND": "Banc interdit tant qu’un As est en main",
+	"RULE_ALLOWED_ON_TABLE": "Carte interdite sur table attendu : {accepted}",
+	"RULE_OPPONENT_SLOT_FORBIDDEN": "Slot adverse interdit",
+	"RULE_TURN_START_FIRST": "À vous de commencer",
+	"RULE_TURN_START": "À vous de jouer",
+	"RULE_TURN_TIMEOUT": "Temps écoulé",
 }
 
 const UI_LABELS = {
@@ -94,8 +89,8 @@ static func popup_text(code: String, params: Dictionary = {}) -> String:
 		return ""
 	return format_template(template, params)
 
-static func ingame_text(code: String, params: Dictionary = {}) -> String:
-	var template := String(INGAME_TEXT_BY_CODE.get(String(code).strip_edges(), ""))
+static func rule_text(code: String, params: Dictionary = {}) -> String:
+	var template := String(RULE_TEXT_BY_CODE.get(String(code).strip_edges(), ""))
 	if template == "":
 		return ""
 	return format_template(template, params)

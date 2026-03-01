@@ -15,7 +15,6 @@ const KEY_DECKS_COLOR := "source"
 const KEY_DRAGGABLE := "draggable"
 
 const KEY_ORDER_ARRAY := "_array_order"
-const KEY_ORDER_ARRAY_LEGACY := "array_order"
 const KEY_ORDER_SLOT := "slot_order"
 
 const META_CARD_ID := "card_id"
@@ -90,8 +89,6 @@ static func _extract_card_payload(data: Dictionary) -> Dictionary:
 
 static func _resolve_order_from_payload(data: Dictionary) -> int:
 	var order_from_payload := int(data.get(KEY_ORDER_ARRAY, -1))
-	if order_from_payload < 0:
-		order_from_payload = int(data.get(KEY_ORDER_ARRAY_LEGACY, -1))
 	if order_from_payload < 0:
 		order_from_payload = int(data.get(KEY_ORDER_SLOT, -1))
 	return order_from_payload

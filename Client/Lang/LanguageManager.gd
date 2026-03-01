@@ -48,12 +48,12 @@ static func popup_text(message_code: String, params: Dictionary = {}) -> String:
 		return text
 	return LangFR.popup_text(message_code, params)
 
-static func ingame_text(message_code: String, params: Dictionary = {}) -> String:
+static func rule_text(message_code: String, params: Dictionary = {}) -> String:
 	var language_pack = _language_pack(_current_language)
-	var text :Variant= language_pack.ingame_text(message_code, params)
+	var text :Variant= language_pack.rule_text(message_code, params)
 	if text != "":
 		return text
-	return LangFR.ingame_text(message_code, params)
+	return LangFR.rule_text(message_code, params)
 
 static func label(label_key: String, fallback := "") -> String:
 	var language_pack = _language_pack(_current_language)

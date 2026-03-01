@@ -53,23 +53,20 @@ const POPUP_TEXT_BY_CODE = {
 	"POPUP_OPPONENT_DISCONNECTED_CHOICE": "{name} disconnected.\nWait or return to the lobby?",
 }
 
-const INGAME_TEXT_BY_CODE = {
-	"INGAME_RULE_OK": "Confirm",
-	"INGAME_MOVE_DENIED": "Move denied",
-	"INGAME_RULE_DECK_ONLY_TO_TABLE": "Deck cards can only be played on a Table slot",
-	"INGAME_RULE_NOT_YOUR_TURN": "Not your turn",
-	"INGAME_RULE_BENCH_ONLY_TO_TABLE": "Bench cards can only be played on a Table slot",
-	"INGAME_RULE_ACE_BLOCKS_BENCH_DECK_TOP": "Bench forbidden while an Ace is on top of the deck",
-	"INGAME_RULE_ACE_BLOCKS_BENCH_HAND": "Bench forbidden while holding an Ace",
-	"INGAME_RULE_CARD_NOT_ALLOWED_ON_TABLE": "Card not allowed on Table (expected: {accepted})",
-	"INGAME_RULE_CANNOT_PLAY_ON_DECK": "Cannot play on a deck",
-	"INGAME_RULE_CANNOT_PLAY_ON_HAND": "Cannot play on the hand",
-	"INGAME_RULE_CANNOT_PLAY_ON_DRAWPILE": "Cannot play on the draw pile",
-	"INGAME_RULE_OPPONENT_SLOT_FORBIDDEN": "Opponent slot forbidden",
+const RULE_TEXT_BY_CODE = {
+	"RULE_OK": "Confirm",
+	"RULE_MOVE_DENIED": "Move denied",
+	"RULE_DECK_TO_TABLE": "Deck cards can only be played on a Table slot",
+	"RULE_NOT_YOUR_TURN": "Not your turn",
+	"RULE_BENCH_TO_TABLE": "Bench cards can only be played on a Table slot",
+	"RULE_ACE_IN_DECK": "Bench forbidden while an Ace is on top of the deck",
+	"RULE_ACE_IN_HAND": "Bench forbidden while holding an Ace",
+	"RULE_ALLOWED_ON_TABLE": "Card not allowed on Table (expected: {accepted})",
+	"RULE_OPPONENT_SLOT_FORBIDDEN": "Opponent slot forbidden",
 
-	"INGAME_TURN_START_FIRST": "You start",
-	"INGAME_TURN_START": "Your turn",
-	"INGAME_TURN_TIMEOUT": "Time’s up",
+	"RULE_TURN_START_FIRST": "You start",
+	"RULE_TURN_START": "Your turn",
+	"RULE_TURN_TIMEOUT": "Time’s up",
 }
 
 const UI_LABELS = {
@@ -93,8 +90,8 @@ static func popup_text(code: String, params: Dictionary = {}) -> String:
 		return ""
 	return format_template(template, params)
 
-static func ingame_text(code: String, params: Dictionary = {}) -> String:
-	var template := String(INGAME_TEXT_BY_CODE.get(String(code).strip_edges(), ""))
+static func rule_text(code: String, params: Dictionary = {}) -> String:
+	var template := String(RULE_TEXT_BY_CODE.get(String(code).strip_edges(), ""))
 	if template == "":
 		return ""
 	return format_template(template, params)
