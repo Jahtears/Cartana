@@ -5,14 +5,14 @@ import {
   DEFAULT_HAND_SIZE,
   TABLE_RECYCLE_CARD_COUNT,
 } from "../constants/turnFlow.js";
-import { shuffle } from "./cardHelpers.js";
+import { shuffle } from "../state/cardStore.js";
 import { getTableSlots } from "./tableHelper.js";
 import {
   getSlotCount,
   getSlotStack,
   putCardtoHandFromPile,
   getHandSize,
-} from "./slotHelpers.js";
+} from "../state/slotStore.js";
 import { debugLog } from "./debugHelpers.js";
 
 function refillEmptyHandSlotsFromPile(game, player, maxCards = DEFAULT_HAND_SIZE) {

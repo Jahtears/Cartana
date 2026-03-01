@@ -40,6 +40,7 @@ const POPUP_TEXT_BY_CODE = {
 	"POPUP_GAME_END_ABANDON": "Game over: abandon. Winner: {name}",
 	"POPUP_GAME_END_DECK_EMPTY": "Game over: empty deck. Winner: {name}",
 	"POPUP_GAME_END_PILE_EMPTY": "Draw: empty draw pile",
+	"POPUP_GAME_END_TIMEOUT_STREAK": "Game over: 3 consecutive timeouts. Winner: {name}",
 
 	"POPUP_UI_ACTION_IMPOSSIBLE": "Action impossible",
 	"POPUP_LOBBY_GET_PLAYERS_ERROR": "get_players error",

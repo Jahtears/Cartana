@@ -14,10 +14,10 @@ var _last_username: String = ""
 var _loading_preferences := false
 var _network_disconnected := false
 
-@onready var _username_input: LineEdit = $CenterContainer/VBoxContainer/Username_input
-@onready var _pin_input: LineEdit = $CenterContainer/VBoxContainer/Pin_input
-@onready var _remember_username_checkbox: CheckBox = $RememberUsernameCheckBox
-@onready var _login_button: Button = $CenterContainer/VBoxContainer/Login_button
+@onready var _username_input: LineEdit = $VBoxContainer/Username_input
+@onready var _pin_input: LineEdit = $VBoxContainer/Pin_input
+@onready var _remember_username_checkbox: CheckBox = $VBoxContainer/Username_input/RememberUsernameCheckBox
+@onready var _login_button: Button = $VBoxContainer/Login_button
 @onready var _language_label: Label = $LanguageRow/LanguageLabel
 @onready var _language_option_button: OptionButton = $LanguageRow/LanguageOptionButton
 
@@ -34,7 +34,6 @@ func _ready() -> void:
 	_setup_language_option_button()
 	_load_login_preferences()
 	_apply_language_to_login_ui()
-	call_deferred("_reposition_remember_username_checkbox")
 
 func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
 	if type != "login":
@@ -165,7 +164,6 @@ func _apply_language_to_login_ui() -> void:
 	_login_button.text = LanguageManager.ui_text("login_button", "Login")
 	_language_label.text = LanguageManager.ui_text("login_language_label", "Language")
 	_refresh_language_options_labels()
-	call_deferred("_reposition_remember_username_checkbox")
 
 func _on_language_option_button_item_selected(index: int) -> void:
 	if index < 0 or index >= _language_option_button.item_count:
@@ -197,22 +195,7 @@ func _save_login_preferences(remember_username: bool, username: String) -> void:
 	config.set_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_USERNAME, username if remember_username else "")
 	config.save(SETTINGS_PATH)
 
-func _reposition_remember_username_checkbox() -> void:
-	if _username_input == null or _remember_username_checkbox == null:
-		return
 
-	var username_pos := _username_input.global_position
-	var username_size := _username_input.size
-	var checkbox_size := _remember_username_checkbox.get_combined_minimum_size()
-
-	_remember_username_checkbox.global_position = Vector2(
-		username_pos.x + username_size.x + REMEMBER_CHECKBOX_GAP,
-		username_pos.y + (username_size.y - checkbox_size.y) * 0.5
-	)
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_RESIZED:
-		call_deferred("_reposition_remember_username_checkbox")
 
 func _exit_tree() -> void:
 	if NetworkManager.response.is_connected(_on_response):

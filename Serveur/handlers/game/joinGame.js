@@ -8,18 +8,27 @@ import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 
 export function handleJoinGame(ctx, ws, req, data, actor) {
+  const sessionUsecases = ctx.usecases?.session ?? ctx;
+  const turnUsecases = ctx.usecases?.turn ?? ctx;
+
   const {
     state,
     sendRes,
     sendEvtUser,
-    emitStartGameToUser,
-    emitFullState,
-    sendEvtSocket,
-    initTurnForGame,
-    emitSnapshotsToAudience,
     refreshLobby,
     setUserActivity,
     Activity,
+  } = ctx;
+  const {
+    emitStartGameToUser,
+    emitFullState,
+    emitSnapshotsToAudience,
+  } = sessionUsecases;
+  const {
+    initTurnForGame,
+  } = turnUsecases;
+  const {
+    sendEvtSocket,
   } = ctx;
   const { userToGame, userToEndGame, gameMeta, readyPlayers, wsByUser } = state;
 

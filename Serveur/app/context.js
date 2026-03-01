@@ -2,19 +2,30 @@
 
 import { randomUUID } from "node:crypto";
 import { createTransport } from "../net/transport.js";
-import { createBroadcaster, createFlush } from "../net/broadcast.js";
+import { createBroadcaster } from "../net/broadcast/broadcaster.js";
+import { createFlush } from "../net/broadcast/flush.js";
 import { createRoles } from "../domain/roles/roles.js";
 import { createLobbyLists } from "../domain/lobby/lists.js";
-import { createGameNotifier, emitSlotState, emitFullState } from "../domain/session/index.js";
+import { createGameNotifier } from "../domain/session/notifier.js";
+import { emitSlotState, emitFullState } from "../domain/session/emitter.js";
 import { createPresence } from "../domain/session/presence.js";
-import { createGame } from "../game/builders/gameBuilder.js";
-import { getCardById } from "../game/helpers/cardHelpers.js";
-import { mapSlotFromClientToServer, mapSlotForClient } from "../game/helpers/slotHelpers.js";
+import { createGame } from "../game/factory/createGame.js";
+import { getCardById } from "../game/state/cardStore.js";
+import { mapSlotFromClientToServer, mapSlotForClient } from "../game/boundary/slotIdMapper.js";
 import { getTableSlots } from "../game/helpers/tableHelper.js";
-import { applyMove } from "../game/MoveApplier.js";
-import { validateMove, refillHandIfEmpty, hasWonByEmptyDeckSlot, hasLoseByEmptyPileSlot } from "../game/Regles.js";
-import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../game/helpers/turnFlowHelpers.js";
+import { applyMove } from "../game/engine/applyMove.js";
+import { validateMove, refillHandIfEmpty, hasWonByEmptyDeckSlot, hasLoseByEmptyPileSlot } from "../game/rules/validateMove.js";
+import { orchestrateMove } from "../game/usecases/move/orchestrateMove.js";
+import { orchestrateTurnTimeout } from "../game/usecases/turn/orchestrateTurnTimeout.js";
+import {
+  initTurnForGame,
+  endTurnAfterBenchPlay,
+  resetTurnTimeoutStreak,
+} from "../game/helpers/turnFlowHelpers.js";
 import { INGAME_MESSAGE } from "../game/constants/ingameMessages.js";
+import { buildCardPayload } from "../game/payload/cardPayload.js";
+import { buildTurnPayload } from "../game/payload/turnPayload.js";
+import { buildStateSnapshotPayload } from "../game/payload/snapshotPayload.js";
 import { saveGameState, loadGameState, deleteGameState } from "../domain/session/Saves.js";
 import { verifyOrCreateUser } from "../handlers/auth/usersStore.js";
 import { createStateManager } from "./stateManager.js";
@@ -155,11 +166,12 @@ export function createServerContext({ onTransportSend } = {}) {
     const meta = state.gameMeta.get(gameId);
     if (game.turn.paused || meta?.result) return false;
 
-    const timeoutResult = tryExpireTurn(game, now);
-    if (!timeoutResult) return false;
+    const timeoutResult = orchestrateTurnTimeout({ game, now });
+    if (!timeoutResult?.expired) return false;
 
     const prev = String(timeoutResult.prev ?? "").trim();
     const next = String(timeoutResult.next ?? "").trim();
+    const endGamePatch = timeoutResult.endGamePatch;
 
     if (prev) {
       emitGameMessage(
@@ -168,12 +180,19 @@ export function createServerContext({ onTransportSend } = {}) {
         { message_code: INGAME_MESSAGE.TURN_TIMEOUT }
       );
     }
-    if (next) {
+    if (next && !endGamePatch) {
       emitGameMessage(
         sendEvtUser,
         next,
         { message_code: INGAME_MESSAGE.TURN_START }
       );
+    }
+
+    if (endGamePatch) {
+      emitGameEndOnce(gameId, endGamePatch);
+      saveGameState(gameId, game);
+      emitSnapshotsToAudience(gameId, { reason: "game_end" });
+      return timeoutResult;
     }
 
     saveGameState(gameId, game);
@@ -226,27 +245,59 @@ export function createServerContext({ onTransportSend } = {}) {
     broadcastGamesList,
     refreshLobby,
 
-    // Notifier (événements de jeu)
+    // Facades use-cases
+    usecases: {
+      move: {
+        orchestrateMove,
+        validateMove,
+        applyMove,
+        getCardById,
+        refillHandIfEmpty,
+        hasWonByEmptyDeckSlot,
+        hasLoseByEmptyPileSlot,
+      },
+      turn: {
+        initTurnForGame,
+        endTurnAfterBenchPlay,
+        processTurnTimeout,
+        resetTurnTimeoutStreak,
+        getTableSlots,
+        withGameUpdate,
+      },
+      session: {
+        emitStartGameToUser,
+        emitSnapshotsToAudience,
+        emitGameEndOnce,
+        emitFullState,
+        emitSlotState,
+      },
+    },
+
+    boundary: {
+      slot: {
+        mapSlotFromClientToServer,
+        mapSlotForClient,
+      },
+    },
+
+    factory: {
+      game: {
+        createGame,
+      },
+    },
+
+    payload: {
+      buildCardPayload,
+      buildTurnPayload,
+      buildStateSnapshotPayload,
+    },
+
+    // Keep selected direct helpers used by generic guards/handlers
     emitStartGameToUser,
     emitSnapshotsToAudience,
     emitGameEndOnce,
-
-    // Game engine (logique métier)
-    createGame,
-    emitSlotState,
     emitFullState,
-    getTableSlots,
-    getCardById,
-    mapSlotFromClientToServer,
-    mapSlotForClient,
-    validateMove,
-    applyMove,
-    initTurnForGame,
-    endTurnAfterBenchPlay,
-    refillHandIfEmpty,
-    hasWonByEmptyDeckSlot,
-    hasLoseByEmptyPileSlot,
-    withGameUpdate,
+    emitSlotState,
     processTurnTimeout,
 
     // Persist (sauvegarde)

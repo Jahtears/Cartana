@@ -1,12 +1,8 @@
-// builders/gameBuilder.js - Game and source builders
-
 import crypto from "crypto";
-import { SlotId, SLOT_CONFIG, SLOT_TYPES } from "../constants/slots.js";
+import { SlotId, SLOT_CONFIG } from "../constants/slots.js";
 import { DEFAULT_HAND_SIZE } from "../constants/turnFlow.js";
-import { NEVER_DRAGGABLE_SLOT_TYPES } from "../helpers/slotViewHelpers.js";
-import { shuffle } from "../helpers/cardHelpers.js";
+import { shuffle } from "../state/cardStore.js";
 import { debugLog } from "../helpers/debugHelpers.js";
-import { slotIdToString } from "../helpers/slotHelpers.js";
 
 const CARD_VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "V", "D", "R"];
 const CARD_COLORS = ["H", "C", "P", "S"];
@@ -166,34 +162,7 @@ function createGame(player1, player2) {
   return game;
 }
 
-function buildCardData(card, slotId, isOwner, disableDrag = false, slotIdForClient = null) {
-  const normalizedSlotId = slotIdToString(slotIdForClient ?? slotId);
-  const slotType = slotId instanceof SlotId ? slotId.type : null;
-
-  const isFaceDown = slotType === SLOT_TYPES.PILE
-    || (slotType === SLOT_TYPES.HAND && !isOwner);
-
-  let draggable = !!isOwner;
-  if (NEVER_DRAGGABLE_SLOT_TYPES.has(slotType)) {
-    draggable = false;
-  }
-  if (disableDrag) {
-    draggable = false;
-  }
-
-  return {
-    card_id: card.id,
-    valeur: isFaceDown ? "" : card.value,
-    couleur: isFaceDown ? "" : card.color,
-    dos: isFaceDown,
-    source: card.source,
-    draggable,
-    slot_id: normalizedSlotId,
-  };
-}
-
 export {
   createEmptySlots,
-  buildCardData,
   createGame,
 };

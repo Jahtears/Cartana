@@ -13,7 +13,7 @@ import {
 import {
   compareCardsByTurnValue,
   findAceCardInHand,
-} from "./cardHelpers.js";
+} from "../state/cardStore.js";
 import {
   cleanupExtraEmptyTableSlots,
   ensureEmptyTableSlot,
@@ -21,13 +21,69 @@ import {
 import {
   drawCardFromHand,
   getSlotStack,
-} from "./slotHelpers.js";
+} from "../state/slotStore.js";
 import {
   recycleFullTableSlotsToPile,
   refillEmptyHandSlotsFromPile,
 } from "./pileFlowHelpers.js";
 import { debugLog } from "./debugHelpers.js";
 import { INGAME_MESSAGE } from "../constants/ingameMessages.js";
+
+function ensureTimeoutStreakMap(game) {
+  if (!game || typeof game !== "object") return Object.create(null);
+  if (!game.turn || typeof game.turn !== "object") game.turn = {};
+
+  if (
+    !game.turn.timeoutStreakByPlayer
+    || typeof game.turn.timeoutStreakByPlayer !== "object"
+    || Array.isArray(game.turn.timeoutStreakByPlayer)
+  ) {
+    game.turn.timeoutStreakByPlayer = Object.create(null);
+  }
+
+  if (Array.isArray(game.players)) {
+    for (const player of game.players) {
+      const username = String(player ?? "").trim();
+      if (!username) continue;
+      const current = Number(game.turn.timeoutStreakByPlayer[username] ?? 0);
+      game.turn.timeoutStreakByPlayer[username] = Number.isFinite(current) && current > 0
+        ? Math.floor(current)
+        : 0;
+    }
+  }
+
+  return game.turn.timeoutStreakByPlayer;
+}
+
+function registerTurnTimeoutStreak(game, player) {
+  const username = String(player ?? "").trim();
+  if (!username) return 0;
+
+  const streakByPlayer = ensureTimeoutStreakMap(game);
+  const current = Number(streakByPlayer[username] ?? 0);
+  const safeCurrent = Number.isFinite(current) && current > 0 ? Math.floor(current) : 0;
+  const nextStreak = safeCurrent + 1;
+  streakByPlayer[username] = nextStreak;
+
+  if (Array.isArray(game?.players)) {
+    for (const other of game.players) {
+      const otherUsername = String(other ?? "").trim();
+      if (!otherUsername || otherUsername === username) continue;
+      streakByPlayer[otherUsername] = 0;
+    }
+  }
+
+  return nextStreak;
+}
+
+function resetTurnTimeoutStreak(game, player) {
+  const username = String(player ?? "").trim();
+  if (!username) return 0;
+
+  const streakByPlayer = ensureTimeoutStreakMap(game);
+  streakByPlayer[username] = 0;
+  return 0;
+}
 
 function initTurnForGame(game) {
   const p1 = game.players[0];
@@ -56,6 +112,7 @@ function initTurnForGame(game) {
 
   const starter = cmp >= 0 ? p1 : p2;
   game.turn = { current: starter, number: INITIAL_TURN_NUMBER };
+  ensureTimeoutStreakMap(game);
   startTurnClock(game.turn, Date.now(), TURN_MS);
 
   debugLog("[TURN] INIT", {
@@ -79,6 +136,7 @@ function endTurnAfterBenchPlay(game, actor) {
   const given = refillEmptyHandSlotsFromPile(game, next, DEFAULT_HAND_SIZE);
 
   game.turn = game.turn || { current: next, number: INITIAL_TURN_NUMBER };
+  ensureTimeoutStreakMap(game);
   game.turn.current = next;
   game.turn.number = (game.turn.number ?? INITIAL_TURN_NUMBER) + 1;
   startTurnClock(game.turn, Date.now(), TURN_MS);
@@ -154,5 +212,7 @@ function tryExpireTurn(game, now = Date.now()) {
 export {
   endTurnAfterBenchPlay,
   initTurnForGame,
+  registerTurnTimeoutStreak,
+  resetTurnTimeoutStreak,
   tryExpireTurn,
 };

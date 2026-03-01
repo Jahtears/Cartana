@@ -1,13 +1,13 @@
-// game/moveRequest.js v2.0 - Thin handler using MoveOrchestrator
-import { emitGameEndThenSnapshot } from "../net/broadcast.js";
-import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../net/guards.js";
-import { resError } from "../net/transport.js";
-import { orchestrateMove } from "./moveOrchestrator.js";
-import { ensureGameMeta } from "./meta.js";
-import { GAME_END_REASONS } from "./constants/gameEnd.js";
-import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
-import { POPUP_MESSAGE } from "../shared/popupMessages.js";
-import { deniedTracePayload, technicalDenied } from "./helpers/deniedHelpers.js";
+import { emitGameEndThenSnapshot } from "../../net/broadcast/gameEndBroadcast.js";
+import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../../net/guards.js";
+import { resError } from "../../net/transport.js";
+import { orchestrateMove } from "../../game/usecases/move/orchestrateMove.js";
+import { ensureGameMeta } from "../../game/meta.js";
+import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
+import { INGAME_MESSAGE } from "../../game/constants/ingameMessages.js";
+import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
+import { deniedTracePayload, technicalDenied } from "../../game/helpers/deniedHelpers.js";
+import { mapSlotForClient, mapSlotFromClientToServer } from "../../game/boundary/slotIdMapper.js";
 
 function safeObject(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -51,12 +51,16 @@ function buildMoveClientErrorPayload({ moveError, cardId, fromSlotId }) {
 }
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
-  const {
-    sendRes,
-    mapSlotFromClientToServer,
-    mapSlotForClient,
-    processTurnTimeout,
-  } = ctx;
+  const sendRes = ctx.sendRes;
+  const turnUsecases = ctx.usecases?.turn ?? ctx;
+  const boundarySlot = ctx.boundary?.slot ?? {};
+  const mapFromClient = boundarySlot.mapSlotFromClientToServer
+    ?? ctx.mapSlotFromClientToServer
+    ?? mapSlotFromClientToServer;
+  const mapForClient = boundarySlot.mapSlotForClient
+    ?? ctx.mapSlotForClient
+    ?? mapSlotForClient;
+  const processTurnTimeout = turnUsecases.processTurnTimeout;
 
   // ✅ GUARDS: game, player, spectator, ended
   const pg = getPlayerGameOrRes(ctx, ws, req, actor);
@@ -83,8 +87,8 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const raw_from = String(data.from_slot_id ?? "").trim();
   const raw_to = String(data.to_slot_id ?? "").trim();
 
-  const from_slot_id = mapSlotFromClientToServer(raw_from, actor, game);
-  const to_slot_id = mapSlotFromClientToServer(raw_to, actor, game);
+  const from_slot_id = mapFromClient(raw_from, actor, game);
+  const to_slot_id = mapFromClient(raw_to, actor, game);
 
   ctx.trace?.("MOVE_REQ", {
     actor,
@@ -118,8 +122,8 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     return true;
   }
 
-  const client_from = mapSlotForClient(from_slot_id, actor, game);
-  const client_to = mapSlotForClient(to_slot_id, actor, game);
+  const client_from = mapForClient(from_slot_id, actor, game);
+  const client_to = mapForClient(to_slot_id, actor, game);
 
   // ✅ ORCHESTRATE: validate → apply → refill → track → check win
   const orchResult = orchestrateMove({

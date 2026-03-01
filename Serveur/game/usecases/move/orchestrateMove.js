@@ -1,10 +1,7 @@
-// game/moveOrchestrator.js - Centralized move orchestration
-// Coordinates: validate → apply → check win → track updates → prepare response 
-
-import { SLOT_TYPES, SlotId } from "./constants/slots.js";
-import { DEFAULT_HAND_SIZE } from "./constants/turnFlow.js";
-import { GAME_END_REASONS } from "./constants/gameEnd.js";
-import { technicalDenied } from "./helpers/deniedHelpers.js";
+import { SLOT_TYPES, SlotId } from "../../constants/slots.js";
+import { DEFAULT_HAND_SIZE } from "../../constants/turnFlow.js";
+import { GAME_END_REASONS } from "../../constants/gameEnd.js";
+import { technicalDenied } from "../../helpers/deniedHelpers.js";
 
 /**
  * Orchestrate a complete move: validate -> apply -> refill -> track updates -> check win.
@@ -30,6 +27,9 @@ export function orchestrateMove(params) {
     to_slot_id: toSlotId,
     ctx,
   } = params;
+  const moveCtx = ctx?.usecases?.move ?? ctx;
+  const turnCtx = ctx?.usecases?.turn ?? ctx;
+
   const {
     validateMove,
     applyMove,
@@ -37,10 +37,13 @@ export function orchestrateMove(params) {
     refillHandIfEmpty,
     hasWonByEmptyDeckSlot,
     hasLoseByEmptyPileSlot,
+  } = moveCtx;
+  const {
     getTableSlots,
     endTurnAfterBenchPlay,
+    resetTurnTimeoutStreak,
     withGameUpdate,
-  } = ctx;
+  } = turnCtx;
 
   //    (player index 0)(slot type pile )(slot index 1)
   const pileSlotId = SlotId.create(0, SLOT_TYPES.PILE, 1);
@@ -89,30 +92,21 @@ export function orchestrateMove(params) {
   const selfRefill = !endsTurn ? refillHandIfEmpty(game, actor, DEFAULT_HAND_SIZE) : [];
 
   // ========================
-  // 6) CHECK WIN CONDITION
+  // 6) CHECK IMMEDIATE GAME END
+  //    PILE_EMPTY is evaluated only at turn end.
   // ========================
-  const resolveGameEnd = () => {
-    if (hasWonByEmptyDeckSlot(game, actor)) {
-      return {
-        winner: actor,
-        game_end_reason: GAME_END_REASONS.DECK_EMPTY,
-      };
+  const immediateGameEnd = hasWonByEmptyDeckSlot(game, actor)
+    ? {
+      winner: actor,
+      game_end_reason: GAME_END_REASONS.DECK_EMPTY,
     }
-    if (hasLoseByEmptyPileSlot(game, actor)) {
-      return {
-        winner: null,
-        game_end_reason: GAME_END_REASONS.PILE_EMPTY,
-      };
-    }
-    return null;
-  };
-  const gameEnd = resolveGameEnd();
+    : null;
 
   // ========================
   // 7) TRACK GAME UPDATES (standard move)
   //    Bench move without immediate game end is flushed once after turn switch.
   // ========================
-  const shouldFlushBeforeTurnSwitch = !endsTurn || !!gameEnd;
+  const shouldFlushBeforeTurnSwitch = !endsTurn || !!immediateGameEnd;
   if (shouldFlushBeforeTurnSwitch) {
     const tableSlots = getTableSlots(game);
     withGameUpdate(gameId, (fx) => {
@@ -131,12 +125,12 @@ export function orchestrateMove(params) {
   // ========================
   // 8) IF WINNER, STOP HERE
   // ========================
-  if (gameEnd) {
+  if (immediateGameEnd) {
     return {
       valid: true,
-      response: { ...baseResponse, winner: gameEnd.winner },
-      winner: gameEnd.winner,
-      game_end_reason: gameEnd.game_end_reason,
+      response: { ...baseResponse, winner: immediateGameEnd.winner },
+      winner: immediateGameEnd.winner,
+      game_end_reason: immediateGameEnd.game_end_reason,
     };
   }
 
@@ -153,6 +147,9 @@ export function orchestrateMove(params) {
   // ========================
   // 10) BENCH PLAY: END TURN
   // ========================
+  if (typeof resetTurnTimeoutStreak === "function") {
+    resetTurnTimeoutStreak(game, actor);
+  }
   const { given, recycled } = endTurnAfterBenchPlay(game, actor);
 
   // Track end-of-turn updates
@@ -171,7 +168,12 @@ export function orchestrateMove(params) {
     fx.turn();
   }, ctx?.trace);
 
-  const postTurnGameEnd = resolveGameEnd();
+  const postTurnGameEnd = hasLoseByEmptyPileSlot(game, actor)
+    ? {
+      winner: null,
+      game_end_reason: GAME_END_REASONS.PILE_EMPTY,
+    }
+    : null;
   if (postTurnGameEnd) {
     return {
       valid: true,

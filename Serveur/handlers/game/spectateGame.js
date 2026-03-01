@@ -4,15 +4,19 @@ import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from "../../net
 import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 export function handleSpectateGame(ctx, ws, req, data, actor) {
+  const sessionUsecases = ctx.usecases?.session ?? ctx;
+
   const {
     sendRes,
-    emitStartGameToUser,
     state,
     refreshLobby,
-    emitFullState,
     sendEvtSocket,
     attachSpectator,
   } = ctx;
+  const {
+    emitStartGameToUser,
+    emitFullState,
+  } = sessionUsecases;
   const { userToSpectate, userToGame, userToEndGame, wsByUser, gameMeta } = state;
 
   const game_id = requireParam(sendRes, ws, req, data, "game_id");

@@ -42,6 +42,7 @@ const POPUP_TEXT_BY_CODE = {
 	"POPUP_GAME_END_ABANDON": "Fin de partie : abandon. Gagnant : {name}",
 	"POPUP_GAME_END_DECK_EMPTY": "Fin de partie : deck vide. Gagnant : {name}",
 	"POPUP_GAME_END_PILE_EMPTY": "Match nul : pioche vide",
+	"POPUP_GAME_END_TIMEOUT_STREAK": "Fin de partie : 3 timeouts consécutifs. Gagnant : {name}",
 
 
 

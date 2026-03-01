@@ -1,10 +1,8 @@
-// game/slotValidators.js - Slot-specific validators extracted from Regles.js
-
-import { SlotId, SLOT_TYPES } from "./constants/slots.js";
-import { getSlotStack } from "./helpers/slotHelpers.js";
-import { debugLog } from "./helpers/debugHelpers.js";
-import { technicalDenied, userDenied } from "./helpers/deniedHelpers.js";
-import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
+import { SlotId, SLOT_TYPES } from "../constants/slots.js";
+import { getSlotStack } from "../state/slotStore.js";
+import { debugLog } from "../helpers/debugHelpers.js";
+import { technicalDenied, userDenied } from "../helpers/deniedHelpers.js";
+import { INGAME_MESSAGE } from "../constants/ingameMessages.js";
 
 /**
  * Validate placement on Table slot

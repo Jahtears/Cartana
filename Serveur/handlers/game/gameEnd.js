@@ -99,11 +99,12 @@ function scheduleCleanup(ctx, game_id, reason) {
 function endGame(ctx, game_id, result, { exclude = [] } = {}) {
   if (!game_id) return { payload: null, created: false };
 
-  const { state, emitGameEndOnce, emitSnapshotsToAudience } = ctx;
+  const sessionUsecases = ctx.usecases?.session ?? ctx;
+  const { state } = ctx;
   const { gameMeta } = state;
   const meta = ensureGameEndMeta(gameMeta, game_id, { initialSent: true });
 
-  const res = emitGameEndOnce(game_id, result, { exclude });
+  const res = sessionUsecases.emitGameEndOnce(game_id, result, { exclude });
 
   if (res.created) {
     meta.acks = new Set();
@@ -111,7 +112,7 @@ function endGame(ctx, game_id, result, { exclude = [] } = {}) {
     meta.post_game_state = POST_GAME_STATES.ENDED;
   }
 
-  emitSnapshotsToAudience(game_id, { reason: "game_end" });
+  sessionUsecases.emitSnapshotsToAudience(game_id, { reason: "game_end" });
 
   if (res.created) scheduleCleanup(ctx, game_id, "game_end");
   return res;

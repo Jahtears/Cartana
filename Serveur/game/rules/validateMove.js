@@ -1,15 +1,14 @@
-// game/Regles.js - Game rules validation (dispatcher only, slot validators delegated)
-import { SlotId, SLOT_TYPES } from "./constants/slots.js";
-import { refillHandIfEmpty } from "./helpers/pileFlowHelpers.js";
-import { slotTopHasAce, slotAnyHasAce } from "./helpers/cardHelpers.js";
+import { SlotId, SLOT_TYPES } from "../constants/slots.js";
+import { refillHandIfEmpty } from "../helpers/pileFlowHelpers.js";
+import { slotTopHasAce, slotAnyHasAce } from "../state/cardStore.js";
 import {
   hasCardInSlot,
   getSlotStack,
-} from "./helpers/slotHelpers.js";
+} from "../state/slotStore.js";
 import { getSlotValidator } from "./slotValidators.js";
-import { debugLog } from "./helpers/debugHelpers.js";
-import { deniedTracePayload, technicalDenied, userDenied } from "./helpers/deniedHelpers.js";
-import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
+import { debugLog } from "../helpers/debugHelpers.js";
+import { deniedTracePayload, technicalDenied, userDenied } from "../helpers/deniedHelpers.js";
+import { INGAME_MESSAGE } from "../constants/ingameMessages.js";
 
 function hasWonByEmptyDeckSlot(game, player) {
   if (!player || !game) return false;

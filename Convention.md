@@ -31,7 +31,7 @@
 Tous les slots — sauf `HAND` — utilisent la convention dense :
 
 - `index 0` = bottom, `index last` = top.
-- `putTop` = `push`, `putBottom` = `unshift`, `drawTop` = `pop`.
+- putTop = `push`, putBottom = `unshift`, drawTop = `pop`.
 - `removeCardFromSlot` = `splice` à l'index trouvé.
 
 > **Exception `HAND` :** le stack est de taille fixe 5. La position d'une carte en main est son index dans le stack. `""` marque une position libre. Les opérations dense (`push`, `pop`…) ne s'appliquent pas à `HAND`.
@@ -82,7 +82,7 @@ Modèle interne serveur :
 
 **Règles :**
 
-- `dos=true` dans `PILE` et dans `HAND` adverse.
+- `dos=true` dans `PILE`, dans `HAND` adverse, et pour `DECK` `top-1`.
 - Si `dos=true`, alors `valeur=""` et `couleur=""`.
 - Une position `HAND` avec `card_id=""` n'est pas émise au client.
 
@@ -92,7 +92,7 @@ Modèle interne serveur :
 
 | Slot    | Cartes visibles              | Draggable                          | Droppable    |
 |---------|------------------------------|------------------------------------|--------------|
-| `DECK`  | top + top-1 (en dos)   (todo)| top uniquement ¹                   | non          |
+| `DECK`  | top + top-1 (en dos)         | top uniquement ¹                   | non          |
 | `HAND`  | toutes (owner) / dos (adv.)  | toutes (owner) ¹                   | non          |
 | `BENCH` | toutes                       | top uniquement ¹                   | cf. §12.2    |
 | `TABLE` | top uniquement               | non                                | cf. §11.1    |
@@ -193,7 +193,7 @@ Le tour initial est numéroté `1`, et le timer est fixé à `TURN_MS = 20 000 m
 Un tour se termine uniquement sur un move valide vers `BENCH`. Un move vers `TABLE` ne termine pas le tour.
 
 Séquence de fin de tour :
-1.deplacement des 12 cartes du slots `TABLE` plein vers bot `PILE`.
+1. deplacement des 12 cartes du slots `TABLE` plein vers bot `PILE`.
 2. Recyclage du slots `TABLE` vidé. 
 3. Refill de la `HAND` du joueur suivant : chaque position `""` du stack est remplacée par le top de `PILE`, dans l'ordre index croissant.
 4. Passage au joueur suivant, incrément du numéro de tour, reset du timer à `TURN_MS`.
@@ -228,10 +228,10 @@ Le serveur vérifie les expirations toutes les `250 ms`. À l'expiration :
 ### 13.2 Déclencheurs de fin de jeu
 
 | Cause | `winner` |
-|-------|----------|----------|
+|-------|----------|
 | Deck de l'acteur vide après un move `DECK → TABLE` | acteur |
-| Pile partagée vide en fin de tour|  `null` (nul) | (todo)
-| 3 timeouts consécutifs d'un joueur | adversaire |(todo)
+| `PILE` vide en fin de tour | `null` (nul) |
+| 3 timeouts consécutifs d'un joueur | adversaire |
 | le joueur quitte la partie avec le bouton | adversaire |
 | le joueur quitte la partie en fermant la fenetre | adversaire |
 
@@ -239,6 +239,21 @@ Le serveur vérifie les expirations toutes les `250 ms`. À l'expiration :
 
 ---
 
+
+---
+
+## 14. Architecture serveur (couches)
+
+- `handlers/game/moveRequest.js` : frontière réseau pour `move_request` (parse/mapping slot client -> `SlotId`), puis appel use-case.
+- `game/usecases/*` : orchestration métier (validate/apply/turn/update), sans payload socket direct.
+- `game/rules/*` : règles globales + validateurs de destination, sans emit/broadcast.
+- `game/engine/*` : mutations d'état (`slots`, timer bonus), sans emit/broadcast.
+- `game/state/*` : accès runtime aux stacks/cartes (`SlotId` canoniques uniquement).
+- `game/boundary/*` : mapping client/serveur et parse `slot_id` (pas de logique métier).
+- `game/payload/*` : transformation domaine -> payload (`card`, `turn`, `snapshot`) sans mutation.
+- `game/factory/*` : création/initialisation de partie uniquement.
+- `domain/session/*` : sélection des destinataires et émission (`emit`/`notifier`) sans règles de jeu.
+- `net/broadcast/*` : dedupe + ordre de flush (`table_sync` -> `slot_state` -> `turn_update` -> messages), sans règles.
 
 ---
 

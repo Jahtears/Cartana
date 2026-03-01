@@ -1,17 +1,14 @@
-// MoveApplier.js v3.2 - Slots = stacks (NO game.stacks)
-// Uses stack helpers + table API
-
-import { TURN_MS, addBonusToTurnClock } from "./turnClock.js";
+import { TURN_MS, addBonusToTurnClock } from "../turnClock.js";
 import {
   ensureEmptyTableSlot,
-} from "./helpers/tableHelper.js";
+} from "../helpers/tableHelper.js";
 import {
   drawCardFromHand,
   getSlotStack,
   removeCardFromSlot,
-} from "./helpers/slotHelpers.js";
-import { SlotId, SLOT_TYPES } from "./constants/slots.js";
-import { debugLog, debugWarn } from "./helpers/debugHelpers.js";
+} from "../state/slotStore.js";
+import { SlotId, SLOT_TYPES } from "../constants/slots.js";
+import { debugLog, debugWarn } from "../helpers/debugHelpers.js";
 
 /* =========================
    APPLY MOVE (PUBLIC)

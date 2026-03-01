@@ -175,6 +175,9 @@ export function handleInvite(ctx, ws, req, data, actor) {
 }
 
 export function handleInviteResponse(ctx, ws, req, data, actor) {
+  const sessionUsecases = ctx.usecases?.session ?? ctx;
+  const gameFactory = ctx.factory?.game ?? ctx;
+
   const {
     state,
     sendRes,
@@ -182,11 +185,11 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
     refreshLobby,
 
     generateGameID,
-    createGame,
-    emitStartGameToUser,
     setUserActivity,
     Activity,
   } = ctx;
+  const { createGame } = gameFactory;
+  const { emitStartGameToUser } = sessionUsecases;
   const { pendingInviteTo, inviteFrom, games, gameMeta } = state;
 
   const to = requireParam(sendRes, ws, req, data, "to");

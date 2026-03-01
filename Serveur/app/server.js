@@ -11,7 +11,7 @@ import { handleLogout } from '../handlers/auth/logout.js';
 import { handleInvite, handleInviteResponse } from '../handlers/lobby/invite.js';
 import { handleJoinGame } from '../handlers/game/joinGame.js';
 import { handleSpectateGame } from '../handlers/game/spectateGame.js';
-import { handleMoveRequest } from '../game/moveRequest.js';
+import { handleMoveRequest } from '../handlers/game/moveRequest.js';
 import { handleLeaveGame, handleAckGameEnd } from '../handlers/game/gameEnd.js';
 
 // ============= IMPORTS APP =============
@@ -156,7 +156,7 @@ const turnExpiryTimer = setInterval(() => {
   for (const [game_id, game] of baseCtx.state.games.entries()) {
     if (!game?.turn) continue;
     try {
-      baseCtx.processTurnTimeout?.(game_id, now);
+      baseCtx.usecases?.turn?.processTurnTimeout?.(game_id, now);
     } catch (err) {
       console.error("[TURN_EXPIRY_ERROR]", { game_id, error: err?.message ?? String(err) });
     }

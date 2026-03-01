@@ -2,6 +2,7 @@ const GAME_END_REASONS = Object.freeze({
   ABANDON: "abandon",
   DECK_EMPTY: "deck_empty",
   PILE_EMPTY: "pile_empty",
+  TIMEOUT_STREAK: "timeout_streak",
 });
 
 const GAME_END_REASON_SET = new Set(Object.values(GAME_END_REASONS));
