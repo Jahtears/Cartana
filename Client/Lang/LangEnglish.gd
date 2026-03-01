@@ -59,7 +59,7 @@ const RULE_TEXT_BY_CODE = {
 	"RULE_DECK_TO_TABLE": "Deck cards can only be played on a Table slot",
 	"RULE_NOT_YOUR_TURN": "Not your turn",
 	"RULE_BENCH_TO_TABLE": "Bench cards can only be played on a Table slot",
-	"RULE_ACE_IN_DECK": "Bench forbidden while an Ace is on top of the deck",
+	"RULE_ACE_ON_DECK": "Bench forbidden while an Ace is on top of the deck",
 	"RULE_ACE_IN_HAND": "Bench forbidden while holding an Ace",
 	"RULE_ALLOWED_ON_TABLE": "Card not allowed on Table (expected: {accepted})",
 	"RULE_OPPONENT_SLOT_FORBIDDEN": "Opponent slot forbidden",

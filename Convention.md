@@ -31,8 +31,8 @@
 Tous les slots — sauf `HAND` — utilisent la convention dense :
 
 - `index 0` = bottom, `index last` = top.
-- putTop = `push`, putBottom = `unshift`, drawTop = `pop`.
-- `removeCardFromSlot` = `splice` à l'index trouvé.
+-  `push`,  `unshift`,  `pop`.
+- `drawCardFromHand` = `splice` à l'index trouvé.
 
 > **Exception `HAND` :** le stack est de taille fixe 5. La position d'une carte en main est son index dans le stack. `""` marque une position libre. Les opérations dense (`push`, `pop`…) ne s'appliquent pas à `HAND`.
 
@@ -191,6 +191,7 @@ Le tour initial est numéroté `1`, et le timer est fixé à `TURN_MS = 20 000 m
 ### 12.2 Fin de tour (action joueur)
 
 Un tour se termine uniquement sur un move valide vers `BENCH`. Un move vers `TABLE` ne termine pas le tour.
+fin de tour interdit si `A`  sur DECK(top )`RULE_ACE_ON_DECK` et/ou si `A`  en main `RULE_ACE_IN_HAND`.
 
 Séquence de fin de tour :
 1. deplacement des 12 cartes du slots `TABLE` plein vers bot `PILE`.
@@ -205,7 +206,7 @@ Chaque move vers `TABLE` ajoute `+10 000 ms` au timer courant, plafonné à `TUR
 ### 12.4 Expiration du timer
 
 Le serveur vérifie les expirations toutes les `250 ms`. À l'expiration :
-1. Tentative d'auto-play des `A` disponible en main vers `TABLE`.
+1. Tentative d'auto-play du `A` disponible sur DECK (top) vers `TABLE`et  des `A` disponible en main vers `TABLE`.
 2. Exécution de la séquence de fin de tour (cf. §12.2).
 3. Notifications : `RULE_TURN_TIMEOUT` → joueur précédent, `RULE_TURN_START` → joueur suivant, puis snapshot.
 
@@ -271,7 +272,7 @@ Payload standard : `{ message_code, details? }`
 |---------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
 | Générique     | `RULE_MOVE_DENIED`                                                                                                                            |
 | Succès / tour | `RULE_OK`, `RULE_TURN_START_FIRST`, `RULE_TURN_START`, `RULE_TURN_TIMEOUT`                                                                   |
-| Refus métier  | `RULE_DECK_TO_TABLE`, `RULE_NOT_YOUR_TURN`, `RULE_BENCH_TO_TABLE`, `RULE_ACE_IN_DECK`, `RULE_ACE_IN_HAND`, `RULE_OPPONENT_SLOT_FORBIDDEN` `RULE_ALLOWED_ON_TABLE` ¹                  |
+| Refus métier  | `RULE_DECK_TO_TABLE`, `RULE_NOT_YOUR_TURN`, `RULE_BENCH_TO_TABLE`, `RULE_ACE_ON_DECK`, `RULE_ACE_IN_HAND`, `RULE_OPPONENT_SLOT_FORBIDDEN` `RULE_ALLOWED_ON_TABLE` ¹                  |
 
 ¹ `RULE_ALLOWED_ON_TABLE` inclut `allowed_values` dans `details`.
 

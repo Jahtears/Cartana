@@ -59,7 +59,7 @@ const RULE_TEXT_BY_CODE = {
 	"RULE_NOT_YOUR_TURN": "Pas votre tour",
 	"RULE_DECK_TO_TABLE": "Carte du deck uniquement sur un slot table",
 	"RULE_BENCH_TO_TABLE": "Carte du banc uniquement sur un slot table",
-	"RULE_ACE_IN_DECK": "Banc interdit tant qu’un As est sur le dessus du deck",
+	"RULE_ACE_ON_DECK": "Banc interdit tant qu’un As est sur le dessus du deck",
 	"RULE_ACE_IN_HAND": "Banc interdit tant qu’un As est en main",
 	"RULE_ALLOWED_ON_TABLE": "Carte interdite sur table attendu : {accepted}",
 	"RULE_OPPONENT_SLOT_FORBIDDEN": "Slot adverse interdit",

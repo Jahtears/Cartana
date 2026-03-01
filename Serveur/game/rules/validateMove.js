@@ -169,7 +169,7 @@ function ruleAceMustBePlayed(game, player, card, fromSlotId, toSlotId) {
   // 1) Ace on top of deck
   const deckSlot = SlotId.create(slotPlayerIndex, SLOT_TYPES.DECK, 1);
   if (slotTopHasAce(game, deckSlot)) {
-    return userDenied("RULE_ACE_IN_DECK");
+    return userDenied("RULE_ACE_ON_DECK");
   }
 
   // 2) Ace anywhere in hand
