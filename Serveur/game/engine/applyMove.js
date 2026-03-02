@@ -3,7 +3,6 @@ import {
   ensureEmptyTableSlot,
 } from "../helpers/tableHelper.js";
 import {
-  drawCardFromHand,
   getSlotStack,
   removeCardFromSlot,
 } from "../state/slotStore.js";
@@ -58,9 +57,7 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
   }
 
   // Remove card from source slot.
-  const removed = fromSlotId.type === SLOT_TYPES.HAND
-    ? drawCardFromHand(game, fromSlotId, card.id) === card.id
-    : removeCardFromSlot(game, fromSlotId, card.id);
+  const removed = removeCardFromSlot(game, fromSlotId, card.id);
   if (!removed) {
     debugWarn("[APPLY] MOVE_SOURCE_MISSING_CARD", {
       actor,

@@ -169,8 +169,18 @@ export function createServerContext({ onTransportSend } = {}) {
         fx.syncTable(getTableSlots(game));
       }
 
-      if (timeoutResult.aceFrom) fx.touch(timeoutResult.aceFrom);
-      if (timeoutResult.aceTo) fx.touch(timeoutResult.aceTo);
+      const autoPlayedAces = Array.isArray(timeoutResult.autoPlayedAces)
+        ? timeoutResult.autoPlayedAces
+        : [];
+      if (autoPlayedAces.length > 0) {
+        for (const move of autoPlayedAces) {
+          if (move?.from) fx.touch(move.from);
+          if (move?.to) fx.touch(move.to);
+        }
+      } else {
+        if (timeoutResult.aceFrom) fx.touch(timeoutResult.aceFrom);
+        if (timeoutResult.aceTo) fx.touch(timeoutResult.aceTo);
+      }
       for (const refill of timeoutResult.given ?? []) {
         if (refill?.slotId) fx.touch(refill.slotId);
       }

@@ -58,15 +58,6 @@ function getSlotStack(game, slotId, initSlotsFactory = null) {
   return slots.get(slotId) || [];
 }
 
-function drawCardFromHand(game, slotId, cardId, initSlotsFactory = null) {
-  if (!isHandSlotId(slotId) || !isCardId(cardId)) return null;
-  const stack = getSlotStack(game, slotId, initSlotsFactory);
-  const idx = stack.indexOf(cardId);
-  if (idx === -1) return null;
-  stack[idx] = "";
-  return cardId;
-}
-
 function putCardtoHandFromPile(game, slotId, cardId, initSlotsFactory = null) {
   if (!isHandSlotId(slotId) || !isCardId(cardId)) return false;
   const stack = getSlotStack(game, slotId, initSlotsFactory);
@@ -124,7 +115,6 @@ function slotIdToString(slotId) {
 }
 
 export {
-  drawCardFromHand,
   ensureSlotStorage,
   getHandSize,
   getSlotCount,

@@ -31,10 +31,9 @@
 Tous les slots — sauf `HAND` — utilisent la convention dense :
 
 - `index 0` = bottom, `index last` = top.
--  `push`,  `unshift`,  `pop`.
-- `drawCardFromHand` = `splice` à l'index trouvé.
+-  `push`,  `unshift`,  `pop`, `splice` .
 
-> **Exception `HAND` :** le stack est de taille fixe 5. La position d'une carte en main est son index dans le stack. `""` marque une position libre. Les opérations dense (`push`, `pop`…) ne s'appliquent pas à `HAND`.
+> **Exception `HAND` :** le stack est de taille fixe 5. La position d'une carte en main est son index dans le stack. `""` marque une position libre.
 
 ---
 

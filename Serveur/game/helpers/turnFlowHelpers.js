@@ -15,14 +15,15 @@ import {
 import {
   compareCardsByTurnValue,
   findAceCardInHand,
+  slotTopHasAce,
 } from "../state/cardStore.js";
 import {
   cleanupExtraEmptyTableSlots,
   ensureEmptyTableSlot,
 } from "./tableHelper.js";
 import {
-  drawCardFromHand,
   getSlotStack,
+  removeCardFromSlot,
 } from "../state/slotStore.js";
 import {
   recycleFullTableSlotsToPile,
@@ -159,26 +160,47 @@ function tryExpireTurn(game, now = Date.now()) {
   let aceFrom = null;
   let aceTo = null;
   let tableSyncNeeded = false;
+  const autoPlayedAces = [];
 
   const prevPlayerArrayIndex = game.players.indexOf(prev);
-  const handSlot = prevPlayerArrayIndex === -1
+  const playerIndex = prevPlayerArrayIndex === -1 ? null : prevPlayerArrayIndex + 1;
+  const deckSlot = playerIndex === null
     ? null
-    : SlotId.create(prevPlayerArrayIndex + 1, SLOT_TYPES.HAND, 1);
-  const ace = handSlot ? findAceCardInHand(game, handSlot, DEFAULT_HAND_SIZE) : null;
-  if (ace) {
-    const { slotId: tableSlot, created } = ensureEmptyTableSlot(game);
-    const removed = drawCardFromHand(game, ace.slotId, ace.cardId);
-    if (removed) {
-      const tableStack = getSlotStack(game, tableSlot);
-      tableStack.push(ace.cardId);
-      playedAce = true;
-      aceFrom = ace.slotId;
-      aceTo = tableSlot;
-      tableSyncNeeded = !!created;
-      if (ensureEmptyTableSlot(game).created) tableSyncNeeded = true;
+    : SlotId.create(playerIndex, SLOT_TYPES.DECK, 1);
+  const handSlot = playerIndex === null
+    ? null
+    : SlotId.create(playerIndex, SLOT_TYPES.HAND, 1);
 
-      debugLog("[TURN] TIMEOUT_AUTO_ACE", { prev, from: aceFrom, to: aceTo });
+  function pickNextAce() {
+    if (deckSlot && slotTopHasAce(game, deckSlot)) {
+      const deckStack = getSlotStack(game, deckSlot);
+      const deckTopCardId = deckStack.length ? deckStack[deckStack.length - 1] : null;
+      if (deckTopCardId) return { slotId: deckSlot, cardId: deckTopCardId };
     }
+    if (handSlot) {
+      return findAceCardInHand(game, handSlot, DEFAULT_HAND_SIZE);
+    }
+    return null;
+  }
+
+  while (true) {
+    const ace = pickNextAce();
+    if (!ace) break;
+
+    const { slotId: tableSlot, created } = ensureEmptyTableSlot(game);
+    const removed = removeCardFromSlot(game, ace.slotId, ace.cardId);
+    if (!removed) break;
+
+    const tableStack = getSlotStack(game, tableSlot);
+    tableStack.push(ace.cardId);
+    playedAce = true;
+    if (!aceFrom) aceFrom = ace.slotId;
+    if (!aceTo) aceTo = tableSlot;
+    tableSyncNeeded = tableSyncNeeded || !!created;
+    autoPlayedAces.push({ cardId: ace.cardId, from: ace.slotId, to: tableSlot });
+    if (ensureEmptyTableSlot(game).created) tableSyncNeeded = true;
+
+    debugLog("[TURN] TIMEOUT_AUTO_ACE", { prev, from: ace.slotId, to: tableSlot });
   }
 
   const { next, given, recycled } = endTurnAfterBenchPlay(game, prev);
@@ -215,6 +237,7 @@ function tryExpireTurn(game, now = Date.now()) {
     playedAce,
     aceFrom,
     aceTo,
+    autoPlayedAces,
     tableSyncNeeded,
     endsAt: game.turn.endsAt,
     durationMs: game.turn.durationMs,
