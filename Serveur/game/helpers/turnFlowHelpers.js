@@ -67,14 +67,6 @@ function registerTurnTimeoutStreak(game, player) {
   const nextStreak = safeCurrent + 1;
   streakByPlayer[username] = nextStreak;
 
-  if (Array.isArray(game?.players)) {
-    for (const other of game.players) {
-      const otherUsername = String(other ?? "").trim();
-      if (!otherUsername || otherUsername === username) continue;
-      streakByPlayer[otherUsername] = 0;
-    }
-  }
-
   return nextStreak;
 }
 

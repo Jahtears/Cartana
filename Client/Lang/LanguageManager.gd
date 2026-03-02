@@ -3,7 +3,6 @@ extends RefCounted
 const LANG_FR := "fr"
 const LANG_EN := "en"
 
-const LangFR = preload("res://Client/Lang/langFR.gd")
 const LangEnglish = preload("res://Client/Lang/LangEnglish.gd")
 
 const LOGIN_TEXT_BY_LANG := {

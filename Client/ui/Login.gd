@@ -7,7 +7,6 @@ const SETTINGS_PATH := "user://client_settings.cfg"
 const SETTINGS_SECTION_LOGIN := "login"
 const SETTINGS_KEY_REMEMBER_USERNAME := "remember_username"
 const SETTINGS_KEY_USERNAME := "username"
-const REMEMBER_CHECKBOX_GAP := 12.0
 
 var _login_pending := false
 var _last_username: String = ""
@@ -204,3 +203,8 @@ func _exit_tree() -> void:
 		NetworkManager.disconnected.disconnect(_on_network_disconnected)
 	if NetworkManager.connection_restored.is_connected(_on_connection_restored):
 		NetworkManager.connection_restored.disconnect(_on_connection_restored)
+
+
+func _on_close_pressed() -> void:
+	NetworkManager.close(1000, NetworkManager.DISCONNECT_REASON_CLOSE)
+	get_tree().quit()
