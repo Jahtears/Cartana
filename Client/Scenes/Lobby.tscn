@@ -26,6 +26,15 @@ offset_bottom = -49.0
 grow_horizontal = 2
 grow_vertical = 0
 
+[node name="SearchPlayer" type="LineEdit" parent="." unique_id=1779329555]
+layout_mode = 0
+offset_left = 480.0
+offset_top = 64.0
+offset_right = 688.0
+offset_bottom = 95.0
+context_menu_enabled = false
+emoji_menu_enabled = false
+
 [node name="PlayersBox" type="ColorRect" parent="." unique_id=183429981]
 layout_mode = 1
 anchors_preset = -1
@@ -35,8 +44,8 @@ anchor_right = 0.48
 anchor_bottom = 0.88
 offset_left = 6.3999977
 offset_top = -52.640007
-offset_right = -103.599976
-offset_bottom = -57.640015
+offset_right = -103.95996
+offset_bottom = 5.76001
 color = Color(0, 0, 0, 0)
 
 [node name="PlayersList" type="ScrollContainer" parent="PlayersBox" unique_id=1527846370]
@@ -44,10 +53,7 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = 12.0
-offset_right = -12.0
-offset_bottom = -12.0
+offset_top = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -65,8 +71,8 @@ anchor_right = 0.95
 anchor_bottom = 0.88
 offset_left = 102.96002
 offset_top = -52.640007
-offset_right = -7.040039
-offset_bottom = -56.23999
+offset_right = -7.4000244
+offset_bottom = 5.76001
 color = Color(0, 0, 0, 0)
 
 [node name="GameList" type="ScrollContainer" parent="GameBox" unique_id=1098180103]
@@ -74,10 +80,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = 12.0
-offset_right = -12.0
-offset_bottom = -12.0
+offset_left = 2.0
+offset_top = 31.0
+offset_right = 2.0
+offset_bottom = -1.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -113,3 +119,4 @@ mouse_filter = 2
 color = Color(0.6745098, 0.3254902, 0.26666668, 1)
 
 [connection signal="pressed" from="Deconnexion" to="." method="_on_deconnexion_pressed"]
+[connection signal="text_changed" from="SearchPlayer" to="." method="_on_search_player_text_changed"]

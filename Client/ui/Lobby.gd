@@ -18,6 +18,9 @@ const ACTION_NETWORK_RETRY := "network_retry"
 var _is_changing_scene := false
 var _statuses: Dictionary = {}            # username -> status
 var _network_disconnected := false
+var _search_query: String = ""
+var _all_players: Array = []
+var _all_games: Array = []
 
 func _ready() -> void:
 	$PlayerNameLabel.text = String(Global.username)
@@ -47,9 +50,10 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 	match type:
 		REQ_GET_PLAYERS:
 			if ok:
-				_statuses = data.get("statuses", {}) as Dictionary
-				update_games_list(data.get("games", []))
-				update_players_list(data.get("players", []))
+				_all_players = _coerce_array(data.get("players", []))
+				_all_games = _coerce_array(data.get("games", []))
+				_statuses = _coerce_dictionary(data.get("statuses", {}))
+				_refresh_lobby_view()
 			else:
 				_show_error_popup(error, Protocol.POPUP_LOBBY_GET_PLAYERS_ERROR)
 
@@ -76,11 +80,13 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			start_game(game_id, players, spectator)
 
 		"players_list":
-			_statuses = data.get("statuses", {}) as Dictionary
-			update_players_list(data.get("players", []))
+			_all_players = _coerce_array(data.get("players", []))
+			_statuses = _coerce_dictionary(data.get("statuses", {}))
+			_refresh_players_view()
 
 		"games_list":
-			update_games_list(data.get("games", []))
+			_all_games = _coerce_array(data.get("games", []))
+			_refresh_games_view()
 
 		"invite_request":
 			var from_user := String(data.get("from", ""))
@@ -159,6 +165,20 @@ func start_game(game_id: String, players: Array, spectator: bool) -> void:
 	_is_changing_scene = true
 	call_deferred("_deferred_change_to_game")
 
+func _on_search_player_text_changed(new_text: String) -> void:
+	_search_query = String(new_text).strip_edges().to_lower()
+	_refresh_lobby_view()
+
+func _refresh_lobby_view() -> void:
+	_refresh_games_view()
+	_refresh_players_view()
+
+func _refresh_players_view() -> void:
+	update_players_list(_all_players)
+
+func _refresh_games_view() -> void:
+	update_games_list(_all_games)
+
 func update_players_list(players: Array) -> void:
 	var list: Node = $PlayersBox/PlayersList/PlayersItems
 	for child in list.get_children():
@@ -177,22 +197,46 @@ func update_players_list(players: Array) -> void:
 		if typ != "lobby":
 			continue
 
+		if not _player_matches_search(ps):
+			continue
+
 		list.add_child(create_player_box(ps))
 
 func update_games_list(games: Array) -> void:
-	Global.current_games = games
-
 	var list: Node = $GameBox/GameList/GameItems
 	for child in list.get_children():
 		child.queue_free()
 
+	var filtered_games: Array = []
 	for game in games:
+		if not _game_matches_search(game):
+			continue
+		filtered_games.append(game)
 		list.add_child(create_game_box(game))
+	Global.current_games = filtered_games
+
+func _player_matches_search(username: String) -> bool:
+	if _search_query == "":
+		return true
+	return String(username).to_lower().contains(_search_query)
+
+func _game_matches_search(game: Variant) -> bool:
+	if _search_query == "":
+		return true
+
+	var g: Dictionary = game if game is Dictionary else {}
+	var players_val = g.get("players", [])
+	var players: Array = players_val if players_val is Array else []
+	for p in players:
+		if String(p).to_lower().contains(_search_query):
+			return true
+	return false
 
 func create_game_box(game: Variant) -> Button:
-	var g := game as Dictionary
+	var g: Dictionary = game if game is Dictionary else {}
 	var game_id := String(g.get("game_id", ""))
-	var players: Array = g.get("players", [])
+	var players_val = g.get("players", [])
+	var players: Array = players_val if players_val is Array else []
 
 	var btn := Button.new()
 	btn.text = str(players) #player vs player
@@ -291,6 +335,12 @@ func _do_logout() -> void:
 	Global.reset_game_state()
 
 	await _go_to_login_safe()
+
+func _coerce_array(value: Variant) -> Array:
+	return value if value is Array else []
+
+func _coerce_dictionary(value: Variant) -> Dictionary:
+	return value if value is Dictionary else {}
 
 func _go_to_login_safe() -> void:
 	if _is_changing_scene:
