@@ -10,9 +10,8 @@ const PREVIEW_CARD_GLOW_COLOR := Color(0.35, 0.95, 0.45, 0.45)
 const PREVIEW_CARD_GLOW_SIZE := 6
 const POINTER_ID_NONE := -2
 const POINTER_ID_MOUSE := -1
-const BACK_TEXTURE_DECK_A := preload("res://DosA.png")
-const BACK_TEXTURE_DECK_B := preload("res://DosB.png")
-const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
+const BACK_TEXTURE_DECK_A := preload("res://Resource/Cartes/DosA.png")
+const BACK_TEXTURE_DECK_B := preload("res://Resource/Cartes/DosB.png")
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
@@ -626,9 +625,10 @@ func _rect_from_collision_shape_node(node: Node2D) -> Rect2:
 	var shape := shape_node.shape
 	if shape is RectangleShape2D:
 		var size := (shape as RectangleShape2D).size
-		var scale := shape_node.global_transform.get_scale()
-		var scaled := Vector2(size.x * absf(scale.x), size.y * absf(scale.y))
+		var shape_scale := shape_node.global_transform.get_scale()
+		var scaled := Vector2(size.x * absf(shape_scale.x), size.y * absf(shape_scale.y))
 		return Rect2(shape_node.global_position - scaled * 0.5, scaled)
+
 	return Rect2()
 
 func _contains_global_point(node: Node2D, global_point: Vector2) -> bool:

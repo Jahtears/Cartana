@@ -148,14 +148,14 @@ static func normalize_invite_response_ui(data: Dictionary) -> Dictionary:
 	return normalize_popup_message(ui_payload)
 
 static func invite_cancelled_ui(data: Dictionary) -> Dictionary:
-	var name := String(data.get("name", "")).strip_edges()
-	if name == "":
-		name = "Utilisateur"
+	var user_name := String(data.get("name", "")).strip_edges()
+	if user_name == "":
+		user_name = "Utilisateur"
 
 	return normalize_popup_message({
 		"message_code": POPUP_INVITE_CANCELLED,
 		"message_params": {
-			"name": name,
+			"name": user_name,
 		},
 	})
 

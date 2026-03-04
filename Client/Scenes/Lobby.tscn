@@ -12,6 +12,132 @@ grow_vertical = 2
 pivot_offset = Vector2(352, 240)
 script = ExtResource("1_ll2xe")
 
+[node name="TabContainer" type="TabContainer" parent="." unique_id=1195529323]
+self_modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+current_tab = 0
+
+[node name="LobbyTab" type="Control" parent="TabContainer" unique_id=1331883829]
+layout_mode = 2
+metadata/_tab_index = 0
+
+[node name="SearchPlayer" type="LineEdit" parent="TabContainer/LobbyTab" unique_id=1779329555]
+layout_mode = 0
+offset_left = 480.0
+offset_top = 33.0
+offset_right = 688.0
+offset_bottom = 64.0
+context_menu_enabled = false
+emoji_menu_enabled = false
+
+[node name="PlayersBox" type="ColorRect" parent="TabContainer/LobbyTab" unique_id=183429981]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.05
+anchor_top = 0.18
+anchor_right = 0.48
+anchor_bottom = 0.88
+offset_left = 6.3999977
+offset_top = -30.060005
+offset_right = -74.44
+offset_bottom = -1.6599731
+color = Color(0, 0, 0, 0)
+
+[node name="PlayersList" type="ScrollContainer" parent="TabContainer/LobbyTab/PlayersBox" unique_id=1527846370]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PlayersItems" type="VBoxContainer" parent="TabContainer/LobbyTab/PlayersBox/PlayersList" unique_id=1359874975]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GameBox" type="ColorRect" parent="TabContainer/LobbyTab" unique_id=1596528923]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.52
+anchor_top = 0.18
+anchor_right = 0.95
+anchor_bottom = 0.88
+offset_left = 88.96002
+offset_top = -30.060005
+offset_right = 8.119995
+offset_bottom = -1.6599731
+color = Color(0, 0, 0, 0)
+
+[node name="GameList" type="ScrollContainer" parent="TabContainer/LobbyTab/GameBox" unique_id=1098180103]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GameItems" type="VBoxContainer" parent="TabContainer/LobbyTab/GameBox/GameList" unique_id=1199569160]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LeaderboardTab" type="Control" parent="TabContainer" unique_id=1966971171]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="SearchLeader" type="LineEdit" parent="TabContainer/LeaderboardTab" unique_id=563521440]
+layout_mode = 0
+offset_left = 480.0
+offset_top = 33.0
+offset_right = 688.0
+offset_bottom = 64.0
+context_menu_enabled = false
+emoji_menu_enabled = false
+
+[node name="LeaderBox" type="ColorRect" parent="TabContainer/LeaderboardTab" unique_id=1763008908]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.05
+anchor_top = 0.18
+anchor_right = 0.48
+anchor_bottom = 0.88
+offset_left = 6.3999977
+offset_top = -30.060005
+offset_right = 534.04004
+offset_bottom = -1.960022
+color = Color(0, 0, 0, 0)
+
+[node name="LeaderList" type="ScrollContainer" parent="TabContainer/LeaderboardTab/LeaderBox" unique_id=13296260]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 256.0
+offset_top = 16.0
+offset_right = -257.0
+offset_bottom = 6.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LeaderItems" type="VBoxContainer" parent="TabContainer/LeaderboardTab/LeaderBox/LeaderList" unique_id=1568871506]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BoutiqueTab" type="Control" parent="TabContainer" unique_id=2084108781]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 2
+
 [node name="PlayerNameLabel" type="Label" parent="." unique_id=2064866708]
 layout_mode = 1
 anchors_preset = 7
@@ -25,72 +151,6 @@ offset_right = 36.00006
 offset_bottom = -49.0
 grow_horizontal = 2
 grow_vertical = 0
-
-[node name="SearchPlayer" type="LineEdit" parent="." unique_id=1779329555]
-layout_mode = 0
-offset_left = 480.0
-offset_top = 64.0
-offset_right = 688.0
-offset_bottom = 95.0
-context_menu_enabled = false
-emoji_menu_enabled = false
-
-[node name="PlayersBox" type="ColorRect" parent="." unique_id=183429981]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.05
-anchor_top = 0.18
-anchor_right = 0.48
-anchor_bottom = 0.88
-offset_left = 6.3999977
-offset_top = -52.640007
-offset_right = -103.95996
-offset_bottom = 5.76001
-color = Color(0, 0, 0, 0)
-
-[node name="PlayersList" type="ScrollContainer" parent="PlayersBox" unique_id=1527846370]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = 32.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="PlayersItems" type="VBoxContainer" parent="PlayersBox/PlayersList" unique_id=1359874975]
-custom_minimum_size = Vector2(300, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="GameBox" type="ColorRect" parent="." unique_id=1596528923]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.52
-anchor_top = 0.18
-anchor_right = 0.95
-anchor_bottom = 0.88
-offset_left = 102.96002
-offset_top = -52.640007
-offset_right = -7.4000244
-offset_bottom = 5.76001
-color = Color(0, 0, 0, 0)
-
-[node name="GameList" type="ScrollContainer" parent="GameBox" unique_id=1098180103]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 2.0
-offset_top = 31.0
-offset_right = 2.0
-offset_bottom = -1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="GameItems" type="VBoxContainer" parent="GameBox/GameList" unique_id=1199569160]
-custom_minimum_size = Vector2(360, 0)
-layout_mode = 2
-size_flags_horizontal = 3
 
 [node name="Deconnexion" type="Button" parent="." unique_id=1298183396]
 layout_mode = 1
@@ -118,5 +178,5 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.6745098, 0.3254902, 0.26666668, 1)
 
+[connection signal="text_changed" from="TabContainer/LobbyTab/SearchPlayer" to="." method="_on_search_player_text_changed"]
 [connection signal="pressed" from="Deconnexion" to="." method="_on_deconnexion_pressed"]
-[connection signal="text_changed" from="SearchPlayer" to="." method="_on_search_player_text_changed"]

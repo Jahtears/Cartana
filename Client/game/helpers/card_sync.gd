@@ -2,8 +2,6 @@
 extends RefCounted
 class_name CardSyncHelper
 
-const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
-
 const UNKNOWN_ORDER_SENTINEL := 2147483647
 
 const KEY_CARD_ID := "card_id"

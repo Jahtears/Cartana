@@ -82,7 +82,7 @@ func _normalize_login_error(error: Dictionary) -> Dictionary:
 	if retry_after_ms <= 0:
 		return normalized
 
-	params["retry_after_s"] = int((retry_after_ms + 999) / 1000)
+	params["retry_after_s"] = (retry_after_ms + 999.0) / 1000
 	normalized["message_params"] = params
 	return normalized
 

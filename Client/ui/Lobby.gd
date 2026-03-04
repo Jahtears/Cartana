@@ -180,7 +180,7 @@ func _refresh_games_view() -> void:
 	update_games_list(_all_games)
 
 func update_players_list(players: Array) -> void:
-	var list: Node = $PlayersBox/PlayersList/PlayersItems
+	var list: Node = $TabContainer/LobbyTab/PlayersBox/PlayersList/PlayersItems
 	for child in list.get_children():
 		child.queue_free()
 
@@ -203,7 +203,7 @@ func update_players_list(players: Array) -> void:
 		list.add_child(create_player_box(ps))
 
 func update_games_list(games: Array) -> void:
-	var list: Node = $GameBox/GameList/GameItems
+	var list: Node = $TabContainer/LobbyTab/GameBox/GameList/GameItems
 	for child in list.get_children():
 		child.queue_free()
 

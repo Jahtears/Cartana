@@ -35,8 +35,8 @@ func _ready() -> void:
 		close_requested.connect(_on_close_requested)
 	hide_and_reset()
 
-func show_code(mode: int, message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
-	var safe_mode := mode
+func show_code(p_mode: int, message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
+	var safe_mode := p_mode
 	if safe_mode != MODE_PASSIVE and safe_mode != MODE_INFO and safe_mode != MODE_CONFIRM:
 		safe_mode = MODE_INFO
 
@@ -49,7 +49,7 @@ func show_code(mode: int, message_code: String, params: Dictionary = {}, payload
 		actions["no"] = String(payload.get("no_action_id", _popup_action_id("CONFIRM_NO", ACTION_CONFIRM_NO)))
 	_show_mode(safe_mode, normalized, payload, options, actions)
 
-func show_normalized(mode: int, normalized: Dictionary, payload: Dictionary = {}, options: Dictionary = {}) -> void:
+func show_normalized(p_mode: int, normalized: Dictionary, payload: Dictionary = {}, options: Dictionary = {}) -> void:
 	var message_code := String(normalized.get("message_code", "")).strip_edges()
 	if message_code == "":
 		return
@@ -59,7 +59,7 @@ func show_normalized(mode: int, normalized: Dictionary, payload: Dictionary = {}
 	var text_override := String(normalized.get("text_override", "")).strip_edges()
 	if text_override != "":
 		merged_options[OPTION_TEXT_OVERRIDE] = text_override
-	show_code(mode, message_code, params, payload, merged_options)
+	show_code(p_mode, message_code, params, payload, merged_options)
 
 func hide_and_reset() -> void:
 	hide()
@@ -69,19 +69,19 @@ func hide_and_reset() -> void:
 	_action_refuse = ACTION_CONFIRM_NO
 	_action_ok = ACTION_INFO_OK
 
-func _show_mode(mode: int, normalized: Dictionary, payload: Dictionary, options: Dictionary, actions: Dictionary) -> void:
-	_mode = mode
+func _show_mode(p_mode: int, normalized: Dictionary, payload: Dictionary, options: Dictionary, actions: Dictionary) -> void:
+	_mode = p_mode
 	_payload = payload.duplicate(true)
 	_payload["message_code"] = String(normalized.get("message_code", ""))
 	_payload["message_params"] = normalized.get("message_params", {})
 
 	_label.text = _resolve_message_text(normalized, options)
 
-	if mode == MODE_PASSIVE:
+	if p_mode == MODE_PASSIVE:
 		_btn_accept.visible = false
 		_btn_refuse.visible = false
 		_btn_ok.visible = false
-	elif mode == MODE_INFO:
+	elif p_mode == MODE_INFO:
 		_action_ok = String(actions.get("ok", ACTION_INFO_OK))
 		_btn_ok.text = _resolve_label(options, OPTION_OK_LABEL_KEY, "ok")
 		_btn_accept.visible = false

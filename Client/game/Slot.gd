@@ -1,9 +1,6 @@
 # Slot.gd - Refactorisé sans redondances
 extends Area2D
 
-const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
-const GameLayoutConfig = preload("res://Client/game/GameLayoutConfig.gd")
-
 # ============= EXPORTS =============
 @export var slot_id: String = ""
 @export var snap_duration: float = GameLayoutConfig.SNAP_DURATION
@@ -250,8 +247,8 @@ func _update_cached_rect() -> void:
 	if shape is RectangleShape2D:
 		var rect_shape := shape as RectangleShape2D
 		var size: Vector2 = rect_shape.size
-		var scale: Vector2 = _collision_shape.global_transform.get_scale()
-		var scaled: Vector2 = Vector2(size.x * absf(scale.x), size.y * absf(scale.y))
+		var node_scale: Vector2 = _collision_shape.global_transform.get_scale()
+		var scaled: Vector2 = Vector2(size.x * absf(scale.x), size.y * absf(node_scale.y))
 		_cached_rect = Rect2(_collision_shape.global_position - scaled * 0.5, scaled)
 	else:
 		_cached_rect = Rect2()
@@ -298,9 +295,9 @@ func _reset_background() -> void:
 func _apply_preview_visual(active: bool) -> void:
 	_set_background_modulate(GameLayoutConfig.PREVIEW_HIGHLIGHT_COLOR if active else GameLayoutConfig.PREVIEW_NORMAL_COLOR)
 
-func _set_background_visible(is_visible: bool) -> void:
+func _set_background_visible(visible_state: bool) -> void:
 	if _background != null:
-		_background.visible = is_visible
+		_background.visible = visible_state
 
 func _set_background_modulate(color: Color) -> void:
 	if _background != null:

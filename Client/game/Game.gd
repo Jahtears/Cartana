@@ -7,15 +7,7 @@ var slot_scene: PackedScene = preload("res://Client/Scenes/Slot.tscn")
 var card_scene: PackedScene = preload("res://Client/Scenes/Carte.tscn")
 
 # ============= CONFIG & HELPERS =============
-const GameLayoutConfig = preload("res://Client/game/GameLayoutConfig.gd")
 const Protocol = preload("res://Client/net/Protocol.gd")
-const GameMessage = preload("res://Client/game/helpers/GameMessage.gd")
-const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
-const TableSyncHelper = preload("res://Client/game/helpers/table_sync.gd")
-const CardSyncHelper = preload("res://Client/game/helpers/card_sync.gd")
-const TimebarUtil = preload("res://Client/game/helpers/TimeBar.gd")
-const DeckCountUtil = preload("res://Client/game/helpers/DeckCount.gd")
-
 # ============= CONSTANTS =============
 const FLOW_INVITE_REQUEST := Protocol.POPUP_FLOW_INVITE_REQUEST
 const REMATCH_CONTEXT := "rematch"

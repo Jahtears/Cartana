@@ -71,7 +71,6 @@ static func ensure_ui(state: Dictionary, root: Control, timeout_handler: Callabl
 		label = RichTextLabel.new()
 		label.name = LABEL_NODE_NAME
 		label.z_index = 1
-		label.layout_mode = 0
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(label)
 		state["label"] = label

@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://dqxpcbdewi0rn"]
 
 [ext_resource type="Script" uid="uid://dgt60tw50p0bn" path="res://Client/game/Carte.gd" id="1_d822b"]
-[ext_resource type="Texture2D" uid="uid://birbipg4vmclp" path="res://DosA.png" id="2_b0gi5"]
-[ext_resource type="FontFile" uid="uid://h40utw55jkpf" path="res://fonts/LiberationSans-Regular.ttf" id="2_w7dsw"]
+[ext_resource type="Texture2D" uid="uid://birbipg4vmclp" path="res://Resource/Cartes/DosA.png" id="2_b0gi5"]
+[ext_resource type="FontFile" uid="uid://h40utw55jkpf" path="res://Resource/fonts/LiberationSans-Regular.ttf" id="2_w7dsw"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_d822b"]
 size = Vector2(80, 119)
