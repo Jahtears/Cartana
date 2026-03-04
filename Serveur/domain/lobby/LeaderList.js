@@ -122,7 +122,7 @@ export function recordLeaderboardResult(players, winner) {
 
 export function getLeaderboardRows() {
   const board = loadLeaderboard();
-  return Object.entries(board)
+  const sortedRows = Object.entries(board)
     .map(([username, stats]) => ({ username, ...normalizeLeaderboardEntry(stats) }))
     .sort((a, b) => (
       b.wins - a.wins
@@ -130,4 +130,27 @@ export function getLeaderboardRows() {
       || a.losses - b.losses
       || a.username.localeCompare(b.username)
     ));
+
+  let position = 0;
+  let currentRank = 0;
+  let prevWins = -1;
+  let prevDraws = -1;
+  let prevLosses = -1;
+
+  return sortedRows.map((row) => {
+    position += 1;
+    if (
+      position === 1
+      || row.wins !== prevWins
+      || row.draws !== prevDraws
+      || row.losses !== prevLosses
+    ) {
+      currentRank = position;
+    }
+
+    prevWins = row.wins;
+    prevDraws = row.draws;
+    prevLosses = row.losses;
+    return { ...row, rank: currentRank };
+  });
 }
