@@ -20,9 +20,10 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-current_tab = 0
+current_tab = 1
 
 [node name="LobbyTab" type="Control" parent="TabContainer" unique_id=1331883829]
+visible = false
 layout_mode = 2
 metadata/_tab_index = 0
 
@@ -105,7 +106,6 @@ grow_horizontal = 2
 grow_vertical = 0
 
 [node name="LeaderboardTab" type="Control" parent="TabContainer" unique_id=1966971171]
-visible = false
 layout_mode = 2
 metadata/_tab_index = 1
 
@@ -126,21 +126,17 @@ anchor_left = 0.05
 anchor_top = 0.18
 anchor_right = 0.48
 anchor_bottom = 0.88
-offset_left = 6.3999977
-offset_top = -30.060005
-offset_right = 534.04004
-offset_bottom = -1.960022
-color = Color(0, 0, 0, 0)
+offset_left = 254.4
+offset_top = -14.060005
+offset_right = 289.04004
+offset_bottom = 4.039978
+color = Color(1, 1, 1, 0)
 
 [node name="LeaderList" type="ScrollContainer" parent="TabContainer/LeaderboardTab/LeaderBox" unique_id=13296260]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 256.0
-offset_top = 16.0
-offset_right = -257.0
-offset_bottom = 6.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -167,7 +163,6 @@ offset_right = -14.0
 offset_bottom = -592.0
 grow_horizontal = 0
 grow_vertical = 0
-text = "Déconnexion"
 
 [node name="Background" type="ColorRect" parent="." unique_id=357516596]
 z_index = -1

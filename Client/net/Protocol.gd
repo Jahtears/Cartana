@@ -1,8 +1,6 @@
 # Protocol.gd
 extends Node
 
-const LanguageManager = preload("res://Client/Lang/LanguageManager.gd")
-
 const POPUP_PREFIX := "POPUP_"
 
 const POPUP_TECH_ERROR_GENERIC := "POPUP_TECH_ERROR_GENERIC"
@@ -93,8 +91,6 @@ static func normalize_popup_message(payload: Dictionary) -> Dictionary:
 		text = popup_text(message_code, params)
 	if text == "":
 		text = popup_text(POPUP_TECH_ERROR_GENERIC)
-	if text == "":
-		text = "Erreur"
 
 	var normalized := {
 		"text": text,
@@ -153,7 +149,7 @@ static func normalize_invite_response_ui(data: Dictionary) -> Dictionary:
 static func invite_cancelled_ui(data: Dictionary) -> Dictionary:
 	var user_name := String(data.get("name", "")).strip_edges()
 	if user_name == "":
-		user_name = "Utilisateur"
+		user_name = LanguageManager.ui_text("UI_GENERIC_USER", "User")
 
 	return normalize_popup_message({
 		"message_code": POPUP_INVITE_CANCELLED,

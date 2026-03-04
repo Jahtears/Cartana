@@ -1,7 +1,6 @@
 extends Control
 
 const Protocol = preload("res://Client/net/Protocol.gd")
-const LanguageManager = preload("res://Client/Lang/LanguageManager.gd")
 
 const SETTINGS_PATH := "user://client_settings.cfg"
 const SETTINGS_SECTION_LOGIN := "login"
@@ -19,6 +18,7 @@ var _network_disconnected := false
 @onready var _login_button: Button = $VBoxContainer/Login_button
 @onready var _language_label: Label = $LanguageRow/LanguageLabel
 @onready var _language_option_button: OptionButton = $LanguageRow/LanguageOptionButton
+@onready var _close_button: Button = $Fermer
 
 func _ready() -> void:
 	if not NetworkManager.is_open():
@@ -29,6 +29,8 @@ func _ready() -> void:
 		NetworkManager.disconnected.connect(_on_network_disconnected)
 	if not NetworkManager.connection_restored.is_connected(_on_connection_restored):
 		NetworkManager.connection_restored.connect(_on_connection_restored)
+	if not LanguageManager.language_changed.is_connected(_on_language_changed):
+		LanguageManager.language_changed.connect(_on_language_changed)
 	PopupUi.hide_and_reset()
 	_setup_language_option_button()
 	_load_login_preferences()
@@ -167,11 +169,12 @@ func _refresh_language_options_labels() -> void:
 		_language_option_button.set_item_text(index, LanguageManager.language_display_name(item_language))
 
 func _apply_language_to_login_ui() -> void:
-	_username_input.placeholder_text = LanguageManager.ui_text("login_username_placeholder", "Username")
-	_pin_input.placeholder_text = LanguageManager.ui_text("login_pin_placeholder", "PIN")
-	_remember_username_checkbox.text = LanguageManager.ui_text("login_remember_username", "Remember username")
-	_login_button.text = LanguageManager.ui_text("login_button", "Login")
-	_language_label.text = LanguageManager.ui_text("login_language_label", "Language")
+	_username_input.placeholder_text = LanguageManager.ui_text("UI_LOGIN_USERNAME_PLACEHOLDER", "Username")
+	_pin_input.placeholder_text = LanguageManager.ui_text("UI_LOGIN_PIN_PLACEHOLDER", "PIN")
+	_remember_username_checkbox.text = LanguageManager.ui_text("UI_LOGIN_REMEMBER_USERNAME", "Remember username")
+	_login_button.text = LanguageManager.ui_text("UI_LOGIN_BUTTON", "Login")
+	_language_label.text = LanguageManager.ui_text("UI_LOGIN_LANGUAGE_LABEL", "Language")
+	_close_button.text = LanguageManager.ui_text("UI_LOGIN_CLOSE_BUTTON", "Quit")
 	_refresh_language_options_labels()
 
 func _on_language_option_button_item_selected(index: int) -> void:
@@ -179,6 +182,9 @@ func _on_language_option_button_item_selected(index: int) -> void:
 		return
 	var language_code := String(_language_option_button.get_item_metadata(index))
 	LanguageManager.set_language(language_code)
+
+func _on_language_changed(_language_code: String) -> void:
+	_select_language_option(LanguageManager.get_language())
 	_apply_language_to_login_ui()
 
 func _load_login_preferences() -> void:
@@ -213,6 +219,8 @@ func _exit_tree() -> void:
 		NetworkManager.disconnected.disconnect(_on_network_disconnected)
 	if NetworkManager.connection_restored.is_connected(_on_connection_restored):
 		NetworkManager.connection_restored.disconnect(_on_connection_restored)
+	if LanguageManager.language_changed.is_connected(_on_language_changed):
+		LanguageManager.language_changed.disconnect(_on_language_changed)
 
 
 func _on_close_pressed() -> void:

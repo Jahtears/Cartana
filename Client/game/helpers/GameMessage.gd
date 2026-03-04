@@ -1,8 +1,6 @@
 extends RefCounted
 class_name GameMessage
 
-const LanguageManager = preload("res://Client/Lang/LanguageManager.gd")
-
 const RULE_PREFIX := "RULE_"
 
 const RULE_OK := "RULE_OK"

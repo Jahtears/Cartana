@@ -28,7 +28,7 @@ const ACTION_PAUSE_WAIT := "pause_wait"
 const ACTION_PAUSE_LEAVE := "pause_leave"
 const ACTION_NETWORK_RETRY := "network_retry"
 
-const LABEL_QUIT := "Quitter"
+const UI_GAME_QUIT_BUTTON_KEY := "UI_GAME_QUIT_BUTTON"
 
 # ============= STATE =============
 var slots_ready: bool = false
@@ -99,11 +99,14 @@ func _ready() -> void:
 		NetworkManager.server_closed.connect(_on_server_closed)
 	if not PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.connect(_on_popup_action)
+	if not LanguageManager.language_changed.is_connected(_on_language_changed):
+		LanguageManager.language_changed.connect(_on_language_changed)
 	
 	if not quitter_button.pressed.is_connected(_on_quitter_pressed):
 		quitter_button.pressed.connect(_on_quitter_pressed)
 	
 	PopupUi.hide_and_reset()
+	_apply_language_to_game_ui()
 
 	if String(Global.current_game_id) != "":
 		_request_game_sync()
@@ -182,9 +185,15 @@ func _apply_positions(positions: Dictionary) -> void:
 	table_root.position = Vector2(center_x, vh * GameLayoutConfig.TABLE_Y_RATIO)
 	pioche_root.position = Vector2(right_x, vh * GameLayoutConfig.TABLE_Y_RATIO)
 	
-	quitter_button.text = LABEL_QUIT
+	quitter_button.text = LanguageManager.ui_text(UI_GAME_QUIT_BUTTON_KEY, "Quit")
 	quitter_button.size = Vector2(GameLayoutConfig.QUITTER_WIDTH, GameLayoutConfig.QUITTER_HEIGHT)
 	quitter_button.position = Vector2(right_x - GameLayoutConfig.QUITTER_OFFSET_X, GameLayoutConfig.QUITTER_OFFSET_Y)
+
+func _apply_language_to_game_ui() -> void:
+	quitter_button.text = LanguageManager.ui_text(UI_GAME_QUIT_BUTTON_KEY, "Quit")
+
+func _on_language_changed(_language_code: String) -> void:
+	_apply_language_to_game_ui()
 
 func _apply_timebar_layout() -> void:
 	TimebarUtil.apply_layout(_timebar_state, p1_banc_anchor.global_position)
@@ -333,7 +342,7 @@ func _handle_invite_request(data: Dictionary) -> void:
 			Protocol.POPUP_INVITE_RECEIVED,
 			{"from": from_user},
 			popup_payload,
-			{"yes_label_key": "accept", "no_label_key": "refuse"}
+			{"yes_label_key": "UI_LABEL_ACCEPT", "no_label_key": "UI_LABEL_REFUSE"}
 		)
 
 func _handle_invite_response(data: Dictionary) -> void:
@@ -360,7 +369,7 @@ func _handle_rematch_declined(data: Dictionary) -> void:
 			"context": context,
 			"source_game_id": String(data.get("source_game_id", "")).strip_edges(),
 		},
-		{"ok_label_key": "back_lobby"}
+		{"ok_label_key": "UI_LABEL_BACK_LOBBY"}
 	)
 
 func _handle_start_game(data: Dictionary) -> void:
@@ -477,7 +486,7 @@ func _on_reconnect_failed() -> void:
 		Protocol.POPUP_PLAYER_RECONNECT_FAIL,
 		{},
 		{"ok_action_id": ACTION_NETWORK_RETRY},
-		{"ok_label_key": "retry"}
+		{"ok_label_key": "UI_LABEL_RETRY"}
 	)
 
 func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
@@ -611,7 +620,7 @@ func _on_game_end(data: Dictionary) -> void:
 				"ok_action_id": ACTION_GAME_END_LEAVE,
 				"game_id": String(Global.current_game_id),
 			},
-			{"ok_label_key": "back_lobby"}
+			{"ok_label_key": "UI_LABEL_BACK_LOBBY"}
 		)
 		return
 
@@ -624,7 +633,7 @@ func _on_game_end(data: Dictionary) -> void:
 			"no_action_id": ACTION_GAME_END_REMATCH,
 			"game_id": String(Global.current_game_id),
 		},
-		{"yes_label_key": "back_lobby", "no_label_key": "rematch"}
+		{"yes_label_key": "UI_LABEL_BACK_LOBBY", "no_label_key": "UI_LABEL_REMATCH"}
 	)
 
 func _ack_end_and_go_lobby() -> void:
@@ -801,7 +810,7 @@ func _on_quitter_pressed() -> void:
 			"yes_action_id": ACTION_QUIT_CANCEL,
 			"no_action_id": ACTION_QUIT_CONFIRM,
 		},
-		{"yes_label_key": "cancel", "no_label_key": "quit"}
+		{"yes_label_key": "UI_LABEL_CANCEL", "no_label_key": "UI_LABEL_QUIT"}
 	)
 
 func _show_pause_choice(who: String) -> void:
@@ -813,7 +822,7 @@ func _show_pause_choice(who: String) -> void:
 			"yes_action_id": ACTION_PAUSE_WAIT,
 			"no_action_id": ACTION_PAUSE_LEAVE,
 		},
-		{"yes_label_key": "wait", "no_label_key": "back_lobby"}
+		{"yes_label_key": "UI_LABEL_WAIT", "no_label_key": "UI_LABEL_BACK_LOBBY"}
 	)
 
 func _schedule_disconnect_choice(who: String) -> void:
@@ -899,6 +908,8 @@ func _exit_tree() -> void:
 		NetworkManager.server_closed.disconnect(_on_server_closed)
 	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)
+	if LanguageManager.language_changed.is_connected(_on_language_changed):
+		LanguageManager.language_changed.disconnect(_on_language_changed)
 
 	GameMessage.cleanup(_game_message_state)
 	TimebarUtil.cleanup(_timebar_state)

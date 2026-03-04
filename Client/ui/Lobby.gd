@@ -24,6 +24,11 @@ var _all_players: Array = []
 var _all_games: Array = []
 var _all_leaderboard: Array = []
 
+@onready var _tab_container: TabContainer = $TabContainer
+@onready var _search_player_input: LineEdit = $TabContainer/LobbyTab/SearchPlayer
+@onready var _search_leader_input: LineEdit = $TabContainer/LeaderboardTab/SearchLeader
+@onready var _logout_button: Button = $Deconnexion
+
 func _ready() -> void:
 	$TabContainer/LobbyTab/PlayerNameLabel.text = String(Global.username)
 
@@ -41,7 +46,10 @@ func _ready() -> void:
 		NetworkManager.server_closed.connect(_on_server_closed)
 	if not PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.connect(_on_popup_action)
+	if not LanguageManager.language_changed.is_connected(_on_language_changed):
+		LanguageManager.language_changed.connect(_on_language_changed)
 	PopupUi.hide_and_reset()
+	_apply_language_to_lobby_ui()
 
 	NetworkManager.request(REQ_GET_PLAYERS, {})
 
@@ -115,7 +123,7 @@ func _on_evt(type: String, data: Dictionary) -> void:
 					Protocol.POPUP_INVITE_RECEIVED,
 					{"from": from_user},
 					popup_payload,
-					{"yes_label_key": "accept", "no_label_key": "refuse"}
+					{"yes_label_key": "UI_LABEL_ACCEPT", "no_label_key": "UI_LABEL_REFUSE"}
 				)
 
 		REQ_INVITE_RESPONSE:
@@ -148,7 +156,7 @@ func _on_reconnect_failed() -> void:
 		Protocol.POPUP_PLAYER_RECONNECT_FAIL,
 		{},
 		{"ok_action_id": ACTION_NETWORK_RETRY},
-		{"ok_label_key": "retry"}
+		{"ok_label_key": "UI_LABEL_RETRY"}
 	)
 
 func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
@@ -190,6 +198,21 @@ func _refresh_games_view() -> void:
 
 func _refresh_leaderboard_view() -> void:
 	update_leaderboard_list(_all_leaderboard)
+
+func _apply_language_to_lobby_ui() -> void:
+	_logout_button.text = LanguageManager.ui_text("UI_LOBBY_LOGOUT_BUTTON", "Logout")
+	_search_player_input.placeholder_text = LanguageManager.ui_text("UI_LOBBY_SEARCH_PLAYER_PLACEHOLDER", "Search player")
+	_search_leader_input.placeholder_text = LanguageManager.ui_text("UI_LOBBY_SEARCH_LEADER_PLACEHOLDER", "Search leaderboard")
+
+	if _tab_container.get_tab_count() > 0:
+		_tab_container.set_tab_title(0, LanguageManager.ui_text("UI_LOBBY_TAB_LOBBY", "Lobby"))
+	if _tab_container.get_tab_count() > 1:
+		_tab_container.set_tab_title(1, LanguageManager.ui_text("UI_LOBBY_TAB_LEADERBOARD", "Leaderboard"))
+	if _tab_container.get_tab_count() > 2:
+		_tab_container.set_tab_title(2, LanguageManager.ui_text("UI_LOBBY_TAB_SHOP", "Shop"))
+
+func _on_language_changed(_language_code: String) -> void:
+	_apply_language_to_lobby_ui()
 
 func update_players_list(players: Array) -> void:
 	var list: Node = $TabContainer/LobbyTab/PlayersBox/PlayersList/PlayersItems
@@ -423,6 +446,8 @@ func _exit_tree() -> void:
 		NetworkManager.server_closed.disconnect(_on_server_closed)
 	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)
+	if LanguageManager.language_changed.is_connected(_on_language_changed):
+		LanguageManager.language_changed.disconnect(_on_language_changed)
 
 func _on_tab_container_tab_changed(tab: int) -> void:
 	if tab != 1:
