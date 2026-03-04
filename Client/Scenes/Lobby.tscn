@@ -191,6 +191,35 @@ visible = false
 layout_mode = 2
 metadata/_tab_index = 2
 
+[node name="ShopVBox" type="VBoxContainer" parent="TabContainer/BoutiqueTab"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="ShopTitle" type="Label" parent="TabContainer/BoutiqueTab/ShopVBox"]
+layout_mode = 2
+text = "Card backs"
+
+[node name="BacksScroll" type="ScrollContainer" parent="TabContainer/BoutiqueTab/ShopVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BacksGrid" type="GridContainer" parent="TabContainer/BoutiqueTab/ShopVBox/BacksScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+
 [node name="Deconnexion" type="Button" parent="." unique_id=1298183396]
 layout_mode = 1
 anchors_preset = 3

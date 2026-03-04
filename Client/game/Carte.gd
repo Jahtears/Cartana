@@ -10,8 +10,8 @@ const PREVIEW_CARD_GLOW_COLOR := Color(0.35, 0.95, 0.45, 0.45)
 const PREVIEW_CARD_GLOW_SIZE := 6
 const POINTER_ID_NONE := -2
 const POINTER_ID_MOUSE := -1
-const BACK_TEXTURE_DECK_A := preload("res://Resource/Cartes/DosA.png")
-const BACK_TEXTURE_DECK_B := preload("res://Resource/Cartes/DosB.png")
+const BACK_TEXTURE_DECK_A := preload("res://Client/Resource/Cartes/DosA.png")
+const BACK_TEXTURE_DECK_B := preload("res://Client/Resource/Cartes/DosB.png")
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
@@ -327,7 +327,15 @@ func _get_back_color(code: String) -> Color:
 	return Color(0.2, 0.4, 1.0)
 
 func _get_back_texture(code: String) -> Texture2D:
-	if code == "A":
+	var source := String(code).strip_edges().to_upper()
+	if source != "A" and source != "B":
+		source = "B"
+
+	var selected_texture := Global.get_back_texture_for_source(source)
+	if selected_texture != null:
+		return selected_texture
+
+	if source == "A":
 		return BACK_TEXTURE_DECK_A
 	return BACK_TEXTURE_DECK_B
 
