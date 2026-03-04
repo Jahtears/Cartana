@@ -31,8 +31,10 @@ layout_mode = 2
 size_flags_vertical = 0
 placeholder_text = "Identifant"
 alignment = 1
+max_length = 12
 context_menu_enabled = false
 emoji_menu_enabled = false
+clear_button_enabled = true
 
 [node name="RememberUsernameCheckBox" type="CheckBox" parent="VBoxContainer/Username_input" unique_id=1647095791]
 layout_mode = 0
@@ -52,6 +54,8 @@ alignment = 1
 max_length = 4
 context_menu_enabled = false
 emoji_menu_enabled = false
+clear_button_enabled = true
+virtual_keyboard_type = 2
 secret = true
 
 [node name="Login_button" type="Button" parent="VBoxContainer" unique_id=1658283452]

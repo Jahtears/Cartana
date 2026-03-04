@@ -4,6 +4,7 @@ extends Control
 const Protocol = preload("res://Client/net/Protocol.gd")
 
 const REQ_GET_PLAYERS := "get_players"
+const REQ_GET_LEADERBOARD := "get_leaderboard"
 const REQ_JOIN_GAME := "join_game"
 const REQ_INVITE := "invite"
 const REQ_INVITE_RESPONSE := "invite_response"
@@ -21,9 +22,10 @@ var _network_disconnected := false
 var _search_query: String = ""
 var _all_players: Array = []
 var _all_games: Array = []
+var _all_leaderboard: Array = []
 
 func _ready() -> void:
-	$PlayerNameLabel.text = String(Global.username)
+	$TabContainer/LobbyTab/PlayerNameLabel.text = String(Global.username)
 
 	if not NetworkManager.response.is_connected(_on_response):
 		NetworkManager.response.connect(_on_response)
@@ -57,6 +59,13 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 			else:
 				_show_error_popup(error, Protocol.POPUP_LOBBY_GET_PLAYERS_ERROR)
 
+		REQ_GET_LEADERBOARD:
+			if ok:
+				_all_leaderboard = _coerce_array(data.get("leaderboard", []))
+				_refresh_leaderboard_view()
+			else:
+				_show_error_popup(error, Protocol.POPUP_UI_ACTION_IMPOSSIBLE)
+				
 		REQ_JOIN_GAME, REQ_SPECTATE_GAME:
 			if not ok:
 				_show_error_popup(error, Protocol.POPUP_UI_ACTION_IMPOSSIBLE)
@@ -179,6 +188,9 @@ func _refresh_players_view() -> void:
 func _refresh_games_view() -> void:
 	update_games_list(_all_games)
 
+func _refresh_leaderboard_view() -> void:
+	update_leaderboard_list(_all_leaderboard)
+
 func update_players_list(players: Array) -> void:
 	var list: Node = $TabContainer/LobbyTab/PlayersBox/PlayersList/PlayersItems
 	for child in list.get_children():
@@ -267,6 +279,41 @@ func create_player_box(username: String) -> Button:
 	)
 
 	return btn
+func update_leaderboard_list(rows: Array) -> void:
+	var list: Node = $TabContainer/LeaderboardTab/LeaderBox/LeaderList/LeaderItems
+	for child in list.get_children():
+		child.queue_free()
+	
+	for row_data in rows:
+		if row_data is Dictionary:
+			list.add_child(create_leaderboard_row(row_data))
+
+func create_leaderboard_row(entry: Dictionary) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.custom_minimum_size = Vector2(300, 36)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	
+	var username := String(entry.get("username", "")).strip_edges()
+	var wins := _coerce_non_negative_int(entry.get("wins", 0))
+	var losses := _coerce_non_negative_int(entry.get("losses", 0))
+	var draws := _coerce_non_negative_int(entry.get("draws", 0))
+	
+	if username == "":
+		username = "-"
+	
+	row.add_child(_create_leaderboard_label(username, 170.0, HORIZONTAL_ALIGNMENT_LEFT))
+	row.add_child(_create_leaderboard_label(str(wins), 60.0, HORIZONTAL_ALIGNMENT_RIGHT))
+	row.add_child(_create_leaderboard_label(str(losses), 60.0, HORIZONTAL_ALIGNMENT_RIGHT))
+	row.add_child(_create_leaderboard_label(str(draws), 60.0, HORIZONTAL_ALIGNMENT_RIGHT))
+	return row
+
+func _create_leaderboard_label(value: String, min_width: float, align: HorizontalAlignment) -> Label:
+	var label := Label.new()
+	label.text = value
+	label.custom_minimum_size = Vector2(min_width, 0)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.horizontal_alignment = align
+	return label
 
 func _on_game_clicked(game_id: String, players: Array) -> void:
 	if game_id == "":
@@ -293,6 +340,9 @@ func _do_spectate_game(game_id: String) -> void:
 		return
 
 	NetworkManager.request(REQ_SPECTATE_GAME, { "game_id": game_id })
+
+func _request_leaderboard() -> void:
+	NetworkManager.request(REQ_GET_LEADERBOARD, {})
 
 # --------------------
 # Déconnexion (bouton Lobby)
@@ -342,6 +392,10 @@ func _coerce_array(value: Variant) -> Array:
 func _coerce_dictionary(value: Variant) -> Dictionary:
 	return value if value is Dictionary else {}
 
+func _coerce_non_negative_int(value: Variant) -> int:
+	var n := int(value)
+	return maxi(n, 0)
+
 func _go_to_login_safe() -> void:
 	if _is_changing_scene:
 		return
@@ -369,3 +423,8 @@ func _exit_tree() -> void:
 		NetworkManager.server_closed.disconnect(_on_server_closed)
 	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)
+
+func _on_tab_container_tab_changed(tab: int) -> void:
+	if tab != 1:
+		return
+	_request_leaderboard()

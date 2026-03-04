@@ -18,7 +18,8 @@ const POPUP_TEXT_BY_CODE = {
 	"POPUP_AUTH_ALREADY_CONNECTED": "Utilisateur déjà connecté",
 	"POPUP_AUTH_MISSING_CREDENTIALS": "Identifiant ou PIN manquant",
 	"POPUP_AUTH_CONNECTION_ERROR": "Erreur de connexion",
-
+	"POPUP_AUTH_INVALID_USERNAME_MIN" : "Le nom d'utilisateur doit contenir au moins 3 caractères.",
+	"POPUP_AUTH_INVALID_PIN_MIN" : "Le code PIN doit contenir 4 chiffres.",
 	"POPUP_PLAYER_DISCONNECTED": "Connexion perdue",
 	"POPUP_PLAYER_RECONNECTED": "Connexion rétablie",
 	"POPUP_PLAYER_RECONNECT_FAIL": "Reconnexion échouée",

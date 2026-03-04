@@ -1,6 +1,7 @@
 import { ensureGameMeta, ensureGameResult } from "../../game/meta.js";
 import { publicGameEndResult } from "../../game/payload/snapshotPayload.js";
 import { emitFullState } from "./emitter.js";
+import { recordLeaderboardResult } from "../lobby/LeaderList.js";
 
 function resolvePlayerOpponent(game, username) {
   if (!game || !Array.isArray(game.players)) return "";
@@ -115,6 +116,15 @@ export function createGameNotifier({
 
     const payload = { game_id, ...publicGameEndResult(result) };
     if (!created) return { payload, created: false };
+
+    try {
+      recordLeaderboardResult(game.players, result?.winner ?? null);
+    } catch (err) {
+      console.error("[LEADERBOARD] failed to persist game result", {
+        game_id,
+        error: err?.message ?? String(err),
+      });
+    }
 
     const excludeSet = new Set((exclude || []).filter(Boolean));
 

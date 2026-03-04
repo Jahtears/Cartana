@@ -9,6 +9,7 @@ import fs from "fs";
 import { handleLogin } from '../handlers/auth/login.js';
 import { handleLogout } from '../handlers/auth/logout.js';
 import { handleInvite, handleInviteResponse } from '../handlers/lobby/invite.js';
+import { handleGetLeaderboard } from '../handlers/lobby/leaderboard.js';
 import { handleJoinGame } from '../handlers/game/joinGame.js';
 import { handleSpectateGame } from '../handlers/game/spectateGame.js';
 import { handleMoveRequest } from '../handlers/game/moveRequest.js';
@@ -107,6 +108,7 @@ const router = createRouter({
   handleMoveRequest,
   handleLeaveGame,
   handleAckGameEnd,
+  handleGetLeaderboard,
   metrics, // Passer les métriques au router
 });
 

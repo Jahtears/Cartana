@@ -34,6 +34,7 @@ offset_right = 688.0
 offset_bottom = 64.0
 context_menu_enabled = false
 emoji_menu_enabled = false
+clear_button_enabled = true
 
 [node name="PlayersBox" type="ColorRect" parent="TabContainer/LobbyTab" unique_id=183429981]
 layout_mode = 1
@@ -89,6 +90,20 @@ custom_minimum_size = Vector2(360, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="PlayerNameLabel" type="Label" parent="TabContainer/LobbyTab" unique_id=2064866708]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -48.0
+offset_top = -136.0
+offset_right = 52.0
+offset_bottom = -49.0
+grow_horizontal = 2
+grow_vertical = 0
+
 [node name="LeaderboardTab" type="Control" parent="TabContainer" unique_id=1966971171]
 visible = false
 layout_mode = 2
@@ -102,6 +117,7 @@ offset_right = 688.0
 offset_bottom = 64.0
 context_menu_enabled = false
 emoji_menu_enabled = false
+clear_button_enabled = true
 
 [node name="LeaderBox" type="ColorRect" parent="TabContainer/LeaderboardTab" unique_id=1763008908]
 layout_mode = 1
@@ -138,20 +154,6 @@ visible = false
 layout_mode = 2
 metadata/_tab_index = 2
 
-[node name="PlayerNameLabel" type="Label" parent="." unique_id=2064866708]
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -63.99994
-offset_top = -136.0
-offset_right = 36.00006
-offset_bottom = -49.0
-grow_horizontal = 2
-grow_vertical = 0
-
 [node name="Deconnexion" type="Button" parent="." unique_id=1298183396]
 layout_mode = 1
 anchors_preset = 3
@@ -178,5 +180,6 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.6745098, 0.3254902, 0.26666668, 1)
 
+[connection signal="tab_changed" from="TabContainer" to="." method="_on_tab_container_tab_changed"]
 [connection signal="text_changed" from="TabContainer/LobbyTab/SearchPlayer" to="." method="_on_search_player_text_changed"]
 [connection signal="pressed" from="Deconnexion" to="." method="_on_deconnexion_pressed"]

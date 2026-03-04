@@ -68,6 +68,7 @@ export function createRouter({
   handleMoveRequest,
   handleLeaveGame,
   handleAckGameEnd,
+  handleGetLeaderboard,
 
   // metrics (optional)
   metrics,
@@ -176,6 +177,7 @@ export function createRouter({
         move_request: async () => handleMoveRequest(ctx, ws, req, data, actor),
         leave_game: async () => handleLeaveGame(ctx, ws, req, data, actor),
         ack_game_end: async () => handleAckGameEnd(ctx, ws, req, data, actor),
+        get_leaderboard: async () => handleGetLeaderboard(ctx, ws, req, data, actor),
       };
 
       const fn = routes[req.type];

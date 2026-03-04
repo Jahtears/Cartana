@@ -97,6 +97,16 @@ func _on_login_button_pressed() -> void:
 	var username: String = _username_input.text.strip_edges()
 	var pin: String = _pin_input.text.strip_edges()
 
+	# --- VALIDATION MINIMUM ---
+	if username.length() < 3:
+		PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_INVALID_USERNAME_MIN)
+		return
+
+	if pin.length() < 4:
+		PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_INVALID_PIN_MIN)
+		return
+	# ---------------------------
+
 	if username == "" or pin == "":
 		PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
 		return
