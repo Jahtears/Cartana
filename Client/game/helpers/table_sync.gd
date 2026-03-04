@@ -2,8 +2,6 @@
 extends RefCounted
 class_name TableSyncHelper
 
-const SlotIdHelper = preload("res://Client/game/helpers/slot_id.gd")
-
 static func sync_table_slots(table: Node, slot_scene: PackedScene, slots_by_id: Dictionary, allowed_table_slots: Dictionary, active_slots: Array, spacing: int = 100, start_pos: Vector2 = Vector2.ZERO) -> void:
 	"""Synchronise les slots de la table"""
 	var wanted := _collect_wanted_slots(active_slots)

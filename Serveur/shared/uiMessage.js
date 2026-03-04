@@ -15,7 +15,7 @@ function safeParams(value) {
 
 /**
  * Canonicalise un payload UI strict:
- * - message_code: code POPUP_* ou INGAME_*
+ * - message_code: code POPUP_* ou RULE_*
  * - message_params: paramètres de template optionnels
  */
 export function toUiMessage(input = {}, defaults = {}) {
@@ -39,7 +39,7 @@ function normalizeTargets(to) {
 }
 
 /**
- * Emit ingame gameplay UI message.
+ * Emit gameplay RULE UI message.
  * - Event: show_game_message
  * - Payload: { message_code, message_params? }
  */

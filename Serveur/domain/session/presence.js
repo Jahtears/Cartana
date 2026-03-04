@@ -2,6 +2,15 @@
 import { ensureGameMeta } from "../../game/meta.js";
 import { pauseTurnClock, resumeTurnClock } from "../../game/turnClock.js";
 
+function notifyOpponent(sendEvtUser, game, actor, evtType, data) {
+  if (typeof sendEvtUser !== "function" || !game) return;
+  for (const player of game.players ?? []) {
+    const username = typeof player === "string" ? player : String(player?.username ?? "");
+    if (!username || username === actor) continue;
+    sendEvtUser(username, evtType, data);
+  }
+}
+
 /**
  * Presence/session : déconnexion / reconnexion + wrapper close WS.
  * Objectif: sortir "close/disconnect/reconnect" de Serveur.js et de handlers/gameEnd.js
@@ -26,7 +35,6 @@ export function createPresence(ctx) {
     refreshLobby,
 
     // misc
-    notifyOpponent,
     emitStartGameToUser,
     emitSnapshotsToAudience,
   } = ctx;
@@ -127,7 +135,7 @@ export function createPresence(ctx) {
       emitSnapshotsToAudience(game_id, { reason: "opponent_rejoined_resume" });
     }
 
-    notifyOpponent(game_id, game, "opponent_rejoined", { game_id, username });
+    notifyOpponent(sendEvtUser, game, username, "opponent_rejoined", { game_id, username });
 
     const spectators = gameSpectators.get(game_id);
     if (spectators?.size) {

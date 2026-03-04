@@ -1,9 +1,6 @@
 # Protocol.gd
 extends Node
 
-const GameMessage = preload("res://Client/game/helpers/GameMessage.gd")
-const LanguageManager = preload("res://Client/Lang/LanguageManager.gd")
-
 const POPUP_PREFIX := "POPUP_"
 
 const POPUP_TECH_ERROR_GENERIC := "POPUP_TECH_ERROR_GENERIC"
@@ -15,13 +12,17 @@ const POPUP_TECH_NOT_IMPLEMENTED := "POPUP_TECH_NOT_IMPLEMENTED"
 const POPUP_TECH_INTERNAL_ERROR := "POPUP_TECH_INTERNAL_ERROR"
 
 const POPUP_AUTH_REQUIRED := "POPUP_AUTH_REQUIRED"
+const POPUP_AUTH_INVALID_USERNAME_MIN := "POPUP_AUTH_INVALID_USERNAME_MIN"
+const POPUP_AUTH_INVALID_PIN_MIN := "POPUP_AUTH_INVALID_PIN_MIN"
 const POPUP_AUTH_BAD_PIN := "POPUP_AUTH_BAD_PIN"
+const POPUP_AUTH_MAX_TRY := "POPUP_AUTH_MAX_TRY"
 const POPUP_AUTH_ALREADY_CONNECTED := "POPUP_AUTH_ALREADY_CONNECTED"
 const POPUP_AUTH_MISSING_CREDENTIALS := "POPUP_AUTH_MISSING_CREDENTIALS"
 const POPUP_AUTH_CONNECTION_ERROR := "POPUP_AUTH_CONNECTION_ERROR"
 const POPUP_PLAYER_DISCONNECTED := "POPUP_PLAYER_DISCONNECTED"
 const POPUP_PLAYER_RECONNECTED := "POPUP_PLAYER_RECONNECTED"
 const POPUP_PLAYER_RECONNECT_FAIL := "POPUP_PLAYER_RECONNECT_FAIL"
+
 
 const POPUP_INVITE_NOT_FOUND := "POPUP_INVITE_NOT_FOUND"
 const POPUP_INVITE_DECLINED := "POPUP_INVITE_DECLINED"
@@ -42,9 +43,11 @@ const POPUP_GAME_END_DRAW := "POPUP_GAME_END_DRAW"
 const POPUP_GAME_END_ABANDON := "POPUP_GAME_END_ABANDON"
 const POPUP_GAME_END_DECK_EMPTY := "POPUP_GAME_END_DECK_EMPTY"
 const POPUP_GAME_END_PILE_EMPTY := "POPUP_GAME_END_PILE_EMPTY"
+const POPUP_GAME_END_TIMEOUT_STREAK := "POPUP_GAME_END_TIMEOUT_STREAK"
 const GAME_END_REASON_ABANDON := "abandon"
 const GAME_END_REASON_DECK_EMPTY := "deck_empty"
 const GAME_END_REASON_PILE_EMPTY := "pile_empty"
+const GAME_END_REASON_TIMEOUT_STREAK := "timeout_streak"
 
 const POPUP_UI_ACTION_IMPOSSIBLE := "POPUP_UI_ACTION_IMPOSSIBLE"
 const POPUP_LOBBY_GET_PLAYERS_ERROR := "POPUP_LOBBY_GET_PLAYERS_ERROR"
@@ -57,17 +60,20 @@ const POPUP_OPPONENT_DISCONNECTED_CHOICE := "POPUP_OPPONENT_DISCONNECTED_CHOICE"
 
 const DEFAULT_ERROR_FALLBACK := POPUP_UI_ACTION_IMPOSSIBLE
 
+const POPUP_FLOW_INVITE_REQUEST := "invite_request"
+const POPUP_ACTION_CONFIRM_YES := "confirm_yes"
+const POPUP_ACTION_CONFIRM_NO := "confirm_no"
+const POPUP_ACTION_INFO_OK := "info_ok"
+
 const POPUP_FLOW := {
-	"INVITE_REQUEST": "invite_request",
+	"INVITE_REQUEST": POPUP_FLOW_INVITE_REQUEST,
 }
 
 const POPUP_ACTION := {
-	"CONFIRM_YES": "confirm_yes",
-	"CONFIRM_NO": "confirm_no",
+	"CONFIRM_YES": POPUP_ACTION_CONFIRM_YES,
+	"CONFIRM_NO": POPUP_ACTION_CONFIRM_NO,
+	"INFO_OK": POPUP_ACTION_INFO_OK,
 }
-
-static func normalize_ingame_message(payload: Dictionary) -> Dictionary:
-	return GameMessage.normalize_ingame_message(payload)
 
 static func normalize_popup_message(payload: Dictionary) -> Dictionary:
 	var params := _extract_message_params(payload)
@@ -85,8 +91,6 @@ static func normalize_popup_message(payload: Dictionary) -> Dictionary:
 		text = popup_text(message_code, params)
 	if text == "":
 		text = popup_text(POPUP_TECH_ERROR_GENERIC)
-	if text == "":
-		text = "Erreur"
 
 	var normalized := {
 		"text": text,
@@ -97,12 +101,6 @@ static func normalize_popup_message(payload: Dictionary) -> Dictionary:
 	if text_override != "" and text_override != message_code:
 		normalized["text_override"] = text_override
 	return normalized
-
-static func normalize_game_message(payload: Dictionary) -> Dictionary:
-	var ingame := normalize_ingame_message(payload)
-	if not ingame.is_empty():
-		return ingame
-	return normalize_popup_message(payload)
 
 static func normalize_popup_error(error: Dictionary, fallback_message := DEFAULT_ERROR_FALLBACK) -> Dictionary:
 	var top_params_val = error.get("message_params", {})
@@ -149,30 +147,41 @@ static func normalize_invite_response_ui(data: Dictionary) -> Dictionary:
 	return normalize_popup_message(ui_payload)
 
 static func invite_cancelled_ui(data: Dictionary) -> Dictionary:
-	var name := String(data.get("name", "")).strip_edges()
-	if name == "":
-		name = "Utilisateur"
+	var user_name := String(data.get("name", "")).strip_edges()
+	if user_name == "":
+		user_name = LanguageManager.ui_text("UI_GENERIC_USER", "User")
 
 	return normalize_popup_message({
 		"message_code": POPUP_INVITE_CANCELLED,
 		"message_params": {
-			"name": name,
+			"name": user_name,
 		},
 	})
 
 static func invite_action_request(action_id: String, payload: Dictionary) -> Dictionary:
 	var flow := String(payload.get("flow", ""))
-	if flow != String(POPUP_FLOW["INVITE_REQUEST"]):
+	if flow != POPUP_FLOW_INVITE_REQUEST:
 		return {}
 
 	var from_user := String(payload.get("from", ""))
 	if from_user == "":
 		return {}
 
-	if action_id == String(POPUP_ACTION["CONFIRM_YES"]):
-		return {"to": from_user, "accepted": true}
-	if action_id == String(POPUP_ACTION["CONFIRM_NO"]):
-		return {"to": from_user, "accepted": false}
+	var req := {}
+	req["to"] = from_user
+	var context := String(payload.get("context", "")).strip_edges()
+	var source_game_id := String(payload.get("source_game_id", "")).strip_edges()
+	if context != "":
+		req["context"] = context
+	if source_game_id != "":
+		req["source_game_id"] = source_game_id
+
+	if action_id == POPUP_ACTION_CONFIRM_YES:
+		req["accepted"] = true
+		return req
+	if action_id == POPUP_ACTION_CONFIRM_NO:
+		req["accepted"] = false
+		return req
 	return {}
 
 static func game_end_popup_message(data: Dictionary, username: String, is_spectator: bool) -> Dictionary:
@@ -220,6 +229,8 @@ static func _game_end_code_from_reason(reason: String) -> String:
 			return POPUP_GAME_END_DECK_EMPTY
 		GAME_END_REASON_PILE_EMPTY:
 			return POPUP_GAME_END_PILE_EMPTY
+		GAME_END_REASON_TIMEOUT_STREAK:
+			return POPUP_GAME_END_TIMEOUT_STREAK
 		_:
 			return POPUP_GAME_ENDED
 

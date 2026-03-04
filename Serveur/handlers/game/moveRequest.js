@@ -1,20 +1,32 @@
-// game/moveRequest.js v2.0 - Thin handler using MoveOrchestrator
-import { emitGameEndThenSnapshot } from "../net/broadcast.js";
-import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../net/guards.js";
-import { resError } from "../net/transport.js";
-import { orchestrateMove } from "./moveOrchestrator.js";
-import { ensureGameMeta } from "./meta.js";
-import { GAME_END_REASONS } from "./constants/gameEnd.js";
-import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
-import { POPUP_MESSAGE } from "../shared/popupMessages.js";
-import { deniedTracePayload, technicalDenied } from "./helpers/deniedHelpers.js";
+import { emitGameEndThenSnapshot } from "../../net/broadcast/gameEndBroadcast.js";
+import { getPlayerGameOrRes, rejectIfSpectatorOrRes, rejectIfEndedOrRes } from "../../net/guards.js";
+import { resError } from "../../net/transport.js";
+import { orchestrateMove } from "../../game/usecases/move/orchestrateMove.js";
+import { ensureGameMeta } from "../../game/meta.js";
+import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
+import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
+import { deniedTracePayload, technicalDenied } from "../../game/helpers/deniedHelpers.js";
+import { mapSlotForClient, mapSlotFromClientToServer } from "../../game/boundary/slotIdMapper.js";
 
 function safeObject(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value;
 }
 
-const INGAME_MESSAGE_CODES = new Set(Object.values(INGAME_MESSAGE));
+const RULE_CODES = new Set([
+  "RULE_OK",
+  "RULE_MOVE_DENIED",
+  "RULE_DECK_TO_TABLE",
+  "RULE_NOT_YOUR_TURN",
+  "RULE_BENCH_TO_TABLE",
+  "RULE_ACE_ON_DECK",
+  "RULE_ACE_IN_HAND",
+  "RULE_ALLOWED_ON_TABLE",
+  "RULE_OPPONENT_SLOT_FORBIDDEN",
+  "RULE_TURN_START_FIRST",
+  "RULE_TURN_START",
+  "RULE_TURN_TIMEOUT",
+]);
 
 function buildMoveDetails(cardId, fromSlotId) {
   const details = {};
@@ -29,12 +41,12 @@ function buildMoveDetails(cardId, fromSlotId) {
 function buildMoveClientErrorPayload({ moveError, cardId, fromSlotId }) {
   const kind = String(moveError?.kind ?? "").trim();
   const payload = {
-    message_code: INGAME_MESSAGE.MOVE_DENIED,
+    message_code: "RULE_MOVE_DENIED",
   };
 
   if (kind === "user") {
     const userCode = String(moveError?.code ?? "").trim();
-    if (INGAME_MESSAGE_CODES.has(userCode)) {
+    if (RULE_CODES.has(userCode)) {
       payload.message_code = userCode;
     }
 
@@ -51,12 +63,16 @@ function buildMoveClientErrorPayload({ moveError, cardId, fromSlotId }) {
 }
 
 export function handleMoveRequest(ctx, ws, req, data, actor) {
-  const {
-    sendRes,
-    mapSlotFromClientToServer,
-    mapSlotForClient,
-    processTurnTimeout,
-  } = ctx;
+  const sendRes = ctx.sendRes;
+  const turnUsecases = ctx.usecases?.turn ?? ctx;
+  const boundarySlot = ctx.boundary?.slot ?? {};
+  const mapFromClient = boundarySlot.mapSlotFromClientToServer
+    ?? ctx.mapSlotFromClientToServer
+    ?? mapSlotFromClientToServer;
+  const mapForClient = boundarySlot.mapSlotForClient
+    ?? ctx.mapSlotForClient
+    ?? mapSlotForClient;
+  const processTurnTimeout = turnUsecases.processTurnTimeout;
 
   // ✅ GUARDS: game, player, spectator, ended
   const pg = getPlayerGameOrRes(ctx, ws, req, actor);
@@ -74,7 +90,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   if (typeof processTurnTimeout === "function") {
     const didExpire = processTurnTimeout(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
-      return resError(sendRes, ws, req, INGAME_MESSAGE.TURN_TIMEOUT, { game_id });
+      return resError(sendRes, ws, req, "RULE_TURN_TIMEOUT", { game_id });
     }
   }
 
@@ -83,8 +99,8 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const raw_from = String(data.from_slot_id ?? "").trim();
   const raw_to = String(data.to_slot_id ?? "").trim();
 
-  const from_slot_id = mapSlotFromClientToServer(raw_from, actor, game);
-  const to_slot_id = mapSlotFromClientToServer(raw_to, actor, game);
+  const from_slot_id = mapFromClient(raw_from, actor, game);
+  const to_slot_id = mapFromClient(raw_to, actor, game);
 
   ctx.trace?.("MOVE_REQ", {
     actor,
@@ -105,7 +121,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
       fromSlotId: raw_from,
     });
 
-    ctx.trace?.("MOVE_DENIED", {
+    ctx.trace?.("RULE_MOVE_DENIED", {
       actor,
       card_id,
       from_slot_id: raw_from || null,
@@ -118,8 +134,8 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     return true;
   }
 
-  const client_from = mapSlotForClient(from_slot_id, actor, game);
-  const client_to = mapSlotForClient(to_slot_id, actor, game);
+  const client_from = mapForClient(from_slot_id, actor, game);
+  const client_to = mapForClient(to_slot_id, actor, game);
 
   // ✅ ORCHESTRATE: validate → apply → refill → track → check win
   const orchResult = orchestrateMove({
@@ -140,7 +156,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
       fromSlotId: client_from,
     });
 
-    ctx.trace?.("MOVE_DENIED", {
+    ctx.trace?.("RULE_MOVE_DENIED", {
       actor,
       card_id,
       from_slot_id: String(client_from),

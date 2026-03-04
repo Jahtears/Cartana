@@ -1,21 +1,22 @@
-// game/slotValidators.js - Slot-specific validators extracted from Regles.js
-
-import { SLOT_TYPES } from "./constants/slots.js";
-import { getSlotContent, getSlotType, isSlotIdPresent } from "./helpers/slotHelpers.js";
-import { debugLog } from "./helpers/debugHelpers.js";
-import { technicalDenied, userDenied } from "./helpers/deniedHelpers.js";
-import { INGAME_MESSAGE } from "./constants/ingameMessages.js";
+import { SlotId, SLOT_TYPES } from "../constants/slots.js";
+import { getSlotStack } from "../state/slotStore.js";
+import { debugLog } from "../helpers/debugHelpers.js";
+import { technicalDenied, userDenied } from "../helpers/deniedHelpers.js";
 
 /**
  * Validate placement on Table slot
  * Rules: empty=[A,R], count=1=[2,R], count=2=[3,R], ... count=9=[10,R], count=10=[D]
  */
 export function validateTableSlot(game, card, fromSlotId, toSlotId) {
-  if (!isSlotIdPresent(game, toSlotId)) {
+  if (!(toSlotId instanceof SlotId)) {
+    return technicalDenied("slot_id_not_canonical");
+  }
+
+  if (!(game?.slots instanceof Map) || !game.slots.has(toSlotId)) {
     return technicalDenied("table_slot_not_found");
   }
 
-  const slot = getSlotContent(game, toSlotId);
+  const slot = getSlotStack(game, toSlotId);
   const count = slot.length;
 
   const allowedByCount = [
@@ -48,7 +49,7 @@ export function validateTableSlot(game, card, fromSlotId, toSlotId) {
     return {
       valid: false,
       kind: "user",
-      code: INGAME_MESSAGE.RULE_CARD_NOT_ALLOWED_ON_TABLE,
+      code: "RULE_ALLOWED_ON_TABLE",
       params: { accepted: acceptedStr },
     };
   }
@@ -63,12 +64,12 @@ function staticDeny(code) {
   return () => userDenied(code);
 }
 
-export const validateDeckSlot = staticDeny(INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DECK);
+export const validateDeckSlot = staticDeny("RULE_MOVE_DENIED");
 
 /**
  * Validate placement on Hand slot (not allowed)
  */
-export const validateHandSlot = staticDeny(INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_HAND);
+export const validateHandSlot = staticDeny("RULE_MOVE_DENIED");
 
 /**
  * Validate placement on Bench slot (always allowed)
@@ -80,26 +81,16 @@ export function validateBenchSlot(game, card, fromSlotId, toSlotId) {
 /**
  * Validate placement on Draw Pile slot (not allowed)
  */
-export const validateDrawPileSlot = staticDeny(INGAME_MESSAGE.RULE_CANNOT_PLAY_ON_DRAWPILE);
-
-function normalizeSlotType(slotType) {
-  const resolvedType = getSlotType(slotType);
-  if (resolvedType) return resolvedType;
-
-  if (typeof slotType === "string") {
-    return slotType;
-  }
-
-  return null;
-}
+export const validateDrawPileSlot = staticDeny("RULE_MOVE_DENIED");
 
 /**
  * Get appropriate validator for slot type
- * @param {string|SlotId} slotType - Slot type or SlotId
+ * @param {SlotId} slotId - Canonical SlotId
  * @returns {Function|null} Validator function or null
  */
-export function getSlotValidator(slotType) {
-  const normalized = normalizeSlotType(slotType);
+export function getSlotValidator(slotId) {
+  if (!(slotId instanceof SlotId)) return null;
+
   const validators = {
     [SLOT_TYPES.TABLE]: validateTableSlot,
     [SLOT_TYPES.DECK]: validateDeckSlot,
@@ -107,5 +98,5 @@ export function getSlotValidator(slotType) {
     [SLOT_TYPES.BENCH]: validateBenchSlot,
     [SLOT_TYPES.PILE]: validateDrawPileSlot,
   };
-  return validators[normalized] ?? null;
+  return validators[slotId.type] ?? null;
 }

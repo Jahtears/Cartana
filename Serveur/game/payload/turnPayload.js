@@ -1,4 +1,4 @@
-// helpers/turnPayloadHelpers.js - Canonical turn payload formatting
+// game/payload/turnPayload.js - Canonical turn payload formatting
 
 function buildTurnPayload(turn, { includeEmpty = false, serverNow = Date.now() } = {}) {
   if (!turn) {

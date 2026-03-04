@@ -12,21 +12,31 @@ grow_vertical = 2
 pivot_offset = Vector2(352, 240)
 script = ExtResource("1_ll2xe")
 
-[node name="PlayerNameLabel" type="Label" parent="." unique_id=2064866708]
+[node name="TabContainer" type="TabContainer" parent="." unique_id=1195529323]
+self_modulate = Color(1, 1, 1, 0)
 layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
+anchors_preset = 15
+anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -63.99994
-offset_top = -136.0
-offset_right = 36.00006
-offset_bottom = -49.0
 grow_horizontal = 2
-grow_vertical = 0
+grow_vertical = 2
+current_tab = 0
 
-[node name="PlayersBox" type="ColorRect" parent="." unique_id=183429981]
+[node name="LobbyTab" type="Control" parent="TabContainer" unique_id=1331883829]
+layout_mode = 2
+metadata/_tab_index = 0
+
+[node name="SearchPlayer" type="LineEdit" parent="TabContainer/LobbyTab" unique_id=1779329555]
+layout_mode = 0
+offset_left = 480.0
+offset_top = 33.0
+offset_right = 688.0
+offset_bottom = 64.0
+context_menu_enabled = false
+emoji_menu_enabled = false
+clear_button_enabled = true
+
+[node name="PlayersBox" type="ColorRect" parent="TabContainer/LobbyTab" unique_id=183429981]
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.05
@@ -34,57 +44,181 @@ anchor_top = 0.18
 anchor_right = 0.48
 anchor_bottom = 0.88
 offset_left = 6.3999977
-offset_top = -52.640007
-offset_right = -103.599976
-offset_bottom = -57.640015
+offset_top = -30.060005
+offset_right = -74.44
+offset_bottom = -1.6599731
 color = Color(0, 0, 0, 0)
 
-[node name="PlayersList" type="ScrollContainer" parent="PlayersBox" unique_id=1527846370]
+[node name="PlayersList" type="ScrollContainer" parent="TabContainer/LobbyTab/PlayersBox" unique_id=1527846370]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = 12.0
-offset_right = -12.0
-offset_bottom = -12.0
+offset_top = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="PlayersItems" type="VBoxContainer" parent="PlayersBox/PlayersList" unique_id=1359874975]
+[node name="PlayersItems" type="VBoxContainer" parent="TabContainer/LobbyTab/PlayersBox/PlayersList" unique_id=1359874975]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="GameBox" type="ColorRect" parent="." unique_id=1596528923]
+[node name="GameBox" type="ColorRect" parent="TabContainer/LobbyTab" unique_id=1596528923]
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.52
 anchor_top = 0.18
 anchor_right = 0.95
 anchor_bottom = 0.88
-offset_left = 102.96002
-offset_top = -52.640007
-offset_right = -7.040039
-offset_bottom = -56.23999
+offset_left = 88.96002
+offset_top = -30.060005
+offset_right = 8.119995
+offset_bottom = -1.6599731
 color = Color(0, 0, 0, 0)
 
-[node name="GameList" type="ScrollContainer" parent="GameBox" unique_id=1098180103]
+[node name="GameList" type="ScrollContainer" parent="TabContainer/LobbyTab/GameBox" unique_id=1098180103]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = 12.0
-offset_right = -12.0
-offset_bottom = -12.0
+offset_top = 32.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="GameItems" type="VBoxContainer" parent="GameBox/GameList" unique_id=1199569160]
+[node name="GameItems" type="VBoxContainer" parent="TabContainer/LobbyTab/GameBox/GameList" unique_id=1199569160]
 custom_minimum_size = Vector2(360, 0)
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="PlayerNameLabel" type="Label" parent="TabContainer/LobbyTab" unique_id=2064866708]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -48.0
+offset_top = -136.0
+offset_right = 52.0
+offset_bottom = -49.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="LeaderboardTab" type="Control" parent="TabContainer" unique_id=1966971171]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="SearchLeader" type="LineEdit" parent="TabContainer/LeaderboardTab" unique_id=563521440]
+layout_mode = 0
+offset_left = 480.0
+offset_top = 33.0
+offset_right = 688.0
+offset_bottom = 64.0
+context_menu_enabled = false
+emoji_menu_enabled = false
+clear_button_enabled = true
+
+[node name="LeaderBox" type="ColorRect" parent="TabContainer/LeaderboardTab" unique_id=1763008908]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.05
+anchor_top = 0.18
+anchor_right = 0.48
+anchor_bottom = 0.88
+offset_left = 254.4
+offset_top = -14.060005
+offset_right = 289.04004
+offset_bottom = 4.039978
+color = Color(1, 1, 1, 0)
+
+[node name="LeaderHeader" type="HBoxContainer" parent="TabContainer/LeaderboardTab/LeaderBox" unique_id=845549688]
+custom_minimum_size = Vector2(376, 0)
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 32.0
+grow_horizontal = 2
+size_flags_horizontal = 3
+
+[node name="HeaderRank" type="Label" parent="TabContainer/LeaderboardTab/LeaderBox/LeaderHeader" unique_id=471068841]
+custom_minimum_size = Vector2(46, 0)
+layout_mode = 2
+size_flags_horizontal = 2
+text = "#"
+horizontal_alignment = 1
+
+[node name="HeaderName" type="Label" parent="TabContainer/LeaderboardTab/LeaderBox/LeaderHeader" unique_id=1580299851]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Name"
+
+[node name="HeaderWin" type="Label" parent="TabContainer/LeaderboardTab/LeaderBox/LeaderHeader" unique_id=991224345]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Win"
+
+[node name="HeaderLose" type="Label" parent="TabContainer/LeaderboardTab/LeaderBox/LeaderHeader" unique_id=657887738]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Lose"
+
+[node name="HeaderDraw" type="Label" parent="TabContainer/LeaderboardTab/LeaderBox/LeaderHeader" unique_id=1673198402]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Draw"
+
+[node name="LeaderList" type="ScrollContainer" parent="TabContainer/LeaderboardTab/LeaderBox" unique_id=13296260]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LeaderItems" type="VBoxContainer" parent="TabContainer/LeaderboardTab/LeaderBox/LeaderList" unique_id=1568871506]
+custom_minimum_size = Vector2(376, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BoutiqueTab" type="Control" parent="TabContainer" unique_id=2084108781]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 2
+
+[node name="ShopVBox" type="VBoxContainer" parent="TabContainer/BoutiqueTab"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="ShopTitle" type="Label" parent="TabContainer/BoutiqueTab/ShopVBox"]
+layout_mode = 2
+text = "Card backs"
+
+[node name="BacksScroll" type="ScrollContainer" parent="TabContainer/BoutiqueTab/ShopVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BacksGrid" type="GridContainer" parent="TabContainer/BoutiqueTab/ShopVBox/BacksScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
 
 [node name="Deconnexion" type="Button" parent="." unique_id=1298183396]
 layout_mode = 1
@@ -93,13 +227,12 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -184.0
-offset_top = -72.0
-offset_right = -38.0
-offset_bottom = -32.0
+offset_left = -160.0
+offset_top = -632.0
+offset_right = -14.0
+offset_bottom = -592.0
 grow_horizontal = 0
 grow_vertical = 0
-text = "Déconnexion"
 
 [node name="Background" type="ColorRect" parent="." unique_id=357516596]
 z_index = -1
@@ -112,4 +245,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.6745098, 0.3254902, 0.26666668, 1)
 
+[connection signal="tab_changed" from="TabContainer" to="." method="_on_tab_container_tab_changed"]
+[connection signal="text_changed" from="TabContainer/LobbyTab/SearchPlayer" to="." method="_on_search_player_text_changed"]
+[connection signal="text_changed" from="TabContainer/LeaderboardTab/SearchLeader" to="." method="_on_search_leader_text_changed"]
 [connection signal="pressed" from="Deconnexion" to="." method="_on_deconnexion_pressed"]

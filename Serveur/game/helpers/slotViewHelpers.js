@@ -12,6 +12,7 @@ const NEVER_DRAGGABLE_SLOT_TYPES = new Set([
 ]);
 
 const TOP_ONLY_DRAGGABLE_SLOT_TYPES = new Set([
+  SLOT_TYPES.DECK,
   SLOT_TYPES.BENCH,
 ]);
 
@@ -25,6 +26,10 @@ function toSlotStack(slotValue) {
 
 function getVisibleCardIdsForSlot(slotType, stack) {
   if (!Array.isArray(stack) || stack.length === 0) return [];
+  if (slotType === SLOT_TYPES.DECK) {
+    if (stack.length === 1) return [stack[0]];
+    return [stack[stack.length - 2], stack[stack.length - 1]];
+  }
   if (TOP_ONLY_VISIBLE_SLOT_TYPES.has(slotType)) {
     return [stack[stack.length - 1]];
   }

@@ -22,6 +22,7 @@ config/features=PackedStringArray("4.6", "GL Compatibility")
 
 Global="*res://Client/net/Global.gd"
 NetworkManager="*res://Client/net/NetworkManager.gd"
+LanguageManager="*res://Client/Lang/LanguageManager.gd"
 PopupUi="*uid://3jldn8mj4lx4"
 
 [display]

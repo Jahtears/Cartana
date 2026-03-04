@@ -3,12 +3,12 @@
 importer="font_data_dynamic"
 type="FontFile"
 uid="uid://h40utw55jkpf"
-path="res://.godot/imported/LiberationSans-Regular.ttf-be0b997dc896c9c29797670f7d0a5012.fontdata"
+path="res://.godot/imported/LiberationSans-Regular.ttf-beca89ea844c2379de2769caf9b3e380.fontdata"
 
 [deps]
 
-source_file="res://fonts/LiberationSans-Regular.ttf"
-dest_files=["res://.godot/imported/LiberationSans-Regular.ttf-be0b997dc896c9c29797670f7d0a5012.fontdata"]
+source_file="res://Client/Resource/fonts/LiberationSans-Regular.ttf"
+dest_files=["res://.godot/imported/LiberationSans-Regular.ttf-beca89ea844c2379de2769caf9b3e380.fontdata"]
 
 [params]
 

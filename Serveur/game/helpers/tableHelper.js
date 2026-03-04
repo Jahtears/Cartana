@@ -1,8 +1,8 @@
 // helpers/tableHelper.js - Table and slot topology operations
 
 import { SlotId, SLOT_TYPES } from "../constants/slots.js";
-import { createEmptySlots } from "../builders/gameBuilder.js";
-import { isSlotEmpty } from "./slotHelpers.js";
+import { createEmptySlots } from "../factory/createGame.js";
+import { isSlotEmpty } from "../state/slotStore.js";
 import { debugLog } from "./debugHelpers.js";
 
 function ensureSlots(game) {

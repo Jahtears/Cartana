@@ -8,7 +8,6 @@ export class Metrics {
     this.wsConnections = 0;
     this.totalMessagesReceived = 0;
     this.totalMessagesSent = 0;
-    this.gamesActive = 0;
     this.startTime = Date.now();
     this.messagesByType = {}; // type => count
   }
@@ -46,14 +45,6 @@ export class Metrics {
   }
 
   /**
-   * Mettre à jour le nombre de jeux actifs
-   * @param {number} count - Nombre de jeux
-   */
-  setGamesActive(count) {
-    this.gamesActive = count;
-  }
-
-  /**
    * Calculer les messages par seconde
    * @returns {number} Messages par seconde
    */
@@ -84,7 +75,6 @@ export class Metrics {
       total_messages_received: this.totalMessagesReceived,
       total_messages_sent: this.totalMessagesSent,
       messages_per_second: this.getMessagesPerSecond(),
-      games_active: this.gamesActive,
       messages_by_type: { ...this.messagesByType },
     };
   }
@@ -96,7 +86,6 @@ export class Metrics {
     this.wsConnections = 0;
     this.totalMessagesReceived = 0;
     this.totalMessagesSent = 0;
-    this.gamesActive = 0;
     this.startTime = Date.now();
     this.messagesByType = {};
   }

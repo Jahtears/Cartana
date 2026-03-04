@@ -8,20 +8,29 @@ import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
 
 
 export function handleJoinGame(ctx, ws, req, data, actor) {
+  const sessionUsecases = ctx.usecases?.session ?? ctx;
+  const turnUsecases = ctx.usecases?.turn ?? ctx;
+
   const {
     state,
     sendRes,
     sendEvtUser,
-    emitStartGameToUser,
-    emitFullState,
-    sendEvtSocket,
-    initTurnForGame,
-    emitSnapshotsToAudience,
     refreshLobby,
     setUserActivity,
     Activity,
   } = ctx;
-  const { userToGame, gameMeta, readyPlayers, wsByUser } = state;
+  const {
+    emitStartGameToUser,
+    emitFullState,
+    emitSnapshotsToAudience,
+  } = sessionUsecases;
+  const {
+    initTurnForGame,
+  } = turnUsecases;
+  const {
+    sendEvtSocket,
+  } = ctx;
+  const { userToGame, userToEndGame, gameMeta, readyPlayers, wsByUser } = state;
 
   const game_id = requireParam(sendRes, ws, req, data, "game_id");
   if (!game_id) return true;
@@ -53,7 +62,13 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
 
   // Resync/rejoin si la partie est déjà initialisée.
   if (meta.initialSent) {
-    emitFullState(game, actor, wsByUser, sendEvtSocket, { view: "player", gameMeta, game_id });
+    emitFullState(game, actor, wsByUser, sendEvtSocket, {
+      view: "player",
+      gameMeta,
+      game_id,
+      userToGame,
+      userToEndGame,
+    });
     sendRes(ws, req, true, { ok: true, game_id, players: game.players, rejoined: true });
     return true;
   }

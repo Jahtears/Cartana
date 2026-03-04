@@ -1,23 +1,21 @@
 extends RefCounted
 class_name GameMessage
 
-const LanguageManager = preload("res://Client/Lang/LanguageManager.gd")
+const RULE_PREFIX := "RULE_"
 
-const INGAME_PREFIX := "INGAME_"
+const RULE_OK := "RULE_OK"
+const RULE_MOVE_DENIED := "RULE_MOVE_DENIED"
+const RULE_TURN_START_FIRST := "RULE_TURN_START_FIRST"
+const RULE_TURN_START := "RULE_TURN_START"
 
-const INGAME_RULE_OK := "INGAME_RULE_OK"
-const INGAME_MOVE_DENIED := "INGAME_MOVE_DENIED"
-const INGAME_TURN_START_FIRST := "INGAME_TURN_START_FIRST"
-const INGAME_TURN_START := "INGAME_TURN_START"
-
-const INGAME_GREEN_CODES := {
-	INGAME_TURN_START_FIRST: true,
-	INGAME_TURN_START: true,
-	INGAME_RULE_OK: true,
+const GREEN_RULE_CODES := {
+	RULE_TURN_START_FIRST: true,
+	RULE_TURN_START: true,
+	RULE_OK: true,
 }
 
-const INGAME_GREEN_COLOR := Color(0.0, 1.0, 0.0)
-const INGAME_RED_COLOR := Color(1.0, 0.2, 0.2)
+const GREEN_RULE_COLOR := Color(0.0, 1.0, 0.0)
+const RED_RULE_COLOR := Color(1.0, 0.2, 0.2)
 
 const LABEL_NODE_NAME := "GameMessage"
 const TIMER_NODE_NAME := "GameMessageTimer"
@@ -35,11 +33,11 @@ static func create_ui_state() -> Dictionary:
 	}
 
 static func text_for_code(message_code: String, params: Dictionary = {}) -> String:
-	return LanguageManager.ingame_text(message_code, params)
+	return LanguageManager.rule_text(message_code, params)
 
-static func normalize_ingame_message(ui_message: Dictionary) -> Dictionary:
+static func normalize_rule_message(ui_message: Dictionary) -> Dictionary:
 	var message_code := String(ui_message.get("message_code", "")).strip_edges()
-	if not message_code.begins_with(INGAME_PREFIX):
+	if not message_code.begins_with(RULE_PREFIX):
 		return {}
 
 	var params_val = ui_message.get("message_params", {})
@@ -71,12 +69,11 @@ static func ensure_ui(state: Dictionary, root: Control, timeout_handler: Callabl
 		label = RichTextLabel.new()
 		label.name = LABEL_NODE_NAME
 		label.z_index = 1
-		label.layout_mode = 0
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(label)
 		state["label"] = label
 
-	_setup_ingame_label(label)
+	_setup_rule_label(label)
 
 	var timer := _get_timer(state)
 	if timer == null:
@@ -97,28 +94,28 @@ static func apply_layout(state: Dictionary, anchor_position: Vector2) -> void:
 	state["anchor_position"] = anchor_position
 	_reposition_label(state)
 
-static func show_ingame_message(ui_message: Dictionary, state: Dictionary) -> void:
-	var ingame_label := _get_label(state)
-	var ingame_timer := _get_timer(state)
+static func show_rule_message(ui_message: Dictionary, state: Dictionary) -> void:
+	var rule_label := _get_label(state)
+	var rule_timer := _get_timer(state)
 
-	var normalized := normalize_ingame_message(ui_message)
+	var normalized := normalize_rule_message(ui_message)
 	if normalized.is_empty():
 		return
 
 	var text := String(normalized.get("text", ""))
-	if text == "" or ingame_label == null:
+	if text == "" or rule_label == null:
 		return
 
-	ingame_label.text = "[center][color=%s]%s[/color][/center]" % [
+	rule_label.text = "[center][color=%s]%s[/color][/center]" % [
 		color_for_code(String(normalized.get("message_code", ""))).to_html(),
 		text
 	]
-	_resize_single_line_label(ingame_label)
+	_resize_single_line_label(rule_label)
 	_reposition_label(state)
-	ingame_label.visible = true
+	rule_label.visible = true
 
-	if ingame_timer != null and ingame_timer.has_method("start"):
-		ingame_timer.start()
+	if rule_timer != null and rule_timer.has_method("start"):
+		rule_timer.start()
 
 static func cleanup(state: Dictionary) -> void:
 	state["label"] = null
@@ -131,23 +128,23 @@ static func get_fade_duration() -> float:
 	return FADE_DURATION
 
 static func color_for_code(message_code: String) -> Color:
-	if INGAME_GREEN_CODES.has(message_code):
-		return INGAME_GREEN_COLOR
-	return INGAME_RED_COLOR
+	if GREEN_RULE_CODES.has(message_code):
+		return GREEN_RULE_COLOR
+	return RED_RULE_COLOR
 
-static func _setup_ingame_label(ingame_label: RichTextLabel) -> void:
-	if ingame_label == null:
+static func _setup_rule_label(rule_label: RichTextLabel) -> void:
+	if rule_label == null:
 		return
-	ingame_label.visible = false
-	ingame_label.clear()
-	ingame_label.bbcode_enabled = true
-	ingame_label.fit_content = true
-	ingame_label.scroll_active = false
-	ingame_label.custom_minimum_size = Vector2.ZERO
-	ingame_label.size = Vector2(DEFAULT_LABEL_WIDTH, DEFAULT_LABEL_HEIGHT)
-	ingame_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	ingame_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ingame_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	rule_label.visible = false
+	rule_label.clear()
+	rule_label.bbcode_enabled = true
+	rule_label.fit_content = true
+	rule_label.scroll_active = false
+	rule_label.custom_minimum_size = Vector2.ZERO
+	rule_label.size = Vector2(DEFAULT_LABEL_WIDTH, DEFAULT_LABEL_HEIGHT)
+	rule_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	rule_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rule_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 static func _reposition_label(state: Dictionary) -> void:
 	var label := _get_label(state)

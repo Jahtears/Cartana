@@ -9,9 +9,10 @@ import fs from "fs";
 import { handleLogin } from '../handlers/auth/login.js';
 import { handleLogout } from '../handlers/auth/logout.js';
 import { handleInvite, handleInviteResponse } from '../handlers/lobby/invite.js';
+import { handleGetLeaderboard } from '../handlers/lobby/leaderboard.js';
 import { handleJoinGame } from '../handlers/game/joinGame.js';
 import { handleSpectateGame } from '../handlers/game/spectateGame.js';
-import { handleMoveRequest } from '../game/moveRequest.js';
+import { handleMoveRequest } from '../handlers/game/moveRequest.js';
 import { handleLeaveGame, handleAckGameEnd } from '../handlers/game/gameEnd.js';
 
 // ============= IMPORTS APP =============
@@ -35,9 +36,14 @@ if (!BACKEND_HTTP_MODE && (TLS_CERT_PATH === "" || TLS_KEY_PATH === "")) {
 
 // ============= INITIALISATION =============
 
+let wsManager = null;
+
 // 1️⃣ Créer le contexte (état + helpers)
 const { baseCtx, loginCtx, onSocketClose } = createServerContext({
-  onTransportSend: () => metrics.recordMessageSent(),
+  onTransportSend: (ws) => {
+    metrics.recordMessageSent();
+    wsManager?.markActivity(ws, "outbound");
+  },
 });
 
 function requestHandler(req, res) {
@@ -84,7 +90,7 @@ if (BACKEND_HTTP_MODE) {
 const wss = new WebSocketServer({ server: transportServer });
 
 // 4️⃣ Créer le wsManager
-const wsManager = createWSManager({ wss, trace: console.log });
+wsManager = createWSManager({ wss, trace: console.log });
 
 // 5️⃣ Créer le router (avec contexte + handlers)
 const router = createRouter({
@@ -102,6 +108,7 @@ const router = createRouter({
   handleMoveRequest,
   handleLeaveGame,
   handleAckGameEnd,
+  handleGetLeaderboard,
   metrics, // Passer les métriques au router
 });
 
@@ -122,6 +129,7 @@ wss.on("connection", async (ws) => {
 
   ws.on("message", async (msg) => {
     try {
+      wsManager.markActivity(ws, "inbound");
       await onMessageWithMetrics(ws, msg.toString());
     } catch (err) {
       console.error("[MESSAGE_ERROR]", err);
@@ -150,7 +158,7 @@ const turnExpiryTimer = setInterval(() => {
   for (const [game_id, game] of baseCtx.state.games.entries()) {
     if (!game?.turn) continue;
     try {
-      baseCtx.processTurnTimeout?.(game_id, now);
+      baseCtx.usecases?.turn?.processTurnTimeout?.(game_id, now);
     } catch (err) {
       console.error("[TURN_EXPIRY_ERROR]", { game_id, error: err?.message ?? String(err) });
     }

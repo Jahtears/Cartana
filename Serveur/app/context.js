@@ -2,23 +2,33 @@
 
 import { randomUUID } from "node:crypto";
 import { createTransport } from "../net/transport.js";
-import { createBroadcaster, createFlush } from "../net/broadcast.js";
+import { createBroadcaster } from "../net/broadcast/broadcaster.js";
+import { createFlush } from "../net/broadcast/flush.js";
 import { createRoles } from "../domain/roles/roles.js";
 import { createLobbyLists } from "../domain/lobby/lists.js";
-import { createGameNotifier, emitSlotState, emitFullState } from "../domain/session/index.js";
+import { createGameNotifier } from "../domain/session/notifier.js";
+import { emitSlotState, emitFullState } from "../domain/session/emitter.js";
 import { createPresence } from "../domain/session/presence.js";
-import { createGame } from "../game/builders/gameBuilder.js";
-import { getCardById } from "../game/helpers/cardHelpers.js";
-import { mapSlotFromClientToServer, mapSlotForClient } from "../game/helpers/slotHelpers.js";
+import { createGame } from "../game/factory/createGame.js";
+import { SLOT_TYPES, SlotId } from "../game/constants/slots.js";
+import { getCardById } from "../game/state/cardStore.js";
+import { mapSlotFromClientToServer, mapSlotForClient } from "../game/boundary/slotIdMapper.js";
 import { getTableSlots } from "../game/helpers/tableHelper.js";
-import { applyMove } from "../game/MoveApplier.js";
-import { validateMove, isBenchSlot, refillHandIfEmpty, hasWonByEmptyDeckSlot, hasLoseByEmptyPileSlot } from "../game/Regles.js";
-import { initTurnForGame, endTurnAfterBenchPlay, tryExpireTurn } from "../game/helpers/turnFlowHelpers.js";
-import { INGAME_MESSAGE } from "../game/constants/ingameMessages.js";
+import { applyMove } from "../game/engine/applyMove.js";
+import { validateMove, refillHandIfEmpty, hasWonByEmptyDeckSlot, hasLoseByEmptyPileSlot } from "../game/rules/validateMove.js";
+import { orchestrateMove } from "../game/usecases/move/orchestrateMove.js";
+import {
+  initTurnForGame,
+  endTurnAfterBenchPlay,
+  resetTurnTimeoutStreak,
+  tryExpireTurn,
+} from "../game/helpers/turnFlowHelpers.js";
+import { buildCardPayload } from "../game/payload/cardPayload.js";
+import { buildTurnPayload } from "../game/payload/turnPayload.js";
+import { buildStateSnapshotPayload } from "../game/payload/snapshotPayload.js";
 import { saveGameState, loadGameState, deleteGameState } from "../domain/session/Saves.js";
 import { verifyOrCreateUser } from "../handlers/auth/usersStore.js";
 import { createStateManager } from "./stateManager.js";
-import { emitGameMessage } from "../shared/uiMessage.js";
 
 export function createServerContext({ onTransportSend } = {}) {
 
@@ -54,6 +64,7 @@ export function createServerContext({ onTransportSend } = {}) {
     wsByUser: state.wsByUser,
     userToGame: state.userToGame,
     userToSpectate: state.userToSpectate,
+    userToEndGame: state.userToEndGame,
     gameSpectators: state.gameSpectators,
     pendingInviteTo: state.pendingInviteTo,
     inviteFrom: state.inviteFrom,
@@ -120,7 +131,6 @@ export function createServerContext({ onTransportSend } = {}) {
       },
 
       syncTable(tableSlots) {
-        game.tableSlots = tableSlots;
         fl.syncTable(tableSlots);
       },
 
@@ -138,16 +148,6 @@ export function createServerContext({ onTransportSend } = {}) {
     fl.flush();
   }
 
-  function notifyOpponent(game_id, game, evtType, data) {
-    if (!game) return;
-    const actor = String(data?.username ?? "");
-    for (const player of game.players ?? []) {
-      const username = typeof player === "string" ? player : String(player?.username ?? "");
-      if (!username || username === actor) continue;
-      sendEvtUser(username, evtType, data);
-    }
-  }
-
   function processTurnTimeout(gameId, now = Date.now()) {
     const game = state.games.get(gameId);
     if (!game?.turn) return false;
@@ -156,28 +156,50 @@ export function createServerContext({ onTransportSend } = {}) {
     if (game.turn.paused || meta?.result) return false;
 
     const timeoutResult = tryExpireTurn(game, now);
-    if (!timeoutResult) return false;
+    if (!timeoutResult?.expired) return false;
 
     const prev = String(timeoutResult.prev ?? "").trim();
     const next = String(timeoutResult.next ?? "").trim();
+    const endGamePatch = timeoutResult.endGamePatch;
+    const pileSlotId = SlotId.create(0, SLOT_TYPES.PILE, 1);
 
-    if (prev) {
-      emitGameMessage(
-        sendEvtUser,
-        prev,
-        { message_code: INGAME_MESSAGE.TURN_TIMEOUT }
-      );
-    }
-    if (next) {
-      emitGameMessage(
-        sendEvtUser,
-        next,
-        { message_code: INGAME_MESSAGE.TURN_START }
-      );
-    }
+    withGameUpdate(gameId, (fx) => {
+      const recycledSlots = timeoutResult.recycled?.recycledSlots;
+      if (timeoutResult.tableSyncNeeded || (Array.isArray(recycledSlots) && recycledSlots.length > 0)) {
+        fx.syncTable(getTableSlots(game));
+      }
+
+      const autoPlayedAces = Array.isArray(timeoutResult.autoPlayedAces)
+        ? timeoutResult.autoPlayedAces
+        : [];
+      if (autoPlayedAces.length > 0) {
+        for (const move of autoPlayedAces) {
+          if (move?.from) fx.touch(move.from);
+          if (move?.to) fx.touch(move.to);
+        }
+      } else {
+        if (timeoutResult.aceFrom) fx.touch(timeoutResult.aceFrom);
+        if (timeoutResult.aceTo) fx.touch(timeoutResult.aceTo);
+      }
+      for (const refill of timeoutResult.given ?? []) {
+        if (refill?.slotId) fx.touch(refill.slotId);
+      }
+      fx.touch(pileSlotId);
+      fx.turn();
+
+      if (prev) {
+        fx.message("show_game_message", { message_code: "RULE_TURN_TIMEOUT" }, { to: prev });
+      }
+      if (next && !endGamePatch) {
+        fx.message("show_game_message", { message_code: "RULE_TURN_START" }, { to: next });
+      }
+    });
 
     saveGameState(gameId, game);
-    emitSnapshotsToAudience(gameId, { reason: "turn_timeout" });
+    if (endGamePatch) {
+      emitGameEndOnce(gameId, endGamePatch);
+      emitSnapshotsToAudience(gameId, { reason: "game_end" });
+    }
     return timeoutResult;
   }
 
@@ -192,7 +214,6 @@ export function createServerContext({ onTransportSend } = {}) {
     saveGameState,
     loadGameState,
     refreshLobby,
-    notifyOpponent,
     emitStartGameToUser,
     emitSnapshotsToAudience,
   });
@@ -226,28 +247,59 @@ export function createServerContext({ onTransportSend } = {}) {
     broadcastGamesList,
     refreshLobby,
 
-    // Notifier (événements de jeu)
+    // Facades use-cases
+    usecases: {
+      move: {
+        orchestrateMove,
+        validateMove,
+        applyMove,
+        getCardById,
+        refillHandIfEmpty,
+        hasWonByEmptyDeckSlot,
+        hasLoseByEmptyPileSlot,
+      },
+      turn: {
+        initTurnForGame,
+        endTurnAfterBenchPlay,
+        processTurnTimeout,
+        resetTurnTimeoutStreak,
+        getTableSlots,
+        withGameUpdate,
+      },
+      session: {
+        emitStartGameToUser,
+        emitSnapshotsToAudience,
+        emitGameEndOnce,
+        emitFullState,
+        emitSlotState,
+      },
+    },
+
+    boundary: {
+      slot: {
+        mapSlotFromClientToServer,
+        mapSlotForClient,
+      },
+    },
+
+    factory: {
+      game: {
+        createGame,
+      },
+    },
+
+    payload: {
+      buildCardPayload,
+      buildTurnPayload,
+      buildStateSnapshotPayload,
+    },
+
+    // Keep selected direct helpers used by generic guards/handlers
     emitStartGameToUser,
     emitSnapshotsToAudience,
     emitGameEndOnce,
-
-    // Game engine (logique métier)
-    createGame,
-    emitSlotState,
     emitFullState,
-    getTableSlots,
-    getCardById,
-    mapSlotFromClientToServer,
-    mapSlotForClient,
-    validateMove,
-    applyMove,
-    initTurnForGame,
-    isBenchSlot,
-    endTurnAfterBenchPlay,
-    refillHandIfEmpty,
-    hasWonByEmptyDeckSlot,
-    hasLoseByEmptyPileSlot,
-    withGameUpdate,
+    emitSlotState,
     processTurnTimeout,
 
     // Persist (sauvegarde)
@@ -257,7 +309,6 @@ export function createServerContext({ onTransportSend } = {}) {
 
     // Helpers
     generateGameID,
-    notifyOpponent,
     handleReconnect,
   };
 
