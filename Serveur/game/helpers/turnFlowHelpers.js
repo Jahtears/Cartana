@@ -18,10 +18,10 @@ import {
   slotTopHasAce,
 } from "../state/cardStore.js";
 import {
-  cleanupExtraEmptyTableSlots,
-  ensureEmptyTableSlot,
+  addTableSlot,
 } from "./tableHelper.js";
 import {
+  getTableSlots,
   getSlotStack,
   removeCardFromSlot,
 } from "../state/slotStore.js";
@@ -122,11 +122,6 @@ function endTurnAfterBenchPlay(game, actor) {
   const recycled = recycleFullTableSlotsToPile(game);
   const next = actor === game.players[0] ? game.players[1] : game.players[0];
 
-  if (recycled?.recycledSlots?.length) {
-    ensureEmptyTableSlot(game);
-    cleanupExtraEmptyTableSlots(game);
-  }
-
   const given = refillEmptyHandSlotsFromPile(game, next, DEFAULT_HAND_SIZE);
 
   game.turn = game.turn || { current: next, number: INITIAL_TURN_NUMBER };
@@ -179,18 +174,24 @@ function tryExpireTurn(game, now = Date.now()) {
     const ace = pickNextAce();
     if (!ace) break;
 
-    const { slotId: tableSlot, created } = ensureEmptyTableSlot(game);
     const removed = removeCardFromSlot(game, ace.slotId, ace.cardId);
     if (!removed) break;
+
+    const tableSlots = getTableSlots(game);
+    const tableSlot = tableSlots.length
+      ? tableSlots[tableSlots.length - 1]
+      : addTableSlot(game);
+
+    if (!tableSlots.length) tableSyncNeeded = true;
 
     const tableStack = getSlotStack(game, tableSlot);
     tableStack.push(ace.cardId);
     playedAce = true;
     if (!aceFrom) aceFrom = ace.slotId;
     if (!aceTo) aceTo = tableSlot;
-    tableSyncNeeded = tableSyncNeeded || !!created;
     autoPlayedAces.push({ cardId: ace.cardId, from: ace.slotId, to: tableSlot });
-    if (ensureEmptyTableSlot(game).created) tableSyncNeeded = true;
+    addTableSlot(game);
+    tableSyncNeeded = true;
 
     debugLog("[TURN] TIMEOUT_AUTO_ACE", { prev, from: ace.slotId, to: tableSlot });
   }

@@ -32,6 +32,7 @@ yarn-error.log*
 
 # Sauvegardes sensibles
 Serveur/app/saves
+Serveur\app\saves\Leaderboard.json
 
 
 # Tests
@@ -53,6 +54,7 @@ Serveur/__tests__
 
 .DS_Store
 Thumbs.db
+/Web
 
 ############################
 # ARCHIVES / TEMP

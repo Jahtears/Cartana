@@ -1,8 +1,9 @@
 import { TURN_MS, addBonusToTurnClock } from "../turnClock.js";
 import {
-  ensureEmptyTableSlot,
+  addTableSlot,
 } from "../helpers/tableHelper.js";
 import {
+  getTableSlots,
   getSlotStack,
   removeCardFromSlot,
 } from "../state/slotStore.js";
@@ -68,6 +69,13 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
   }
 
   let createdTableSlotId = null;
+  let shouldAddTrailingTableSlot = false;
+
+  if (toSlotId.type === SLOT_TYPES.TABLE) {
+    const tableSlots = getTableSlots(game);
+    const lastTableSlot = tableSlots.length ? tableSlots[tableSlots.length - 1] : null;
+    shouldAddTrailingTableSlot = !lastTableSlot || lastTableSlot.index === toSlotId.index;
+  }
 
   // Convention: bottom = index 0, top = last index.
   // - Table/Bench => push on top
@@ -79,10 +87,9 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
     targetStack.unshift(card.id);
   }
 
-  // Ensure there is an empty table slot available.
-  if (toSlotId.type === SLOT_TYPES.TABLE) {
-    const ensured = ensureEmptyTableSlot(game);
-    createdTableSlotId = ensured.created ? ensured.slotId : null;
+  // Keep one trailing table slot only when playing on current last TABLE index.
+  if (toSlotId.type === SLOT_TYPES.TABLE && shouldAddTrailingTableSlot) {
+    createdTableSlotId = addTableSlot(game);
   }
 
   // +10s bonus on non TABLE->TABLE moves to TABLE (cap at TURN_MS).

@@ -2,10 +2,10 @@ import { GAME_END_REASONS } from "../constants/gameEnd.js";
 import { SLOT_TYPES } from "../constants/slots.js";
 import { mapSlotForClient } from "../boundary/slotIdMapper.js";
 import { buildCardPayload } from "./cardPayload.js";
-import { getTableSlots } from "../helpers/tableHelper.js";
 import {
   getSlotCount,
   getSlotStack,
+  getTableSlots,
   isOwnerForSlot,
   slotIdToString,
 } from "../state/slotStore.js";

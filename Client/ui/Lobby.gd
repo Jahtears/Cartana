@@ -277,7 +277,7 @@ func _rebuild_shop_back_items() -> void:
 func _create_shop_back_item(back_id: String) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(SHOP_CARD_MIN_WIDTH, 0.0)
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_horizontal = Control.SIZE_EXPAND
 
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.12, 0.12, 0.16, 0.85)
@@ -377,11 +377,9 @@ func _refresh_shop_selection_buttons() -> void:
 
 func _set_shop_button_state(button: Button, source: String, is_selected: bool) -> void:
 	var label := _shop_source_label(source)
-	if is_selected:
-		label = "%s (%s)" % [label, LanguageManager.ui_text("UI_SHOP_SELECTED", "selected")]
 	button.text = label
 	button.button_pressed = is_selected
-	button.modulate = Color(1, 1, 1, 1) if is_selected else Color(0.84, 0.84, 0.84, 1)
+	button.modulate = Color(0.392, 0.722, 0.0, 1.0) if is_selected else Color(0.84, 0.84, 0.84, 1)
 
 func _apply_language_to_lobby_ui() -> void:
 	_logout_button.text = LanguageManager.ui_text("UI_LOBBY_LOGOUT_BUTTON", "Logout")

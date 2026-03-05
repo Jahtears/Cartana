@@ -92,6 +92,20 @@ function getHandSize(game, playerIndex) {
   return getSlotCount(game, handSlot);
 }
 
+function getTableSlots(game, initSlotsFactory = null) {
+  const slots = ensureSlotStorage(game, initSlotsFactory);
+  if (!(slots instanceof Map)) return [];
+
+  const tableSlots = [];
+  for (const [slotId] of slots) {
+    if (!(slotId instanceof SlotId) || slotId.type !== SLOT_TYPES.TABLE) continue;
+    tableSlots.push(slotId);
+  }
+
+  tableSlots.sort((a, b) => a.index - b.index);
+  return tableSlots;
+}
+
 function hasCardInSlot(game, slotId, cardId) {
   if (!game || !game.slots) return false;
   const slotContent = getSlotStack(game, slotId);
@@ -119,6 +133,7 @@ export {
   getHandSize,
   getSlotCount,
   getSlotStack,
+  getTableSlots,
   hasCardInSlot,
   isOwnerForSlot,
   isSlotEmpty,
