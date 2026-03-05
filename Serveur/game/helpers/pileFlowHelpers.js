@@ -6,10 +6,11 @@ import {
   TABLE_RECYCLE_CARD_COUNT,
 } from "../constants/turnFlow.js";
 import { shuffle } from "../state/cardStore.js";
-import { getTableSlots } from "./tableHelper.js";
+import { removeTableslot } from "./tableHelper.js";
 import {
   getSlotCount,
   getSlotStack,
+  getTableSlots,
   putCardtoHandFromPile,
   getHandSize,
 } from "../state/slotStore.js";
@@ -79,8 +80,9 @@ function recycleFullTableSlotsToPile(game) {
       if (typeof id === "string") pile.unshift(id);
     }
 
-    game.slots.delete(slotId);
-    recycledSlots.push(slotId);
+    if (removeTableslot(game, slotId.index)) {
+      recycledSlots.push(slotId);
+    }
 
     debugLog("[PILE] RECYCLE_TABLE_TO_PILE", {
       slotId,
