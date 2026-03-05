@@ -32,6 +32,7 @@ offset_left = 480.0
 offset_top = 33.0
 offset_right = 688.0
 offset_bottom = 64.0
+alignment = 1
 context_menu_enabled = false
 emoji_menu_enabled = false
 clear_button_enabled = true
@@ -47,7 +48,7 @@ offset_left = 6.3999977
 offset_top = -30.060005
 offset_right = -74.44
 offset_bottom = -1.6599731
-color = Color(0, 0, 0, 0)
+color = Color(1, 1, 1, 0)
 
 [node name="PlayersList" type="ScrollContainer" parent="TabContainer/LobbyTab/PlayersBox" unique_id=1527846370]
 layout_mode = 1
@@ -115,6 +116,7 @@ offset_left = 480.0
 offset_top = 33.0
 offset_right = 688.0
 offset_bottom = 64.0
+alignment = 1
 context_menu_enabled = false
 emoji_menu_enabled = false
 clear_button_enabled = true
@@ -130,7 +132,7 @@ offset_left = 254.4
 offset_top = -14.060005
 offset_right = 289.04004
 offset_bottom = 4.039978
-color = Color(1, 1, 1, 0)
+color = Color(0.5880054, 0.07729996, 0.9339283, 1)
 
 [node name="LeaderHeader" type="HBoxContainer" parent="TabContainer/LeaderboardTab/LeaderBox" unique_id=845549688]
 custom_minimum_size = Vector2(376, 0)
@@ -146,7 +148,7 @@ custom_minimum_size = Vector2(46, 0)
 layout_mode = 2
 size_flags_horizontal = 2
 text = "#"
-horizontal_alignment = 1
+horizontal_alignment = 2
 
 [node name="HeaderName" type="Label" parent="TabContainer/LeaderboardTab/LeaderBox/LeaderHeader" unique_id=1580299851]
 custom_minimum_size = Vector2(150, 0)
@@ -191,7 +193,7 @@ visible = false
 layout_mode = 2
 metadata/_tab_index = 2
 
-[node name="ShopVBox" type="VBoxContainer" parent="TabContainer/BoutiqueTab"]
+[node name="ShopVBox" type="VBoxContainer" parent="TabContainer/BoutiqueTab" unique_id=934608177]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -204,21 +206,21 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 12
 
-[node name="ShopTitle" type="Label" parent="TabContainer/BoutiqueTab/ShopVBox"]
+[node name="ShopTitle" type="Label" parent="TabContainer/BoutiqueTab/ShopVBox" unique_id=79654173]
 layout_mode = 2
 text = "Card backs"
 
-[node name="BacksScroll" type="ScrollContainer" parent="TabContainer/BoutiqueTab/ShopVBox"]
+[node name="BacksScroll" type="ScrollContainer" parent="TabContainer/BoutiqueTab/ShopVBox" unique_id=863221491]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="BacksGrid" type="GridContainer" parent="TabContainer/BoutiqueTab/ShopVBox/BacksScroll"]
+[node name="BacksGrid" type="GridContainer" parent="TabContainer/BoutiqueTab/ShopVBox/BacksScroll" unique_id=1757639264]
 layout_mode = 2
 size_flags_horizontal = 3
-columns = 2
 theme_override_constants/h_separation = 12
 theme_override_constants/v_separation = 12
+columns = 4
 
 [node name="Deconnexion" type="Button" parent="." unique_id=1298183396]
 layout_mode = 1
@@ -235,7 +237,7 @@ grow_horizontal = 0
 grow_vertical = 0
 
 [node name="Background" type="ColorRect" parent="." unique_id=357516596]
-z_index = -1
+z_index = -2
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -243,7 +245,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.6745098, 0.3254902, 0.26666668, 1)
+color = Color(0.13333334, 0.5254902, 0.5764706, 1)
 
 [connection signal="tab_changed" from="TabContainer" to="." method="_on_tab_container_tab_changed"]
 [connection signal="text_changed" from="TabContainer/LobbyTab/SearchPlayer" to="." method="_on_search_player_text_changed"]
