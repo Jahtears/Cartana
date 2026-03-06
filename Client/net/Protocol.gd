@@ -96,7 +96,6 @@ static func normalize_popup_message(payload: Dictionary) -> Dictionary:
 		"text": text,
 		"message_code": message_code,
 		"message_params": params,
-		"color": _extract_color(payload, Color.WHITE),
 	}
 	if text_override != "" and text_override != message_code:
 		normalized["text_override"] = text_override
@@ -248,12 +247,3 @@ static func _extract_message_code(payload: Dictionary) -> String:
 
 static func _extract_text(payload: Dictionary) -> String:
 	return String(payload.get("text", "")).strip_edges()
-
-static func _extract_color(payload: Dictionary, fallback: Color) -> Color:
-	var color := fallback
-	var color_val = payload.get("color", null)
-	if color_val is Color:
-		color = color_val
-	elif color_val is String and String(color_val) != "":
-		color = Color.from_string(String(color_val), color)
-	return color
