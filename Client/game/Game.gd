@@ -6,11 +6,6 @@ extends Control
 var slot_scene: PackedScene = preload("res://Client/Scenes/Slot.tscn")
 var card_scene: PackedScene = preload("res://Client/Scenes/Carte.tscn")
 
-# ============= HANDLERS =============
-var _event_handler := GameEventHandler.new()
-var _connection_handler := GameConnectionHandler.new()
-var _response_handler := GameResponseHandler.new()
-
 # ============= CONFIG & HELPERS =============
 const Protocol = preload("res://Client/net/Protocol.gd")
 # ============= CONSTANTS =============
