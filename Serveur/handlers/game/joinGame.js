@@ -63,7 +63,6 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
   // Resync/rejoin si la partie est déjà initialisée.
   if (meta.initialSent) {
     emitFullState(game, actor, wsByUser, sendEvtSocket, {
-      view: "player",
       gameMeta,
       game_id,
       userToGame,

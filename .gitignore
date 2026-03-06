@@ -32,8 +32,6 @@ yarn-error.log*
 
 # Sauvegardes sensibles
 Serveur/app/saves
-Serveur\app\saves\Leaderboard.json
-
 
 # Tests
 coverage/

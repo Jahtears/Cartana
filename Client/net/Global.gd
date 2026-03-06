@@ -23,11 +23,8 @@ var players_in_game: Array = []
 var current_games: Array = []
 var is_spectator: bool = false
 # --- AJOUTS ---
-var view: String = "" # "player" | "spectator"
-var result: Dictionary = {} # {} si pas fini, sinon {winner}
-var table_slots: Array = [] # (player, type, index)
-var last_turn: Dictionary = {} # {current, turnNumber} (optionnel)
 
+var result: Dictionary = {} # {} si pas fini, sinon {winner}
 var _available_back_ids: Array[String] = []
 var _back_path_by_id: Dictionary = {}
 var _back_texture_cache: Dictionary = {}
@@ -46,10 +43,7 @@ func reset_game_state() -> void:
 	current_game_id = ""
 	players_in_game.clear()
 	is_spectator = false
-	view = ""
 	result.clear()
-	table_slots.clear()
-	last_turn.clear()
 
 func get_available_back_ids() -> Array[String]:
 	var out: Array[String] = []
