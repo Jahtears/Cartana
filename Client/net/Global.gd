@@ -22,9 +22,9 @@ var current_game_id: String = ""
 var players_in_game: Array = []
 var current_games: Array = []
 var is_spectator: bool = false
-# --- AJOUTS ---
-
 var result: Dictionary = {} # {} si pas fini, sinon {winner}
+
+# Card back management
 var _available_back_ids: Array[String] = []
 var _back_path_by_id: Dictionary = {}
 var _back_texture_cache: Dictionary = {}
