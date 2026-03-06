@@ -14,6 +14,9 @@ var _response_handler := GameResponseHandler.new()
 # ============= CONFIG & HELPERS =============
 const Protocol = preload("res://Client/net/Protocol.gd")
 # ============= CONSTANTS =============
+const REMATCH_CONTEXT := "rematch"
+const ACK_INTENT_REMATCH := "rematch"
+
 const REQ_JOIN_GAME := "join_game"
 const REQ_SPECTATE_GAME := "spectate_game"
 const REQ_ACK_GAME_END := "ack_game_end"
