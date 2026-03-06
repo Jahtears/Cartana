@@ -1,4 +1,4 @@
-# Game.gd - Main game controller (layout + coordination)
+# Game.gd - Layout simplifié + Handlers complets du code original
 
 extends Control
 
@@ -9,15 +9,15 @@ var card_scene: PackedScene = preload("res://Client/Scenes/Carte.tscn")
 # ============= CONFIG & HELPERS =============
 const Protocol = preload("res://Client/net/Protocol.gd")
 # ============= CONSTANTS =============
+const FLOW_INVITE_REQUEST := Protocol.POPUP_FLOW_INVITE_REQUEST
 const REMATCH_CONTEXT := "rematch"
 const ACK_INTENT_REMATCH := "rematch"
-
 const REQ_JOIN_GAME := "join_game"
 const REQ_SPECTATE_GAME := "spectate_game"
-const REQ_ACK_GAME_END := "ack_game_end"
-const REQ_LEAVE_GAME := "leave_game"
 const REQ_INVITE := "invite"
 const REQ_INVITE_RESPONSE := "invite_response"
+const REQ_ACK_GAME_END := "ack_game_end"
+const REQ_LEAVE_GAME := "leave_game"
 
 const ACTION_GAME_END_LEAVE := "game_end_leave"
 const ACTION_GAME_END_REMATCH := "game_end_rematch"
@@ -295,53 +295,236 @@ func _on_evt(type: String, data: Dictionary) -> void:
 	if not slots_ready:
 		pending_events.append({"type": type, "data": data})
 		return
-
+	
 	match type:
 		"start_game":
-			GameEventHandler.handle_start_game(data, self)
+			_handle_start_game(data)
 		"table_sync":
-			GameEventHandler.handle_table_sync(data, self)
+			_handle_table_sync(data)
 		"slot_state":
-			GameEventHandler.handle_slot_state(data, self)
+			_handle_slot_state(data)
 		"state_snapshot":
-			GameEventHandler.handle_state_snapshot(data, self)
+			_handle_state_snapshot(data)
 		"show_game_message":
 			_show_game_feedback(data)
 		"game_end":
-			GameEventHandler.handle_game_end(data, self)
+			_handle_game_end(data)
 		"turn_update":
 			_set_turn_timer(data)
 		"opponent_disconnected":
-			GameEventHandler.handle_opponent_disconnected(data, self)
+			_handle_opponent_disconnected(data)
 		"opponent_rejoined":
-			GameEventHandler.handle_opponent_rejoined(data, self)
+			_handle_opponent_rejoined(data)
 		"invite_request":
-			GameEventHandler.handle_invite_request(data)
+			_handle_invite_request(data)
 		"invite_response":
-			GameEventHandler.handle_invite_response(data)
+			_handle_invite_response(data)
 		"invite_cancelled":
-			GameEventHandler.handle_invite_cancelled(data)
+			_handle_invite_cancelled(data)
 		"rematch_declined":
-			GameEventHandler.handle_rematch_declined(data)
+			_handle_rematch_declined(data)
 
+func _handle_invite_request(data: Dictionary) -> void:
+	var from_user := String(data.get("from", ""))
+	if from_user != "":
+		var popup_payload := {
+			"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST),
+			"from": from_user
+		}
+		var context := String(data.get("context", "")).strip_edges()
+		var source_game_id := String(data.get("source_game_id", "")).strip_edges()
+		if context != "":
+			popup_payload["context"] = context
+		if source_game_id != "":
+			popup_payload["source_game_id"] = source_game_id
+		PopupUi.show_code(
+			PopupUi.MODE_CONFIRM,
+			Protocol.POPUP_INVITE_RECEIVED,
+			{"from": from_user},
+			popup_payload,
+			{"yes_label_key": "UI_LABEL_ACCEPT", "no_label_key": "UI_LABEL_REFUSE"}
+		)
+
+func _handle_invite_response(data: Dictionary) -> void:
+	var ui := Protocol.normalize_invite_response_ui(data)
+	if String(ui.get("text", "")) != "":
+		PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
+
+func _handle_invite_cancelled(data: Dictionary) -> void:
+	var ui := Protocol.invite_cancelled_ui(data)
+	if String(ui.get("text", "")).strip_edges() == "":
+		return
+	PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
+
+func _handle_rematch_declined(data: Dictionary) -> void:
+	var context := String(data.get("context", "")).strip_edges().to_lower()
+	if context != REMATCH_CONTEXT:
+		return
+	var ui := Protocol.normalize_invite_response_ui(data)
+	PopupUi.show_normalized(
+		PopupUi.MODE_INFO,
+		ui,
+		{
+			"ok_action_id": ACTION_REMATCH_DECLINED_LEAVE,
+			"context": context,
+			"source_game_id": String(data.get("source_game_id", "")).strip_edges(),
+		},
+		{"ok_label_key": "UI_LABEL_BACK_LOBBY"}
+	)
+
+func _handle_start_game(data: Dictionary) -> void:
+	Global.current_game_id = String(data.get("game_id", ""))
+	Global.players_in_game = data.get("players", [])
+	Global.is_spectator = bool(data.get("spectator", false))
+	Global.result.clear()
+
+	_reset_board_state()
+	slots_ready = true
+	pending_events.clear()
+	_is_changing_scene = false
+	_game_end_prompted = false
+	_leave_sent = false
+	_opponent_disconnected = false
+	_network_disconnected = false
+	_disconnect_prompt_seq += 1
+	PopupUi.hide_and_reset()
+
+	if Global.current_game_id != "":
+		_request_game_sync()
+
+func _handle_table_sync(data: Dictionary) -> void:
+	if slots_ready:
+		TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, data.get("slots", []), _table_spacing, START_POS)
+	else:
+		pending_events.append({"type": "table_sync", "data": data})
+
+func _handle_slot_state(data: Dictionary) -> void:
+	if slots_ready:
+		_on_slot_state(data)
+	else:
+		pending_events.append({"type": "slot_state", "data": data})
+
+func _handle_state_snapshot(data: Dictionary) -> void:
+	if slots_ready:
+		_apply_state_snapshot(data)
+	else:
+		pending_events.append({"type": "state_snapshot", "data": data})
+
+func _handle_game_end(data: Dictionary) -> void:
+	Global.result = data.duplicate()
+	var merged := data.duplicate(true)
+	merged["game_id"] = String(merged.get("game_id", String(Global.current_game_id)))
+	_on_game_end(merged)
+
+func _handle_opponent_disconnected(data: Dictionary) -> void:
+	var who := String(data.get("username", ""))
+	_opponent_disconnected = true
+	PopupUi.show_code(PopupUi.MODE_PASSIVE, Protocol.POPUP_OPPONENT_DISCONNECTED, {"name": who})
+	_schedule_disconnect_choice(who)
+
+func _handle_opponent_rejoined(data: Dictionary) -> void:
+	var who := String(data.get("username", ""))
+	_opponent_disconnected = false
+	_disconnect_prompt_seq += 1
+	PopupUi.hide_and_reset()
+	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_OPPONENT_REJOINED, {"name": who})
 
 # ============= RESPONSES =============
 
 func _on_response(_rid: String, type: String, ok: bool, _data: Dictionary, error: Dictionary) -> void:
-	GameResponseHandler.handle_response(_rid, type, ok, _data, error, self)
+	if type == "login":
+		if ok and String(Global.current_game_id) != "":
+			_request_game_sync()
+		return
+	if type == REQ_INVITE:
+		if ok:
+			PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_INVITE_SENT)
+		else:
+			PopupUi.show_normalized(PopupUi.MODE_INFO, Protocol.normalize_popup_error(error, Protocol.POPUP_INVITE_FAILED))
+		return
+
+	if type != "move_request":
+		return
+
+	var card_id = _data.get("card_id", "")
+	if card_id != "":
+		var card = cards.get(card_id)
+		if card and card.has_method("_reset_move_pending"):
+			card._reset_move_pending()
+
+	if ok:
+		_show_game_feedback({
+			"message_code": GameMessage.RULE_OK,
+		})
+	else:
+		var ui := _normalize_move_error(error, GameMessage.RULE_MOVE_DENIED)
+		var details_val = error.get("details", {})
+		var details: Dictionary = details_val if details_val is Dictionary else {}
+		_show_game_feedback(ui)
+
+		if details.has("card_id") and details.has("from_slot_id"):
+			_on_invalid_move({
+				"card_id": String(details.get("card_id", "")),
+				"from_slot_id": String(details.get("from_slot_id", ""))
+			})
 
 func _on_connection_lost() -> void:
-	GameConnectionHandler.on_connection_lost(self)
+	_network_disconnected = true
+	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_DISCONNECTED)
 
 func _on_connection_restored() -> void:
-	GameConnectionHandler.on_connection_restored(self)
+	if not _network_disconnected:
+		return
+	_network_disconnected = false
+	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_RECONNECTED)
 
 func _on_reconnect_failed() -> void:
-	GameConnectionHandler.on_reconnect_failed(self)
+	if not _network_disconnected:
+		return
+	PopupUi.show_code(
+		PopupUi.MODE_INFO,
+		Protocol.POPUP_PLAYER_RECONNECT_FAIL,
+		{},
+		{"ok_action_id": ACTION_NETWORK_RETRY},
+		{"ok_label_key": "UI_LABEL_RETRY"}
+	)
 
-func _on_server_closed(server_reason: String, close_code: int, raw_reason: String) -> void:
-	GameConnectionHandler.on_server_closed(server_reason, close_code, raw_reason, self)
+func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
+	_network_disconnected = false
+	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_TECH_INTERNAL_ERROR)
 
+func _normalize_move_error(error: Dictionary, fallback_message_code: String) -> Dictionary:
+	var message_code := String(error.get("message_code", "")).strip_edges()
+	var text := String(error.get("text", "")).strip_edges()
+	var message_params := _merge_error_message_params(error)
+
+	var normalized := GameMessage.normalize_rule_message({
+		"message_code": message_code,
+		"text": text,
+		"message_params": message_params,
+	})
+	if not normalized.is_empty():
+		return normalized
+
+	return GameMessage.normalize_rule_message({
+		"message_code": fallback_message_code,
+		"message_params": message_params,
+	})
+
+func _merge_error_message_params(error: Dictionary) -> Dictionary:
+	var details_val = error.get("details", {})
+	var details: Dictionary = details_val if details_val is Dictionary else {}
+	var top_params_val = error.get("message_params", {})
+	var top_params: Dictionary = top_params_val if top_params_val is Dictionary else {}
+	var details_params_val = details.get("message_params", {})
+	var details_params: Dictionary = details_params_val if details_params_val is Dictionary else {}
+
+	var out: Dictionary = {}
+	for key in details_params.keys():
+		out[key] = details_params[key]
+	for key in top_params.keys():
+		out[key] = top_params[key]
+	return out
 
 func _request_game_sync() -> void:
 	var game_id := String(Global.current_game_id)
@@ -381,6 +564,42 @@ func _apply_slot_cards_update(slot_id: String, slot, arr: Array, count_for_slot:
 	if slot != null and slot.has_method("finalize_server_sync"):
 		slot.call("finalize_server_sync")
 
+# ============= SNAPSHOT =============
+
+func _apply_state_snapshot(data: Dictionary) -> void:
+	for s in slots_by_id.values():
+		if s and s.has_method("clear_slot"):
+			s.clear_slot()
+	DeckCountUtil.reset_counts(_deck_count_state)
+
+	TableSyncHelper.sync_table_slots(table_root, slot_scene, slots_by_id, allowed_table_slots, data.get("table", []), _table_spacing, START_POS)
+
+	var slots_dict: Dictionary = data.get("slots", {})
+	var slot_counts_val = data.get("slot_counts", null)
+	var slot_counts: Dictionary = slot_counts_val if slot_counts_val is Dictionary else {}
+	for k in slots_dict.keys():
+		var slot_id := SlotIdHelper.normalize_slot_id(String(k))
+		var slot = _resolve_slot_for_update(slot_id, false)
+
+		var arr: Array = slots_dict.get(k, [])
+		var count_for_slot := arr.size()
+		if slot_counts.has(k):
+			count_for_slot = maxi(0, int(slot_counts.get(k, count_for_slot)))
+		_apply_slot_cards_update(slot_id, slot, arr, count_for_slot, false, false)
+
+	var turn_val = data.get("turn", null)
+	if turn_val is Dictionary:
+		_set_turn_timer(turn_val as Dictionary)
+	else:
+		_set_turn_timer({})
+
+	var result_val = data.get("result", null)
+	if result_val is Dictionary and (result_val as Dictionary).size() > 0:
+		var e := result_val as Dictionary
+		var merged := {"game_id": String(Global.current_game_id)}
+		for kk in e.keys():
+			merged[kk] = e[kk]
+		_on_game_end(merged)
 
 # ============= GAME END =============
 
@@ -478,6 +697,22 @@ func _ack_end_invite_rematch_in_game() -> void:
 		invite_payload["source_game_id"] = source_game_id
 	NetworkManager.request(REQ_INVITE, invite_payload)
 
+# ============= SLOT STATE =============
+
+func _on_slot_state(data: Dictionary) -> void:
+	var slot_id := SlotIdHelper.normalize_slot_id(String(data.get("slot_id", "")))
+	if slot_id == "":
+		return
+
+	var slot = _resolve_slot_for_update(slot_id, true)
+	if slot == null and SlotIdHelper.is_table_slot_id(slot_id) and not allowed_table_slots.has(slot_id):
+		return
+
+	var arr: Array = data.get("cards", [])
+	var count_for_slot := arr.size()
+	if data.has("count"):
+		count_for_slot = maxi(0, int(data.get("count", count_for_slot)))
+	_apply_slot_cards_update(slot_id, slot, arr, count_for_slot, true, true)
 
 # ============= INVALID MOVE =============
 
@@ -578,8 +813,29 @@ func _on_quitter_pressed() -> void:
 		{"yes_label_key": "UI_LABEL_CANCEL", "no_label_key": "UI_LABEL_QUIT"}
 	)
 
+func _show_pause_choice(who: String) -> void:
+	PopupUi.show_code(
+		PopupUi.MODE_CONFIRM,
+		Protocol.POPUP_OPPONENT_DISCONNECTED_CHOICE,
+		{"name": who},
+		{
+			"yes_action_id": ACTION_PAUSE_WAIT,
+			"no_action_id": ACTION_PAUSE_LEAVE,
+		},
+		{"yes_label_key": "UI_LABEL_WAIT", "no_label_key": "UI_LABEL_BACK_LOBBY"}
+	)
+
 func _schedule_disconnect_choice(who: String) -> void:
-	GameConnectionHandler.schedule_disconnect_choice(who, self)
+	_disconnect_prompt_seq += 1
+	var seq := _disconnect_prompt_seq
+	var timer := get_tree().create_timer(5.0)
+	timer.timeout.connect(func() -> void:
+		if seq != _disconnect_prompt_seq:
+			return
+		if not _opponent_disconnected:
+			return
+		_show_pause_choice(who)
+	)
 
 func _on_popup_action(action_id: String, payload: Dictionary) -> void:
 	if action_id == ACTION_NETWORK_RETRY:
