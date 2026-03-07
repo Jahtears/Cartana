@@ -25,11 +25,11 @@ func handle_event(type: String, data: Dictionary) -> void:
 		"state_snapshot":
 			_handle_state_snapshot(data)
 		"show_game_message":
-				game._show_game_feedback(data)
+				game.ui_manager.show_game_feedback(data)
 		"game_end":
 			_handle_game_end(data)
 		"turn_update":
-				game._set_turn_timer(data)
+				game.ui_manager.set_turn_timer(data, Callable(NetworkManager, "sync_server_clock"), bool(Global.is_spectator), String(Global.username))
 		"opponent_disconnected":
 			_handle_opponent_disconnected(data)
 		"opponent_rejoined":
@@ -68,12 +68,12 @@ func on_response(rid: String, type: String, ok: bool, _data: Dictionary, error: 
 			card._reset_move_pending()
 
 	if ok:
-		game._show_game_feedback({"message_code": GameMessage.RULE_OK})
+		game.ui_manager.show_game_feedback({"message_code": GameMessage.RULE_OK})
 	else:
 		var ui := _normalize_move_error(error, GameMessage.RULE_MOVE_DENIED)
 		var details_val = error.get("details", {})
 		var details: Dictionary = details_val if details_val is Dictionary else {}
-		game._show_game_feedback(ui)
+		game.ui_manager.show_game_feedback(ui)
 
 		if details.has("card_id") and details.has("from_slot_id"):
 			_on_invalid_move({

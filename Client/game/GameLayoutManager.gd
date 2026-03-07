@@ -1,18 +1,30 @@
 extends RefCounted
 class_name GameLayoutManager
 
+# Main nodes
 var root: Node = null
 var player1_root: Node2D = null
 var player2_root: Node2D = null
 var table_root: Node2D = null
 var pioche_root: Node2D = null
 var quitter_button: Button = null
+
+# UI anchor nodes for player-linked UI
+var p1_banc_anchor: Node2D = null
+var p1_main_anchor: Node2D = null
+
+# Layout state
 var positions_cache: Dictionary = {}
 var _slot_spacing: float = 0.0
 var _table_spacing: int = 0
 var config = null
 
-func setup(root_control: Node, nodes: Dictionary, layout_config = null) -> void:
+# UI state references
+var _timebar_state: Dictionary = {}
+var _game_message_state: Dictionary = {}
+var _deck_count_state: Dictionary = {}
+
+func setup(root_control: Node, nodes: Dictionary, ui_states: Dictionary = {}, layout_config = null) -> void:
 	root = root_control
 	config = layout_config if layout_config != null else GameLayoutConfig
 	player1_root = nodes.get("player1_root", null)
@@ -20,6 +32,16 @@ func setup(root_control: Node, nodes: Dictionary, layout_config = null) -> void:
 	table_root = nodes.get("table_root", null)
 	pioche_root = nodes.get("pioche_root", null)
 	quitter_button = nodes.get("quitter_button", null)
+	
+	# NEW: UI anchor nodes
+	p1_banc_anchor = nodes.get("p1_banc_anchor", null)
+	p1_main_anchor = nodes.get("p1_main_anchor", null)
+	
+	# NEW: Store UI state references
+	_timebar_state = ui_states.get("timebar", {})
+	_game_message_state = ui_states.get("game_message", {})
+	_deck_count_state = ui_states.get("deck_count", {})
+	
 	_table_spacing = config.TABLE_SPACING
 
 func compute_layout() -> Dictionary:
@@ -51,6 +73,7 @@ func apply_layout(ctx: Dictionary) -> void:
 	positions_cache = ctx
 	_slot_spacing = float(ctx.get("slot_spacing", config.DEFAULT_SLOT_SPACING))
 	_apply_positions(positions_cache)
+	_apply_player_linked_ui_layout()  # NEW
 
 func _apply_positions(positions: Dictionary) -> void:
 	if table_root != null:
@@ -63,10 +86,39 @@ func _apply_positions(positions: Dictionary) -> void:
 		var right_x2 = positions.get("right_x", 0)
 		pioche_root.position = Vector2(right_x2, vh2 * config.TABLE_Y_RATIO)
 	if quitter_button != null:
-		quitter_button.text = LanguageManager.ui_text("UI_GAME_QUIT_BUTTON", "Quit")
+		_apply_language_to_button()
 		quitter_button.size = Vector2(config.QUITTER_WIDTH, config.QUITTER_HEIGHT)
 		var right_x3 = positions.get("right_x", 0)
 		quitter_button.position = Vector2(right_x3 - config.QUITTER_OFFSET_X, config.QUITTER_OFFSET_Y)
+
+# === NEW: Language updates ===
+func _apply_language_to_button() -> void:
+	if quitter_button != null:
+		quitter_button.text = LanguageManager.ui_text("UI_GAME_QUIT_BUTTON", "Quit")
+
+func apply_language() -> void:
+	"""Apply language updates to UI"""
+	_apply_language_to_button()
+
+func apply_ui_layout() -> void:
+	"""Apply layout for all player-linked UI elements (public interface)"""
+	_apply_player_linked_ui_layout()
+
+# === NEW: Player-linked UI positioning ===
+func _apply_timebar_layout() -> void:
+	if p1_banc_anchor != null and _timebar_state.size() > 0:
+		TimebarUtil.apply_layout(_timebar_state, p1_banc_anchor.global_position)
+
+func _apply_game_message_layout() -> void:
+	if p1_main_anchor != null and _game_message_state.size() > 0:
+		GameMessage.apply_layout(_game_message_state, p1_main_anchor.global_position)
+
+func _apply_player_linked_ui_layout() -> void:
+	"""Apply layout for all player-linked UI elements"""
+	_apply_timebar_layout()
+	_apply_game_message_layout()
+	if _deck_count_state.size() > 0:
+		DeckCountUtil.update_positions(_deck_count_state, root, player1_root, player2_root)
 
 func reflow_layout(create_slots: bool, _apply_linked_ui: bool, refresh_slot_rows: bool, apply_players_cb = null) -> void:
 	var ctx := compute_layout()
