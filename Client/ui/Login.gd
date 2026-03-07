@@ -68,7 +68,7 @@ func _show_login_error(error: Dictionary) -> void:
 	PopupUi.show_normalized(PopupUi.MODE_INFO, popup)
 
 func _normalize_login_error(error: Dictionary) -> Dictionary:
-	var normalized := Protocol.normalize_popup_error(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
+	var normalized := PopupMessage.normalize_popup_error(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
 	var message_code := String(normalized.get("message_code", "")).strip_edges()
 	if message_code != Protocol.POPUP_AUTH_MAX_TRY:
 		return normalized

@@ -45,7 +45,7 @@ func show_game_feedback(ui_message: Dictionary) -> void:
 		display_rule_message(rule_msg)
 		return
 
-	var popup_msg := Protocol.normalize_popup_message(ui_message)
+	var popup_msg := PopupMessage.normalize_popup_message(ui_message)
 	PopupUi.show_normalized(PopupUi.MODE_INFO, popup_msg)
 
 func display_rule_message(ui_message: Dictionary) -> void:

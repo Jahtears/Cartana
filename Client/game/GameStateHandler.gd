@@ -55,7 +55,7 @@ func on_response(rid: String, type: String, ok: bool, _data: Dictionary, error: 
 		if ok:
 			PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_INVITE_SENT)
 		else:
-			PopupUi.show_normalized(PopupUi.MODE_INFO, Protocol.normalize_popup_error(error, Protocol.POPUP_INVITE_FAILED))
+			PopupUi.show_normalized(PopupUi.MODE_INFO, PopupMessage.normalize_popup_error(error, Protocol.POPUP_INVITE_FAILED))
 		return
 
 	if type != "move_request":
@@ -87,7 +87,7 @@ func _handle_invite_request(data: Dictionary) -> void:
 	var from_user := String(data.get("from", ""))
 	if from_user != "":
 		var popup_payload := {
-			"flow": Protocol.popup_flow("INVITE_REQUEST", game.FLOW_INVITE_REQUEST),
+			"flow": PopupMessage.popup_flow("INVITE_REQUEST", game.FLOW_INVITE_REQUEST),
 			"from": from_user
 		}
 		var context := String(data.get("context", "")).strip_edges()
@@ -105,12 +105,12 @@ func _handle_invite_request(data: Dictionary) -> void:
 		)
 
 func _handle_invite_response(data: Dictionary) -> void:
-	var ui := Protocol.normalize_invite_response_ui(data)
+	var ui := PopupMessage.normalize_invite_response_ui(data)
 	if String(ui.get("text", "")) != "":
 		PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
 
 func _handle_invite_cancelled(data: Dictionary) -> void:
-	var ui := Protocol.invite_cancelled_ui(data)
+	var ui := PopupMessage.invite_cancelled_ui(data)
 	if String(ui.get("text", "")).strip_edges() == "":
 		return
 	PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
@@ -119,16 +119,12 @@ func _handle_rematch_declined(data: Dictionary) -> void:
 	var context := String(data.get("context", "")).strip_edges().to_lower()
 	if context != game.REMATCH_CONTEXT:
 		return
-	var ui := Protocol.normalize_invite_response_ui(data)
+	var ui := PopupMessage.normalize_invite_response_ui(data)
 	PopupUi.show_normalized(
 		PopupUi.MODE_INFO,
 		ui,
-		{
-			"ok_action_id": game.ACTION_REMATCH_DECLINED_LEAVE,
-			"context": context,
-			"source_game_id": String(data.get("source_game_id", "")).strip_edges(),
-		},
-		{"ok_label_key": "UI_LABEL_BACK_LOBBY"}
+		{"context": context, "source_game_id": String(data.get("source_game_id", "")).strip_edges()},
+		{"ok_action_id": game.ACTION_REMATCH_DECLINED_LEAVE, "ok_label_key": "UI_LABEL_BACK_LOBBY"}
 	)
 
 func _handle_start_game(data: Dictionary) -> void:
@@ -205,8 +201,8 @@ func _on_reconnect_failed() -> void:
 		PopupUi.MODE_INFO,
 		Protocol.POPUP_PLAYER_RECONNECT_FAIL,
 		{},
-		{"ok_action_id": game.ACTION_NETWORK_RETRY},
-		{"ok_label_key": "UI_LABEL_RETRY"}
+		{},
+		{"ok_action_id": game.ACTION_NETWORK_RETRY, "ok_label_key": "UI_LABEL_RETRY"}
 	)
 
 func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
@@ -323,7 +319,7 @@ func _on_game_end(data: Dictionary) -> void:
 	if game._game_end_prompted:
 		return
 	game._game_end_prompted = true
-	var popup_msg := Protocol.game_end_popup_message(data, String(Global.username), bool(Global.is_spectator))
+	var popup_msg := PopupMessage.game_end_popup_message(data, String(Global.username), bool(Global.is_spectator))
 	var rematch_allowed := bool(data.get("rematch_allowed", true))
 	if game._opponent_disconnected:
 		rematch_allowed = false
@@ -332,11 +328,8 @@ func _on_game_end(data: Dictionary) -> void:
 			PopupUi.MODE_INFO,
 			String(popup_msg.get("message_code", "")),
 			popup_msg.get("message_params", {}) as Dictionary,
-			{
-				"ok_action_id": game.ACTION_GAME_END_LEAVE,
-				"game_id": String(Global.current_game_id),
-			},
-			{"ok_label_key": "UI_LABEL_BACK_LOBBY"}
+			{"game_id": String(Global.current_game_id)},
+			{"ok_action_id": game.ACTION_GAME_END_LEAVE, "ok_label_key": "UI_LABEL_BACK_LOBBY"}
 		)
 		return
 
@@ -344,12 +337,8 @@ func _on_game_end(data: Dictionary) -> void:
 		PopupUi.MODE_CONFIRM,
 		String(popup_msg.get("message_code", "")),
 		popup_msg.get("message_params", {}) as Dictionary,
-		{
-			"yes_action_id": game.ACTION_GAME_END_LEAVE,
-			"no_action_id": game.ACTION_GAME_END_REMATCH,
-			"game_id": String(Global.current_game_id),
-		},
-		{"yes_label_key": "UI_LABEL_BACK_LOBBY", "no_label_key": "UI_LABEL_REMATCH"}
+		{"game_id": String(Global.current_game_id)},
+		{"yes_action_id": game.ACTION_GAME_END_LEAVE, "no_action_id": game.ACTION_GAME_END_REMATCH, "yes_label_key": "UI_LABEL_BACK_LOBBY", "no_label_key": "UI_LABEL_REMATCH"}
 	)
 
 func _ack_end_and_go_lobby() -> void:
@@ -394,7 +383,7 @@ func _ack_end_invite_rematch_in_game() -> void:
 		if not bool(ack_res.get("ok", false)):
 			var err_val = ack_res.get("error", {})
 			var err: Dictionary = err_val if err_val is Dictionary else {}
-			PopupUi.show_normalized(PopupUi.MODE_INFO, Protocol.normalize_popup_error(err, Protocol.POPUP_UI_ACTION_IMPOSSIBLE))
+			PopupUi.show_normalized(PopupUi.MODE_INFO, PopupMessage.normalize_popup_error(err, Protocol.POPUP_UI_ACTION_IMPOSSIBLE))
 			return
 
 	if opponent_name == "":
