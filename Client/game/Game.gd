@@ -273,11 +273,8 @@ func _on_quitter_pressed() -> void:
 		PopupUi.MODE_CONFIRM,
 		Protocol.POPUP_QUIT_CONFIRM,
 		{},
-		{
-			"yes_action_id": ACTION_QUIT_CANCEL,
-			"no_action_id": ACTION_QUIT_CONFIRM,
-		},
-		{"yes_label_key": "UI_LABEL_CANCEL", "no_label_key": "UI_LABEL_QUIT"}
+		{},
+		{"yes_action_id": ACTION_QUIT_CANCEL, "no_action_id": ACTION_QUIT_CONFIRM, "yes_label_key": "UI_LABEL_CANCEL", "no_label_key": "UI_LABEL_QUIT"}
 	)
 
 func _show_pause_choice(who: String) -> void:
@@ -285,11 +282,8 @@ func _show_pause_choice(who: String) -> void:
 		PopupUi.MODE_CONFIRM,
 		Protocol.POPUP_OPPONENT_DISCONNECTED_CHOICE,
 		{"name": who},
-		{
-			"yes_action_id": ACTION_PAUSE_WAIT,
-			"no_action_id": ACTION_PAUSE_LEAVE,
-		},
-		{"yes_label_key": "UI_LABEL_WAIT", "no_label_key": "UI_LABEL_BACK_LOBBY"}
+		{},
+		{"yes_action_id": ACTION_PAUSE_WAIT, "no_action_id": ACTION_PAUSE_LEAVE, "yes_label_key": "UI_LABEL_WAIT", "no_label_key": "UI_LABEL_BACK_LOBBY"}
 	)
 
 func _schedule_disconnect_choice(who: String) -> void:

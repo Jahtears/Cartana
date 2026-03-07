@@ -42,31 +42,20 @@ func _ready() -> void:
 	_apply_language_to_popup()
 	hide_and_reset()
 
-func show_code(p_mode: int, message_code: String, params: Dictionary = {}, payload: Dictionary = {}, options: Dictionary = {}) -> void:
+func show_code(p_mode: int, message_code: String, params: Dictionary = {}, context: Dictionary = {}, options: Dictionary = {}) -> void:
 	var safe_mode := p_mode
 	if safe_mode != MODE_PASSIVE and safe_mode != MODE_INFO and safe_mode != MODE_CONFIRM:
 		safe_mode = MODE_INFO
 
 	var normalized := _normalize_popup_payload(message_code, params, options)
-	var actions := {}
-	if safe_mode == MODE_INFO:
-		actions["ok"] = String(payload.get("ok_action_id", _popup_action_id("INFO_OK", ACTION_INFO_OK)))
-	elif safe_mode == MODE_CONFIRM:
-		actions["yes"] = String(payload.get("yes_action_id", _popup_action_id("CONFIRM_YES", ACTION_CONFIRM_YES)))
-		actions["no"] = String(payload.get("no_action_id", _popup_action_id("CONFIRM_NO", ACTION_CONFIRM_NO)))
-	_show_mode(safe_mode, normalized, payload, options, actions)
+	var actions := _resolve_actions(safe_mode, options)
+	_show_mode(safe_mode, normalized, context, options, actions)
 
-func show_normalized(p_mode: int, normalized: Dictionary, payload: Dictionary = {}, options: Dictionary = {}) -> void:
-	var message_code := String(normalized.get("message_code", "")).strip_edges()
-	if message_code == "":
+func show_normalized(p_mode: int, normalized: Dictionary, context: Dictionary = {}, options: Dictionary = {}) -> void:
+	if normalized.get("message_code", "") == "":
 		return
-	var params_val = normalized.get("message_params", {})
-	var params: Dictionary = params_val if params_val is Dictionary else {}
-	var merged_options: Dictionary = options.duplicate(true)
-	var text_override := String(normalized.get("text_override", "")).strip_edges()
-	if text_override != "":
-		merged_options[OPTION_TEXT_OVERRIDE] = text_override
-	show_code(p_mode, message_code, params, payload, merged_options)
+	var actions := _resolve_actions(p_mode, options)
+	_show_mode(p_mode, normalized, context, options, actions)
 
 func hide_and_reset() -> void:
 	hide()
@@ -77,12 +66,15 @@ func hide_and_reset() -> void:
 	_action_refuse = ACTION_CONFIRM_NO
 	_action_ok = ACTION_INFO_OK
 
-func _show_mode(p_mode: int, normalized: Dictionary, payload: Dictionary, options: Dictionary, actions: Dictionary) -> void:
+func _show_mode(p_mode: int, normalized: Dictionary, context: Dictionary, options: Dictionary, actions: Dictionary) -> void:
 	_mode = p_mode
-	_payload = payload.duplicate(true)
-	_options = options.duplicate(true)
+	_payload = {}
 	_payload["message_code"] = String(normalized.get("message_code", ""))
 	_payload["message_params"] = normalized.get("message_params", {})
+	# Store context data for signal handlers
+	for key in context:
+		_payload[key] = context[key]
+	_options = options.duplicate(true)
 
 	if p_mode == MODE_PASSIVE:
 		_btn_accept.visible = false
@@ -111,7 +103,7 @@ func _normalize_popup_payload(message_code: String, params: Dictionary, options:
 	var text_override := String(options.get(OPTION_TEXT_OVERRIDE, "")).strip_edges()
 	if text_override != "":
 		payload["text"] = text_override
-	return Protocol.normalize_popup_message(payload)
+	return PopupMessage.normalize_popup_message(payload)
 
 func _resolve_message_text(normalized: Dictionary, options: Dictionary) -> String:
 	var text_override := String(options.get(OPTION_TEXT_OVERRIDE, "")).strip_edges()
@@ -121,7 +113,7 @@ func _resolve_message_text(normalized: Dictionary, options: Dictionary) -> Strin
 
 func _resolve_label(options: Dictionary, option_key: String, default_label_key: String) -> String:
 	var label_key := String(options.get(option_key, default_label_key)).strip_edges()
-	return Protocol.popup_label(label_key)
+	return PopupMessage.popup_label(label_key)
 
 func _apply_language_to_popup() -> void:
 	title = LanguageManager.ui_text("UI_POPUP_WINDOW_TITLE", "Information")
@@ -143,8 +135,12 @@ func _apply_language_to_popup() -> void:
 func _on_language_changed(_language_code: String) -> void:
 	_apply_language_to_popup()
 
-func _popup_action_id(key: String, fallback: String) -> String:
-	return Protocol.popup_action(key, fallback)
+func _resolve_actions(p_mode: int, options: Dictionary) -> Dictionary:
+	return {
+		"ok": options.get("ok_action_id", ACTION_INFO_OK),
+		"yes": options.get("yes_action_id", ACTION_CONFIRM_YES),
+		"no": options.get("no_action_id", ACTION_CONFIRM_NO),
+	}
 
 func _on_button_accept_pressed() -> void:
 	if _mode == MODE_CONFIRM:

@@ -160,7 +160,7 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			var from_user := String(data.get("from", ""))
 			if from_user != "":
 				var popup_payload := {
-					"flow": Protocol.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST),
+					"flow": PopupMessage.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST),
 					"from": from_user
 				}
 				var context := String(data.get("context", "")).strip_edges()
@@ -178,7 +178,7 @@ func _on_evt(type: String, data: Dictionary) -> void:
 				)
 
 		REQ_INVITE_RESPONSE:
-			var ui := Protocol.normalize_invite_response_ui(data)
+			var ui := PopupMessage.normalize_invite_response_ui(data)
 			if String(ui.get("text", "")) != "":
 				PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
 
@@ -186,7 +186,7 @@ func _on_evt(type: String, data: Dictionary) -> void:
 			_handle_invite_cancelled(data)
 
 func _show_error_popup(error: Dictionary, fallback_message: String) -> void:
-	var popup := Protocol.normalize_popup_error(error, fallback_message)
+	var popup := PopupMessage.normalize_popup_error(error, fallback_message)
 	PopupUi.show_normalized(PopupUi.MODE_INFO, popup)
 
 func _on_connection_lost() -> void:
@@ -206,8 +206,8 @@ func _on_reconnect_failed() -> void:
 		PopupUi.MODE_INFO,
 		Protocol.POPUP_PLAYER_RECONNECT_FAIL,
 		{},
-		{"ok_action_id": ACTION_NETWORK_RETRY},
-		{"ok_label_key": "UI_LABEL_RETRY"}
+		{},
+		{"ok_action_id": ACTION_NETWORK_RETRY, "ok_label_key": "UI_LABEL_RETRY"}
 	)
 
 func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
@@ -215,7 +215,7 @@ func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: St
 	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_TECH_INTERNAL_ERROR)
 
 func _handle_invite_cancelled(data: Dictionary) -> void:
-	var ui := Protocol.invite_cancelled_ui(data)
+	var ui := PopupMessage.invite_cancelled_ui(data)
 	if String(ui.get("text", "")).strip_edges() == "":
 		return
 	PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
@@ -665,10 +665,10 @@ func _on_popup_action(action_id: String, payload: Dictionary) -> void:
 	var flow := String(payload.get("flow", ""))
 	match flow:
 		FLOW_SPECTATE_GAME:
-			if action_id == Protocol.popup_action("CONFIRM_YES", Protocol.POPUP_ACTION_CONFIRM_YES):
+			if action_id == PopupMessage.popup_action("CONFIRM_YES", Protocol.POPUP_ACTION_CONFIRM_YES):
 				_do_spectate_game(String(payload.get("game_id", "")))
 		FLOW_LOGOUT:
-			if action_id == Protocol.popup_action("CONFIRM_YES", Protocol.POPUP_ACTION_CONFIRM_YES):
+			if action_id == PopupMessage.popup_action("CONFIRM_YES", Protocol.POPUP_ACTION_CONFIRM_YES):
 				await _do_logout()
 
 func _do_logout() -> void:
