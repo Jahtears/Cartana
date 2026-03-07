@@ -441,7 +441,7 @@ func update_players_list(players: Array) -> void:
 		if ps == Global.username:
 			continue
 
-		# ✅ status API : filtrer via activity (pas via scan games)
+		#  status API : filtrer via activity (pas via scan games)
 		var st: Dictionary = _statuses.get(ps, {}) as Dictionary
 		var activity: Dictionary = st.get("activity", {}) as Dictionary
 		var typ := String(activity.get("type", "lobby"))
@@ -675,10 +675,10 @@ func _do_logout() -> void:
 	await NetworkManager.request_async(REQ_LOGOUT, {}, 3.0)
 	NetworkManager.close(1000, "logout")
 
-	# ✅ reset "session"
+	#  reset "session"
 	Global.username = ""
 
-	# ✅ reset "game state" (API canonique)
+	#  reset "game state" (API canonique)
 	Global.reset_game_state()
 
 	await _go_to_login_safe()

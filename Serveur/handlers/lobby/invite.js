@@ -265,14 +265,14 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
     return true;
   }
 
-  // ✅ créer game
+  //  créer game
   const game_id = generateGameID();
   const game = createGame(actor, to);
   games.set(game_id, game);
 
   ensureGameMeta(gameMeta, game_id, { initialSent: false });
 
-  // ✅ activité: si actor/to étaient spectateurs -> ils passent joueur (nettoyage auto)
+  //  activité: si actor/to étaient spectateurs -> ils passent joueur (nettoyage auto)
   setUserActivity(actor, Activity.IN_GAME, game_id);
   setUserActivity(to, Activity.IN_GAME, game_id);
 
