@@ -154,7 +154,7 @@ export function createRouter({
       const ctx = withTrace(baseCtx, req, actor);
       ctx.sendRes = sendResWithRidCache;
 
-      // ✅ Routes mapping (handlers externes)
+      //  Routes mapping (handlers externes)
       const routes = {
         ping: async () => {
           sendResWithRidCache(ws, req, true, { server_ms: Date.now() });

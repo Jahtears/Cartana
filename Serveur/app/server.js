@@ -115,7 +115,7 @@ const router = createRouter({
 // ============= WEBSOCKET EVENTS =============
 
 wss.on("connection", async (ws) => {
-  console.log("✅ Client connecté");
+  console.log(" Client connecté");
   metrics.recordConnection();
   
   // Init heartbeat + meta

@@ -48,7 +48,7 @@ var _drag_canceled_frame := -1
 
 # ============= PREVIEW & SLOT =============
 var _current_preview_slot: Node2D = null
-var _current_preview_card: Node2D = null  # ← NOUVEAU : carte en preview
+var _current_preview_card: Node2D = null
 var slot: Node2D = null
 var _slot_cache: Array = []
 var _slot_cache_valid := false
@@ -72,7 +72,7 @@ func _process(_delta: float) -> void:
 		var frame = get_tree().get_frame()
 		if frame - _last_preview_frame >= PREVIEW_CHECK_INTERVAL:
 			_preview_slot_under_card()
-			_preview_card_under_card()  # ← NOUVEAU : détect cartes aussi
+			_preview_card_under_card()
 			_last_preview_frame = frame
 	else:
 		# ===== HOVER STATE MANAGEMENT =====

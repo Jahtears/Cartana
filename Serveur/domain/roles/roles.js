@@ -39,7 +39,7 @@ export function createRoles(ctx) {
   function setUserActivity(username, activity, game_id = null) {
     const prevSpectate = userToSpectate.get(username) ?? null;
 
-    // ✅ si on quitte spectate OU si on change de game_id en restant spectateur
+    //  si on quitte spectate OU si on change de game_id en restant spectateur
     if (prevSpectate && (activity !== Activity.SPECTATING || prevSpectate !== game_id)) {
       _removeFromSpectatorsSet(username, prevSpectate);
       userToSpectate.delete(username);
@@ -50,7 +50,7 @@ export function createRoles(ctx) {
       else userToGame.delete(username);
       userToEndGame.delete(username);
 
-      // ✅ ex-spectateur -> clean
+      //  ex-spectateur -> clean
       userToSpectate.delete(username);
       return;
     }
@@ -125,7 +125,7 @@ export function createRoles(ctx) {
     setUserActivity(username, Activity.LOBBY, null);
   }
 
-  // ✅ utile sur disconnect: évite “invites fantômes”
+  //  utile sur disconnect: évite “invites fantômes”
   function clearInvitesForUser(username) {
     // si username était invité
     if (pendingInviteTo.has(username)) {

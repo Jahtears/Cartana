@@ -197,7 +197,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
   // abandonneur sort (l’adversaire / specs restent attachés jusqu’à ack)
   setUserActivity(actor, Activity.LOBBY, null);
 
-  // ✅ game_end idempotent/once (uniquement à la création du result)
+  //  game_end idempotent/once (uniquement à la création du result)
   const winner = game.players.find((p) => p !== actor) ?? null;
 
   endGame(
@@ -238,10 +238,10 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
   // déterminer l’appartenance AVANT detach
   const { wasPlayer, wasSpec } = getAckMembership(state, game_id, actor);
 
-  // ✅ detach idempotent (joueur + spectateur)
+  //  detach idempotent (joueur + spectateur)
   setUserActivity(actor, Activity.LOBBY, null);
 
-  // ✅ ACK idempotent : si game inexistante => OK
+  //  ACK idempotent : si game inexistante => OK
   if (handleAlreadyGoneAck(games, gameMeta, game_id)) {
     return sendAckResponse(refreshLobby, sendRes, ws, req, {
       ack: true,
@@ -263,7 +263,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
 
   const meta = ensureGameEndMeta(gameMeta, game_id, { initialSent: true });
 
-  // ✅ si un joueur ACK alors que la partie n'est pas finie => traiter comme abandon
+  //  si un joueur ACK alors que la partie n'est pas finie => traiter comme abandon
   maybeEndByAckAsAbandon(ctx, game_id, game, actor, wasPlayer, meta);
   if (ackIntent === ACK_INTENT_REMATCH && wasPlayer && meta.result) {
     meta.post_game_state = POST_GAME_STATES.REMATCH_PENDING;

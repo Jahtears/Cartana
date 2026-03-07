@@ -74,7 +74,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     ?? mapSlotForClient;
   const processTurnTimeout = turnUsecases.processTurnTimeout;
 
-  // ✅ GUARDS: game, player, spectator, ended
+  //  GUARDS: game, player, spectator, ended
   const pg = getPlayerGameOrRes(ctx, ws, req, actor);
   if (!pg) return true;
   const { game_id, game } = pg;
@@ -86,7 +86,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     return resError(sendRes, ws, req, POPUP_MESSAGE.GAME_PAUSED, { game_id });
   }
 
-  // ✅ TURN EXPIRY CHECK
+  //  TURN EXPIRY CHECK
   if (typeof processTurnTimeout === "function") {
     const didExpire = processTurnTimeout(game_id);
     if (didExpire && String(game?.turn?.current ?? "") !== actor) {
@@ -94,7 +94,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     }
   }
 
-  // ✅ EXTRACT & MAP SLOTS
+  //  EXTRACT & MAP SLOTS
   const card_id = String(data.card_id ?? "").trim();
   const raw_from = String(data.from_slot_id ?? "").trim();
   const raw_to = String(data.to_slot_id ?? "").trim();
@@ -137,7 +137,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const client_from = mapForClient(from_slot_id, actor, game);
   const client_to = mapForClient(to_slot_id, actor, game);
 
-  // ✅ ORCHESTRATE: validate → apply → refill → track → check win
+  //  ORCHESTRATE: validate → apply → refill → track → check win
   const orchResult = orchestrateMove({
     game_id,
     game,
@@ -148,7 +148,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     ctx,
   });
 
-  // ✅ HANDLE RESULT
+  //  HANDLE RESULT
   if (!orchResult.valid) {
     const errorPayload = buildMoveClientErrorPayload({
       moveError: orchResult,
@@ -169,7 +169,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     return true;
   }
 
-  // ✅ GAME END: emit end then broadcast
+  //  GAME END: emit end then broadcast
   if (orchResult.winner || orchResult.game_end_reason) {
     emitGameEndThenSnapshot(ctx, game_id, {
       winner: orchResult.winner,
@@ -179,7 +179,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
     });
   }
 
-  // ✅ RESPOND
+  //  RESPOND
   sendRes(ws, req, true, orchResult.response);
   return true;
 }

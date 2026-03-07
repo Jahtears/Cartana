@@ -19,7 +19,7 @@ const PENDING_ACTIVITY_TIMEOUT_MS = 15000
 const PENDING_ACTIVITY_PROBE_TIMEOUT_MS = 4000
 const PENDING_ACTIVITY_TIMEOUT_REASON = "Connection lost (no server response)"
 
-# ✅ NOUVEAU: Reconnexion automatique
+# Reconnexion automatique
 const RECONNECT_INITIAL_DELAY_SEC = 1.0
 const RECONNECT_MAX_DELAY_SEC = 30.0
 const RECONNECT_BACKOFF_MULTIPLIER = 1.5
@@ -50,7 +50,7 @@ enum RequestPriority { LOW = 0, NORMAL = 5, HIGH = 8, CRITICAL = 10 }
 enum ConnectionState { IDLE, CONNECTING, CONNECTED, RECOVERING }
 enum DisconnectClass { VOLUNTARY, SERVER_CLOSED_EXPLICIT, CLIENT_LOST }
 
-# ✅ NOUVEAU: Reconnexion state
+# Reconnexion state
 var _reconnect_timer: Timer = null
 var _reconnect_delay_sec: float = RECONNECT_INITIAL_DELAY_SEC
 var _reconnect_attempts: int = 0
@@ -172,19 +172,19 @@ func _try_auto_login() -> void:
 	_login_in_flight = true
 	request("login", _auth_credentials.duplicate(true), RequestPriority.CRITICAL)
 
-# ✅ NOUVEAU: Reset reconnect state
+# Reset reconnect state
 func _reset_reconnect_state() -> void:
 	_reconnect_delay_sec = RECONNECT_INITIAL_DELAY_SEC
 	_reconnect_attempts = 0
 	_cancel_reconnect_timer()
 
-# ✅ NOUVEAU: Annuler timer de reconnexion
+# Annuler timer de reconnexion
 func _cancel_reconnect_timer() -> void:
 	if _reconnect_timer:
 		_reconnect_timer.queue_free()
 		_reconnect_timer = null
 
-# ✅ NOUVEAU: Planifier reconnexion avec backoff exponentiel
+# Planifier reconnexion avec backoff exponentiel
 func _schedule_reconnect() -> void:
 	if not _allow_reconnect:
 		return
@@ -318,7 +318,7 @@ func _process(_delta: float) -> void:
 			_connect_in_flight = false
 			_clear_activity_probe()
 			_last_rx_ms = Time.get_ticks_msec()
-			_reset_reconnect_state()  # ✅ Reset backoff on success
+			_reset_reconnect_state()  #  Reset backoff on success
 			_connection_state = ConnectionState.CONNECTED
 			if has_login_credentials() and not _is_authenticated:
 				_try_auto_login()
