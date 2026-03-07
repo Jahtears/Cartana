@@ -44,7 +44,6 @@ var _leave_sent := false
 var _disconnect_prompt_seq := 0
 var _opponent_disconnected := false
 var _network_disconnected := false
-var _message_tween: Tween = null
 var _deck_count_state: Dictionary = DeckCountUtil.create_state()
 # ============= LAYOUT STATE =============
 var _slot_spacing: float = GameLayoutConfig.DEFAULT_SLOT_SPACING
@@ -53,6 +52,7 @@ var _positions_cache: Dictionary = {}
 var layout_manager = null
 var board_factory = null
 var game_state_handler = null
+var ui_manager = null
 
 # ============= LAYOUT CONSTANTS =============
 var START_POS: Vector2 = GameLayoutConfig.START_POS
@@ -78,7 +78,7 @@ var _game_message_state: Dictionary = GameMessage.create_ui_state()
 func _ready() -> void:
 	_connect_layout_signals()
 
-	# Setup layout manager
+	# Setup layout manager with UI nodes and states
 	layout_manager = preload("res://Client/game/GameLayoutManager.gd").new()
 	layout_manager.setup(self, {
 		"player1_root": player1_root,
@@ -86,6 +86,12 @@ func _ready() -> void:
 		"table_root": table_root,
 		"pioche_root": pioche_root,
 		"quitter_button": quitter_button,
+		"p1_banc_anchor": p1_banc_anchor,
+		"p1_main_anchor": p1_main_anchor,
+	}, {
+		"timebar": _timebar_state,
+		"game_message": _game_message_state,
+		"deck_count": _deck_count_state,
 	}, GameLayoutConfig)
 
 	# Setup board factory
@@ -95,6 +101,14 @@ func _ready() -> void:
 	# Setup game state handler (event/response handling)
 	game_state_handler = preload("res://Client/game/GameStateHandler.gd").new()
 	game_state_handler.setup(self)
+
+	# Setup UI manager
+	ui_manager = preload("res://Client/game/GameUIManager.gd").new()
+	ui_manager.setup(self, {
+		"game_message": _game_message_state,
+		"timebar": _timebar_state,
+		"deck_count": _deck_count_state,
+	})
 
 	_init_layout()
 	
@@ -132,7 +146,7 @@ func _ready() -> void:
 		quitter_button.pressed.connect(_on_quitter_pressed)
 	
 	PopupUi.hide_and_reset()
-	_apply_language_to_game_ui()
+	layout_manager.apply_language()
 
 	if String(Global.current_game_id) != "":
 		if game_state_handler != null and game_state_handler.has_method("_request_game_sync"):
@@ -140,7 +154,13 @@ func _ready() -> void:
 
 	await get_tree().process_frame
 	slots_ready = true
-	TimebarUtil.update_timebar(_timebar_state, Callable(NetworkManager, "server_now_ms"))
+	ui_manager.init_ui_components(Callable(ui_manager, "on_message_timeout"))
+	
+	# Apply UI layout after UI components are created
+	if layout_manager != null:
+		layout_manager.apply_ui_layout()
+	
+	ui_manager.update_timebar(Callable(NetworkManager, "server_now_ms"))
 
 	board_factory.ensure_static_slots_once(pioche_root)
 
@@ -151,30 +171,19 @@ func _ready() -> void:
 # ============= LAYOUT INITIALIZATION (SIMPLIFIÉ) =============
 
 func _init_layout() -> void:
-	"""Initialise layout + slots fixes (sans reflow rows)"""
+	"""Initialise layout + UI"""
 	if layout_manager != null:
-		var ctx :Variant= layout_manager.compute_layout()
-		_apply_layout_context(ctx)
+		var ctx: Dictionary = layout_manager.compute_layout()
+		_positions_cache = ctx
+		_slot_spacing = float(ctx.get("slot_spacing", GameLayoutConfig.DEFAULT_SLOT_SPACING))
+		layout_manager.apply_layout(ctx)
 		_apply_players_layout(true)
-		if true:
-			_ensure_static_slots_once()
-	else:
-		_reflow_layout(true, false, false)
-	_init_ui()
+		_ensure_static_slots_once()
 
 func _compute_layout_context() -> Dictionary:
 	if layout_manager != null:
 		return layout_manager.compute_layout()
 	return {}
-
-func _apply_layout_context(ctx: Dictionary) -> void:
-	# Always update local cache/spacing so other functions can use it
-	_positions_cache = ctx
-	_slot_spacing = float(ctx.get("slot_spacing", GameLayoutConfig.DEFAULT_SLOT_SPACING))
-	if layout_manager != null:
-		layout_manager.apply_layout(ctx)
-	else:
-		_apply_positions(_positions_cache)
 
 func _apply_players_layout(create_slots: bool) -> void:
 	_setup_player(player1_root, 1, create_slots)
@@ -184,47 +193,21 @@ func _ensure_static_slots_once() -> void:
 	board_factory.ensure_static_slots_once(pioche_root)
 
 func _reflow_layout(create_slots: bool, apply_linked_ui: bool, refresh_slot_rows: bool) -> void:
-	# Use GameLayoutManager as the authoritative reflow implementation
-	layout_manager.reflow_layout(create_slots, apply_linked_ui, refresh_slot_rows, Callable(self, "_apply_players_layout"))
+	"""Reflow the layout and refresh UI elements"""
+	if layout_manager == null:
+		return
+	
+	var ctx: Dictionary = layout_manager.compute_layout()
+	_positions_cache = ctx
+	_slot_spacing = float(ctx.get("slot_spacing", GameLayoutConfig.DEFAULT_SLOT_SPACING))
+	layout_manager.apply_layout(ctx)
+	
 	if create_slots:
+		_apply_players_layout(create_slots)
 		_ensure_static_slots_once()
-	return
-
-func _apply_positions(positions: Dictionary) -> void:
-	"""Applique TOUTES les positions calculées"""
-	var vh = positions["vh"]
-	var center_x = positions["center_x"]
-	var right_x = positions["right_x"]
-
-	table_root.position = Vector2(center_x, vh * GameLayoutConfig.TABLE_Y_RATIO)
-	pioche_root.position = Vector2(right_x, vh * GameLayoutConfig.TABLE_Y_RATIO)
-
-	quitter_button.text = LanguageManager.ui_text(UI_GAME_QUIT_BUTTON_KEY, "Quit")
-	quitter_button.size = Vector2(GameLayoutConfig.QUITTER_WIDTH, GameLayoutConfig.QUITTER_HEIGHT)
-	quitter_button.position = Vector2(right_x - GameLayoutConfig.QUITTER_OFFSET_X, GameLayoutConfig.QUITTER_OFFSET_Y)
-
-func _apply_language_to_game_ui() -> void:
-	quitter_button.text = LanguageManager.ui_text(UI_GAME_QUIT_BUTTON_KEY, "Quit")
-
-func _apply_timebar_layout() -> void:
-	TimebarUtil.apply_layout(_timebar_state, p1_banc_anchor.global_position)
-
-func _apply_game_message_layout() -> void:
-	GameMessage.apply_layout(_game_message_state, p1_main_anchor.global_position)
-
-func _apply_player_linked_ui_layout() -> void:
-	_apply_timebar_layout()
-	_apply_game_message_layout()
-	DeckCountUtil.update_positions(_deck_count_state, self, player1_root, player2_root)
-
-func _init_ui() -> void:
-	"""Initialise l'UI"""
-	GameMessage.ensure_ui(_game_message_state, self, Callable(self, "_on_message_timeout"))
-
-	TimebarUtil.ensure_ui(_timebar_state, self)
-	DeckCountUtil.ensure_ui(_deck_count_state, self)
-	DeckCountUtil.reset_counts(_deck_count_state)
-	_apply_player_linked_ui_layout()
+	
+	if refresh_slot_rows:
+		_update_all_slot_rows()
 
 # ============= SETUP JOUEURS ET SLOTS (SIMPLIFIÉ) =============
 
@@ -271,55 +254,17 @@ func _on_evt(type: String, data: Dictionary) -> void:
 
 # ============= UI MESSAGES =============
 
-func _show_game_feedback(ui_message: Dictionary) -> void:
-	"""Affiche un message de jeu"""
-	var rule_msg := GameMessage.normalize_rule_message(ui_message)
-	if not rule_msg.is_empty():
-		_display_rule_message(rule_msg)
-		return
-
-	var popup_msg := Protocol.normalize_popup_message(ui_message)
-	PopupUi.show_normalized(PopupUi.MODE_INFO, popup_msg)
-
-func _display_rule_message(ui_message: Dictionary) -> void:
-	"""Affiche et anime le message"""
-	if _message_tween and is_instance_valid(_message_tween):
-		_message_tween.kill()
-	
-	GameMessage.show_rule_message(ui_message, _game_message_state)
-	var label := GameMessage.get_label(_game_message_state)
-	if label != null:
-		label.modulate.a = 1.0
-
-func _on_message_timeout() -> void:
-	"""Appelé quand le timer du message expire"""
-	_hide_message_with_fade()
-
-func _hide_message_with_fade() -> void:
-	"""Cache le message avec un fadeout"""
-	var label := GameMessage.get_label(_game_message_state)
-	if label == null or not label.visible:
-		return
-	
-	if _message_tween and is_instance_valid(_message_tween):
-		_message_tween.kill()
-	
-	_message_tween = create_tween()
-	_message_tween.tween_property(label, "modulate:a", 0.0, GameMessage.get_fade_duration())
-	await _message_tween.finished
-	
-	label.visible = false
-	label.modulate.a = 1.0
+# Migrées vers GameUIManager.gd - voir show_game_feedback(), display_rule_message(), etc.
 
 # ============= TIMEBAR =============
 
 func _process(_delta: float) -> void:
-	TimebarUtil.update_timebar(_timebar_state, Callable(NetworkManager, "server_now_ms"))
+	if ui_manager != null:
+		ui_manager.update_timebar(Callable(NetworkManager, "server_now_ms"))
 
 func _set_turn_timer(turn: Dictionary) -> void:
-	TimebarUtil.set_turn_timer(_timebar_state, turn, Callable(NetworkManager, "sync_server_clock"))
-	TimebarUtil.update_timebar_mode(_timebar_state, bool(Global.is_spectator), String(Global.username))
-	TimebarUtil.update_timebar(_timebar_state, Callable(NetworkManager, "server_now_ms"))
+	if ui_manager != null:
+		ui_manager.set_turn_timer(turn, Callable(NetworkManager, "sync_server_clock"), bool(Global.is_spectator), String(Global.username))
 
 # ============= QUITTER =============
 
@@ -434,13 +379,9 @@ func _exit_tree() -> void:
 	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)
 
-
-	GameMessage.cleanup(_game_message_state)
-	TimebarUtil.cleanup(_timebar_state)
-	DeckCountUtil.cleanup(_deck_count_state)
-	
-	if _message_tween and is_instance_valid(_message_tween):
-		_message_tween.kill()
+	# Cleanup managers
+	if ui_manager != null:
+		ui_manager.cleanup()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
