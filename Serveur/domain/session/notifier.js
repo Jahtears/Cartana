@@ -83,6 +83,7 @@ export function createGameNotifier({
 
     for (const p of game.players) {
       emitFullState(game, p, wsByUser, sendEvtSocket, {
+        view: "player",
         gameMeta,
         game_id,
         userToGame,
@@ -94,6 +95,7 @@ export function createGameNotifier({
     if (specs && specs.size) {
       for (const s of specs) {
         emitFullState(game, s, wsByUser, sendEvtSocket, {
+          view: "spectator",
           gameMeta,
           game_id,
           userToGame,

@@ -44,6 +44,7 @@ export function handleSpectateGame(ctx, ws, req, data, actor) {
     meta.initialSent
   ) {
     emitFullState(game, actor, wsByUser, sendEvtSocket, {
+      view: "spectator",
       gameMeta,
       game_id,
       userToGame,

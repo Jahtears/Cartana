@@ -597,6 +597,18 @@ func sync_server_clock(server_epoch_ms: int) -> void:
 
 # ============= DIAGNOSTICS =============
 
+func get_queue_stats() -> Dictionary:
+	return {
+		"queue_size": _request_queue.size(),
+		"pending_requests": _pending_requests.size(),
+		"is_open": is_open(),
+		"is_authenticated": _is_authenticated,
+		"has_credentials": has_login_credentials(),
+		"server_clock_offset_ms": server_clock_offset_ms,
+		"reconnect_attempts": _reconnect_attempts,
+		"reconnect_next_delay_sec": _reconnect_delay_sec,
+	}
+
 func get_pending_request(rid: String) -> Dictionary:
 	return _pending_requests.get(rid, {})
 

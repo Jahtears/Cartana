@@ -67,10 +67,10 @@ export function createBroadcaster({
     if (meta.slot_sig[key] === sig) return;
     meta.slot_sig[key] = sig;
 
-    emitSlotState(game, game.players, wsByUser, sendEvtSocket, { slot_id});
+    emitSlotState(game, game.players, wsByUser, sendEvtSocket, { slot_id, view: "player" });
 
     if (specs && specs.size) {
-      emitSlotState(game, [...specs], wsByUser, sendEvtSocket, { slot_id});
+      emitSlotState(game, [...specs], wsByUser, sendEvtSocket, { slot_id, view: "spectator" });
     }
   };
 
