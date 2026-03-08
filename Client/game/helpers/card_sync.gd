@@ -20,29 +20,25 @@ const META_JUST_CREATED := "just_created"
 const META_LAST_SLOT_ID := "last_slot_id"
 const META_SERVER_ARRAY_ORDER := "_server_array_order"
 
-static func get_or_create_card(game_ctx: Dictionary, card_id: String) -> Node2D:
-	var cards = game_ctx.get("cards", null)
-	var card_scene: PackedScene = game_ctx.get("card_scene", null)
-	var root: Node = game_ctx.get("root", null)
-
-	if cards == null:
+static func get_or_create_card(game_ctx: CardContext, card_id: String) -> Node2D:
+	if game_ctx == null or game_ctx.cards == null:
 		return null
 
-	if cards.has(card_id):
-		return cards[card_id] as Node2D
+	if game_ctx.cards.has(card_id):
+		return game_ctx.cards[card_id] as Node2D
 
-	if card_scene == null or root == null:
+	if game_ctx.card_scene == null or game_ctx.root == null:
 		return null
 
-	var card := card_scene.instantiate() as Node2D
-	root.add_child(card)
-	cards[card_id] = card
+	var card := game_ctx.card_scene.instantiate() as Node2D
+	game_ctx.root.add_child(card)
+	game_ctx.cards[card_id] = card
 	card.set_meta(META_CARD_ID, card_id)
 	card.set_meta(META_JUST_CREATED, true)
 	card.set_meta(META_LAST_SLOT_ID, "")
 	return card
 
-static func apply_card_update(game_ctx: Dictionary, data: Dictionary) -> void:
+static func apply_card_update(game_ctx: CardContext, data: Dictionary) -> void:
 	var card_id: String = String(data.get(KEY_CARD_ID, ""))
 	if card_id == "":
 		return
@@ -91,11 +87,10 @@ static func _resolve_order_from_payload(data: Dictionary) -> int:
 		order_from_payload = int(data.get(KEY_ORDER_SLOT, -1))
 	return order_from_payload
 
-static func _resolve_target_slot(game_ctx: Dictionary, slot_id: String):
-	if slot_id == "":
+static func _resolve_target_slot(game_ctx: CardContext, slot_id: String):
+	if slot_id == "" or game_ctx == null:
 		return null
-	var slots_by_id: Dictionary = game_ctx.get("slots_by_id", {})
-	return slots_by_id.get(slot_id, null)
+	return game_ctx.slots_by_id.get(slot_id, null)
 
 static func _should_animate_snap(card: Node2D, target_slot, slot_id: String) -> bool:
 	if bool(card.get_meta(META_JUST_CREATED, false)):

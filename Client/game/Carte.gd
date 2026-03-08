@@ -421,10 +421,9 @@ func _end_drag() -> void:
 		return
 
 	var to_slot_id := ""
-	if _current_preview_slot.has_method("get_slot_id"):
-		to_slot_id = String(_current_preview_slot.call("get_slot_id"))
-	else:
-		to_slot_id = String(_current_preview_slot.get("slot_id"))
+	var target_slot := _current_preview_slot as Slot
+	if target_slot != null:
+		to_slot_id = target_slot.get_slot_id()
 
 	if not _send_move_if_valid(to_slot_id):
 		_rollback_drag()
@@ -564,10 +563,9 @@ func _is_drop_target_allowed(slot_node: Node) -> bool:
 		return false
 
 	var target_slot_id := ""
-	if slot_node.has_method("get_slot_id"):
-		target_slot_id = String(slot_node.call("get_slot_id"))
-	else:
-		target_slot_id = String(slot_node.get("slot_id"))
+	var target_slot := slot_node as Slot
+	if target_slot != null:
+		target_slot_id = target_slot.get_slot_id()
 
 	if target_slot_id == "":
 		return false
@@ -692,10 +690,9 @@ func _send_move_if_valid(to_slot_id: String) -> bool:
 
 	var from_slot_id := ""
 	if slot != null:
-		if slot.has_method("get_slot_id"):
-			from_slot_id = String(slot.call("get_slot_id"))
-		else:
-			from_slot_id = String(slot.slot_id)
+		var slot_ref := slot as Slot
+		if slot_ref != null:
+			from_slot_id = slot_ref.get_slot_id()
 
 	if from_slot_id == "" or to_slot_id == "":
 		return false

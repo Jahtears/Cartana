@@ -263,12 +263,10 @@ func _request_game_sync() -> void:
 		NetworkManager.request(game.REQ_JOIN_GAME, {"game_id": game_id})
 
 func _resolve_slot_for_update(slot_id: String, require_allowed_table: bool) -> Variant:
-	var slot :Variant= game.slots_by_id.get(slot_id)
-	if slot == null and SlotIdHelper.is_table_slot_id(slot_id):
-		if require_allowed_table and not game.allowed_table_slots.has(slot_id):
+	if require_allowed_table and SlotIdHelper.is_table_slot_id(slot_id):
+		if not game.allowed_table_slots.has(slot_id):
 			return null
-		slot = game.slots_by_id.get(slot_id)
-	return slot
+	return game.slots_by_id.get(slot_id)
 
 func _apply_slot_cards_update(slot_id: String, slot, arr: Array, count_for_slot: int, animate_on_finalize: bool, clear_slot_first: bool) -> void:
 	if clear_slot_first and slot != null and slot.has_method("clear_slot"):

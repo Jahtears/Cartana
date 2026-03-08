@@ -39,15 +39,15 @@ var allowed_table_slots: Dictionary = {}
 
 # ============= UI STATE =====
 var _is_changing_scene := false
-var _game_end_prompted := false
+var _game_end_prompted := false  # Used by GameStateHandler
 var _leave_sent := false
 var _disconnect_prompt_seq := 0
 var _opponent_disconnected := false
-var _network_disconnected := false
+var _network_disconnected := false  # Used by GameStateHandler
 var _deck_count_state: Dictionary = DeckCountUtil.create_state()
 # ============= LAYOUT STATE =============
 var _slot_spacing: float = GameLayoutConfig.DEFAULT_SLOT_SPACING
-var _table_spacing: int = GameLayoutConfig.TABLE_SPACING
+var _table_spacing: int = GameLayoutConfig.TABLE_SPACING  # Used by GameStateHandler and TableSyncHelper
 var _positions_cache: Dictionary = {}
 var layout_manager = null
 var board_factory = null
@@ -67,7 +67,7 @@ var START_POS: Vector2 = GameLayoutConfig.START_POS
 @onready var quitter_button: Button = $Quitter
 
 # ============= CARD CONTEXT =============
-var _card_ctx: Dictionary = {}
+var _card_ctx: CardContext = null
 
 # ============= TIMEBAR STATE =============
 var _timebar_state: Dictionary = TimebarUtil.create_state()
@@ -112,45 +112,16 @@ func _ready() -> void:
 
 	_init_layout()
 	
-	_card_ctx = {
-		"cards": cards,
-		"card_scene": card_scene,
-		"slots_by_id": slots_by_id,
-		"root": self,
-	}
+	_card_ctx = CardContext.new(cards, card_scene, slots_by_id, self)
 
 	# ===== CONNECTER LES SIGNAUX RÉSEAU =====
-	# Route events/responses to the extracted GameStateHandler
-	if not NetworkManager.evt.is_connected(game_state_handler.handle_event):
-		NetworkManager.evt.connect(game_state_handler.handle_event)
-	if not NetworkManager.response.is_connected(game_state_handler.on_response):
-		NetworkManager.response.connect(game_state_handler.on_response)
-	# Connect connection-related signals to the handler when available
-	if game_state_handler != null and game_state_handler.has_method("on_connection_lost"):
-		if not NetworkManager.connection_lost.is_connected(game_state_handler.on_connection_lost):
-			NetworkManager.connection_lost.connect(game_state_handler.on_connection_lost)
-	if game_state_handler != null and game_state_handler.has_method("on_connection_restored"):
-		if not NetworkManager.connection_restored.is_connected(game_state_handler.on_connection_restored):
-			NetworkManager.connection_restored.connect(game_state_handler.on_connection_restored)
-	if game_state_handler != null and game_state_handler.has_method("on_reconnect_failed"):
-		if not NetworkManager.reconnect_failed.is_connected(game_state_handler.on_reconnect_failed):
-			NetworkManager.reconnect_failed.connect(game_state_handler.on_reconnect_failed)
-	if game_state_handler != null and game_state_handler.has_method("on_server_closed"):
-		if not NetworkManager.server_closed.is_connected(game_state_handler.on_server_closed):
-			NetworkManager.server_closed.connect(game_state_handler.on_server_closed)
-	if not PopupUi.action_selected.is_connected(_on_popup_action):
-		PopupUi.action_selected.connect(_on_popup_action)
-
-	
-	if not quitter_button.pressed.is_connected(_on_quitter_pressed):
-		quitter_button.pressed.connect(_on_quitter_pressed)
+	_connect_network_signals()
 	
 	PopupUi.hide_and_reset()
 	layout_manager.apply_language()
 
-	if String(Global.current_game_id) != "":
-		if game_state_handler != null and game_state_handler.has_method("_request_game_sync"):
-			game_state_handler._request_game_sync()
+	if String(Global.current_game_id) != "" and game_state_handler != null:
+		game_state_handler._request_game_sync()
 
 	await get_tree().process_frame
 	slots_ready = true
@@ -170,15 +141,33 @@ func _ready() -> void:
 
 # ============= LAYOUT INITIALIZATION (SIMPLIFIÉ) =============
 
+func _do_layout(create_slots: bool, apply_ui: bool, refresh_rows: bool) -> void:
+	"""Centralised layout computation and application
+	
+	Args:
+		create_slots: Whether to create/recreate player slots
+		apply_ui: Whether to apply UI layout (timebar, messages, etc)
+		refresh_rows: Whether to refresh slot row positions
+	"""
+	if layout_manager == null:
+		return
+	
+	var ctx: Dictionary = layout_manager.compute_layout()
+	_positions_cache = ctx
+	_slot_spacing = float(ctx.get("slot_spacing", GameLayoutConfig.DEFAULT_SLOT_SPACING))
+	layout_manager.apply_layout(ctx)
+	_apply_players_layout(create_slots)
+	_ensure_static_slots_once()
+	
+	if refresh_rows:
+		board_factory.update_all_slot_rows(_slot_spacing)
+	
+	if apply_ui:
+		layout_manager.apply_ui_layout()
+
 func _init_layout() -> void:
 	"""Initialise layout + UI"""
-	if layout_manager != null:
-		var ctx: Dictionary = layout_manager.compute_layout()
-		_positions_cache = ctx
-		_slot_spacing = float(ctx.get("slot_spacing", GameLayoutConfig.DEFAULT_SLOT_SPACING))
-		layout_manager.apply_layout(ctx)
-		_apply_players_layout(true)
-		_ensure_static_slots_once()
+	_do_layout(true, false, false)
 
 func _compute_layout_context() -> Dictionary:
 	if layout_manager != null:
@@ -192,24 +181,8 @@ func _apply_players_layout(create_slots: bool) -> void:
 func _ensure_static_slots_once() -> void:
 	board_factory.ensure_static_slots_once(pioche_root)
 
-func _reflow_layout(create_slots: bool, apply_linked_ui: bool, refresh_slot_rows: bool) -> void:
-	"""Reflow the layout and refresh UI elements"""
-	if layout_manager == null:
-		return
-	
-	var ctx: Dictionary = layout_manager.compute_layout()
-	_positions_cache = ctx
-	_slot_spacing = float(ctx.get("slot_spacing", GameLayoutConfig.DEFAULT_SLOT_SPACING))
-	layout_manager.apply_layout(ctx)
-	
-	if create_slots:
-		_apply_players_layout(create_slots)
-		_ensure_static_slots_once()
-	
-	if refresh_slot_rows:
-		_update_all_slot_rows()
-
-# ============= SETUP JOUEURS ET SLOTS (SIMPLIFIÉ) =============
+func _relayout_board() -> void:
+	_do_layout(false, true, true)
 
 func _setup_player(player: Node, player_id: int, create_slots: bool = false) -> void:
 	"""Setup unique pour création/repositionnement d'un joueur"""
@@ -225,15 +198,28 @@ func _setup_player(player: Node, player_id: int, create_slots: bool = false) -> 
 
 # Slot creation and rows are now handled exclusively by BoardFactory
 
-func _update_all_slot_rows() -> void:
-	"""Met à jour positions de tous les slots"""
-	board_factory.update_all_slot_rows(_slot_spacing)
-
-func _update_row_positions(player_id: int, slot_type: String, count: int) -> void:
-	"""Met à jour les positions d'une rangée de slots"""
-	board_factory.update_row_positions(player_id, slot_type, count, _slot_spacing)
-
 # ============= LAYOUT SIGNALS & RESIZE (SIMPLIFIÉ) =============
+
+func _safe_connect(sig: Signal, target: Object, method: String) -> void:
+	"""Helper: Safe signal connection with existence check and deduplication"""
+	if target == null:
+		return
+	if not target.has_method(method):
+		return
+	var callable := Callable(target, method)
+	if not sig.is_connected(callable):
+		sig.connect(callable)
+
+func _connect_network_signals() -> void:
+	"""Extract all network signal connections to a single method"""
+	_safe_connect(NetworkManager.evt,               game_state_handler, "handle_event")
+	_safe_connect(NetworkManager.response,          game_state_handler, "on_response")
+	_safe_connect(NetworkManager.connection_lost,   game_state_handler, "on_connection_lost")
+	_safe_connect(NetworkManager.connection_restored, game_state_handler, "on_connection_restored")
+	_safe_connect(NetworkManager.reconnect_failed,  game_state_handler, "on_reconnect_failed")
+	_safe_connect(NetworkManager.server_closed,     game_state_handler, "on_server_closed")
+	_safe_connect(PopupUi.action_selected,          self,               "_on_popup_action")
+	_safe_connect(quitter_button.pressed,           self,               "_on_quitter_pressed")
 
 func _connect_layout_signals() -> void:
 	var vp := get_viewport()
@@ -243,8 +229,6 @@ func _connect_layout_signals() -> void:
 func _on_viewport_size_changed() -> void:
 	_relayout_board()
 
-func _relayout_board() -> void:
-	_reflow_layout(false, true, true)
 
 # ============= EVENTS & RESPONSES (ORIGINAL COMPLET) =============
 
