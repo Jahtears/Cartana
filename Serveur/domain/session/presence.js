@@ -99,13 +99,17 @@ export function createPresence(ctx) {
   }
 
   function handleReconnect(username) {
+    console.log('[RECONNECT] handleReconnect called for:', username);
     // 1) spectateur: rien à faire
     const spectate_id = userToSpectate.get(username);
     if (spectate_id) return;
 
     // 2) joueur
     const game_id = userToGame.get(username);
-    if (!game_id) return;
+    if (!game_id) {
+      console.log('[RECONNECT] No game_id for user:', username);
+      return;
+    }
 
     let game = games.get(game_id);
 
@@ -149,6 +153,7 @@ export function createPresence(ctx) {
 
   function onSocketClose(ws) {
     const username = userByWs.get(ws);
+    console.log('[PRESENCE] onSocketClose:', { username, hasUsername: !!username });
     if (!username) return;
 
     // purge invites avant suppression wsByUser
@@ -159,6 +164,7 @@ export function createPresence(ctx) {
 
     userByWs.delete(ws);
     wsByUser.delete(username);
+    console.log('[PRESENCE] User unregistered:', { username });
 
     refreshLobby();
   }

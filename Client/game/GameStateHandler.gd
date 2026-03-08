@@ -4,6 +4,7 @@ class_name GameStateHandler
 const Protocol = preload("res://Client/net/Protocol.gd")
 
 var game: Node = null
+var _waiting_for_reauth := false
 
 func setup(game_ref: Node) -> void:
 	game = game_ref
@@ -50,6 +51,12 @@ func on_response(rid: String, type: String, ok: bool, _data: Dictionary, error: 
 	if type == "login":
 		if ok and String(Global.current_game_id) != "":
 			_request_game_sync()
+		if _waiting_for_reauth:
+			_waiting_for_reauth = false
+			if ok:
+				PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_RECONNECTED)
+			else:
+				PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_RECONNECT_FAIL)
 		return
 	if type == game.REQ_INVITE:
 		if ok:
@@ -184,19 +191,22 @@ func _handle_opponent_rejoined(data: Dictionary) -> void:
 	PopupUi.hide_and_reset()
 	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_OPPONENT_REJOINED, {"name": who})
 
-func _on_connection_lost() -> void:
+func on_connection_lost() -> void:
 	game._network_disconnected = true
+	_waiting_for_reauth = false
 	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_DISCONNECTED)
 
-func _on_connection_restored() -> void:
+func on_connection_restored() -> void:
 	if not game._network_disconnected:
 		return
 	game._network_disconnected = false
-	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_RECONNECTED)
+	_waiting_for_reauth = true
+	# Don't show popup yet, wait for authentication
 
-func _on_reconnect_failed() -> void:
+func on_reconnect_failed() -> void:
 	if not game._network_disconnected:
 		return
+	_waiting_for_reauth = false
 	PopupUi.show_code(
 		PopupUi.MODE_INFO,
 		Protocol.POPUP_PLAYER_RECONNECT_FAIL,
@@ -205,7 +215,7 @@ func _on_reconnect_failed() -> void:
 		{"ok_action_id": game.ACTION_NETWORK_RETRY, "ok_label_key": "UI_LABEL_RETRY"}
 	)
 
-func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
+func on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
 	game._network_disconnected = false
 	PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_TECH_INTERNAL_ERROR)
 
