@@ -1,5 +1,4 @@
-# Game.gd - Layout simplifié + Handlers complets du code original
-
+# Game.gd
 extends Control
 
 # ============= SCENES =============
@@ -8,27 +7,33 @@ var card_scene: PackedScene = preload("res://Client/Scenes/Carte.tscn")
 
 # ============= CONFIG & HELPERS =============
 const Protocol = preload("res://Client/net/Protocol.gd")
-# ============= CONSTANTS =============
-const FLOW_INVITE_REQUEST := Protocol.POPUP_FLOW_INVITE_REQUEST
-const REMATCH_CONTEXT := "rematch"
-const ACK_INTENT_REMATCH := "rematch"
-const REQ_JOIN_GAME := "join_game"
-const REQ_SPECTATE_GAME := "spectate_game"
-const REQ_INVITE := "invite"
-const REQ_INVITE_RESPONSE := "invite_response"
-const REQ_ACK_GAME_END := "ack_game_end"
-const REQ_LEAVE_GAME := "leave_game"
 
-const ACTION_GAME_END_LEAVE := "game_end_leave"
-const ACTION_GAME_END_REMATCH := "game_end_rematch"
-const ACTION_REMATCH_DECLINED_LEAVE := "rematch_declined_leave"
-const ACTION_QUIT_CANCEL := "quit_cancel"
-const ACTION_QUIT_CONFIRM := "quit_confirm"
-const ACTION_PAUSE_WAIT := "pause_wait"
-const ACTION_PAUSE_LEAVE := "pause_leave"
-const ACTION_NETWORK_RETRY := "network_retry"
+# ============= PROTOCOL ALIASES =============
+# Alias locaux pour les nodes fils (GameStateHandler/Manager) qui lisent game.REQ_* / game.ACTION_*.
+const FLOW_INVITE_REQUEST           := Protocol.POPUP_FLOW_INVITE_REQUEST
+const REQ_JOIN_GAME                 := Protocol.REQ_JOIN_GAME
+const REQ_SPECTATE_GAME             := Protocol.REQ_SPECTATE_GAME
+const REQ_INVITE                    := Protocol.REQ_INVITE
+const REQ_INVITE_RESPONSE           := Protocol.REQ_INVITE_RESPONSE
+const REQ_ACK_GAME_END              := Protocol.REQ_ACK_GAME_END
+const REQ_LEAVE_GAME                := Protocol.REQ_LEAVE_GAME
+const REMATCH_CONTEXT               := Protocol.REMATCH_CONTEXT
+const ACK_INTENT_REMATCH            := Protocol.ACK_INTENT_REMATCH
+const ACTION_GAME_END_LEAVE         := Protocol.ACTION_GAME_END_LEAVE
+const ACTION_GAME_END_REMATCH       := Protocol.ACTION_GAME_END_REMATCH
+const ACTION_REMATCH_DECLINED_LEAVE := Protocol.ACTION_REMATCH_DECLINED_LEAVE
+const ACTION_QUIT_CANCEL            := Protocol.ACTION_QUIT_CANCEL
+const ACTION_QUIT_CONFIRM           := Protocol.ACTION_QUIT_CONFIRM
+const ACTION_PAUSE_WAIT             := Protocol.ACTION_PAUSE_WAIT
+const ACTION_PAUSE_LEAVE            := Protocol.ACTION_PAUSE_LEAVE
+const ACTION_NETWORK_RETRY          := Protocol.ACTION_NETWORK_RETRY
+const UI_GAME_QUIT_BUTTON_KEY       := Protocol.UI_GAME_QUIT_BUTTON_KEY
 
-const UI_GAME_QUIT_BUTTON_KEY := "UI_GAME_QUIT_BUTTON"
+# ============= MANAGERS =============
+# layout_manager et ui_manager ne sont PAS des membres : ils vivent dans _game_context.
+var board_factory:       BoardFactory     = null
+var game_state_manager:  GameStateManager = null
+var _game_context:       GameContext      = null
 
 # ============= STATE =============
 var slots_ready: bool = false
@@ -37,117 +42,97 @@ var pending_events: Array[Dictionary] = []
 var cards: Dictionary = {}
 var allowed_table_slots: Dictionary = {}
 
-# ============= UI STATE =====
-var _is_changing_scene := false
-var _game_end_prompted := false  # Used by GameStateHandler
-var _leave_sent := false
+# ============= UI STATE =============
+var _is_changing_scene     := false
+var _game_end_prompted     := false
+var _leave_sent            := false
 var _disconnect_prompt_seq := 0
 var _opponent_disconnected := false
 var _deck_count_state: Dictionary = DeckCountUtil.create_state()
+
 # ============= LAYOUT STATE =============
-var _slot_spacing: float = GameLayoutConfig.DEFAULT_SLOT_SPACING
+var _slot_spacing:    float      = GameLayoutConfig.DEFAULT_SLOT_SPACING
 var _positions_cache: Dictionary = {}
-var layout_manager = null
-var board_factory = null
-var game_state_manager = null  # NEW - replaces game_state_handler
-var ui_manager = null
-var _game_context: GameContext = null  # NEW - central context for services
-
-# ============= LAYOUT CONSTANTS =============
-var START_POS: Vector2 = GameLayoutConfig.START_POS
-
-# ============= NODES =============
-@onready var player1_root: Node2D = $Board/Player1
-@onready var player2_root: Node2D = $Board/Player2
-@onready var p1_main_anchor: Node2D = $Board/Player1/Main
-@onready var p1_banc_anchor: Node2D = $Board/Player1/Banc
-@onready var pioche_root: Node2D = $Board/Pioche
-@onready var table_root: Node2D = $Board/Table
-@onready var quitter_button: Button = $Quitter
+var START_POS:        Vector2    = GameLayoutConfig.START_POS
 
 # ============= CARD CONTEXT =============
 var _card_ctx: CardContext = null
 
-# ============= TIMEBAR STATE =============
-var _timebar_state: Dictionary = TimebarUtil.create_state()
+# ============= UI STATE DICTS =============
+var _timebar_state:      Dictionary = TimebarUtil.create_state()
 var _game_message_state: Dictionary = GameMessage.create_ui_state()
+
+# ============= NODES =============
+@onready var player1_root:   Node2D = $Board/Player1
+@onready var player2_root:   Node2D = $Board/Player2
+@onready var p1_main_anchor: Node2D = $Board/Player1/Main
+@onready var p1_banc_anchor: Node2D = $Board/Player1/Banc
+@onready var pioche_root:    Node2D = $Board/Pioche
+@onready var table_root:     Node2D = $Board/Table
+@onready var quitter_button: Button = $Quitter
 
 # ============= LIFECYCLE =============
 
 func _ready() -> void:
 	_connect_layout_signals()
 
-	# Setup board factory
 	board_factory = preload("res://Client/game/factories/BoardFactory.gd").new()
 	board_factory.setup(slot_scene, slots_by_id, START_POS)
 
-	# Setup CardContext early for services
 	_card_ctx = preload("res://Client/game/types/CardContext.gd").new(cards, card_scene, slots_by_id, self)
 
-	# Setup layout manager first
-	layout_manager = preload("res://Client/game/managers/GameLayoutManager.gd").new()
+	var layout_manager: GameLayoutManager = preload("res://Client/game/managers/GameLayoutManager.gd").new()
 	layout_manager.setup(self, {
-		"player1_root": player1_root,
-		"player2_root": player2_root,
-		"table_root": table_root,
-		"pioche_root": pioche_root,
+		"player1_root":   player1_root,
+		"player2_root":   player2_root,
+		"table_root":     table_root,
+		"pioche_root":    pioche_root,
 		"quitter_button": quitter_button,
 		"p1_banc_anchor": p1_banc_anchor,
 		"p1_main_anchor": p1_main_anchor,
 	}, {
-		"timebar": _timebar_state,
+		"timebar":      _timebar_state,
 		"game_message": _game_message_state,
-		"deck_count": _deck_count_state,
+		"deck_count":   _deck_count_state,
 	}, GameLayoutConfig)
 
-	# Setup UI manager
-	ui_manager = preload("res://Client/game/managers/GameUIManager.gd").new()
+	var ui_manager: GameUIManager = preload("res://Client/game/managers/GameUIManager.gd").new()
 	ui_manager.setup(self, {
 		"game_message": _game_message_state,
-		"timebar": _timebar_state,
-		"deck_count": _deck_count_state,
+		"timebar":      _timebar_state,
+		"deck_count":   _deck_count_state,
 	})
 
-	# Setup GameContext - central container for all application state (AFTER managers are created)
 	_game_context = preload("res://Client/game/types/GameContext.gd").new(self)
-	_game_context.card_context = _card_ctx
-	_game_context.ui_manager = ui_manager
-	_game_context.layout_manager = layout_manager
-	# Sync with Global state
+	_game_context.card_context    = _card_ctx
+	_game_context.ui_manager      = ui_manager
+	_game_context.layout_manager  = layout_manager
 	_game_context.current_game_id = String(Global.current_game_id)
-	_game_context.is_spectator = bool(Global.is_spectator)
+	_game_context.is_spectator    = bool(Global.is_spectator)
 	_game_context.players_in_game = Global.players_in_game.duplicate()
-	_game_context.result = Global.result.duplicate() if Global.result is Dictionary else {}
+	_game_context.result          = Global.result.duplicate() if Global.result is Dictionary else {}
 
-	# Setup game state manager (event/response handling) - replaces GameStateHandler
 	game_state_manager = preload("res://Client/game/managers/GameStateManager.gd").new(_game_context)
 
 	_init_layout()
-
-	# ===== CONNECTER LES SIGNAUX RÉSEAU =====
 	_connect_network_signals()
-	
+
 	PopupUi.hide_and_reset()
-	layout_manager.apply_language()
+	_game_context.layout_manager.apply_language()
 
 	if String(Global.current_game_id) != "":
-		# Request game sync from server
 		var game_id := String(Global.current_game_id)
 		if bool(Global.is_spectator):
-			NetworkManager.request("spectate_game", {"game_id": game_id})
+			NetworkManager.request(REQ_SPECTATE_GAME, {"game_id": game_id})
 		else:
-			NetworkManager.request("join_game", {"game_id": game_id})
+			NetworkManager.request(REQ_JOIN_GAME, {"game_id": game_id})
 
 	await get_tree().process_frame
 	slots_ready = true
-	_game_context.slots_ready = true  # Sync GameContext state
-	ui_manager.init_ui_components(Callable(ui_manager, "on_message_timeout"))
-	
-	# Apply UI layout after UI components are created
-	if layout_manager != null:
-		layout_manager.apply_ui_layout()
-	
-	ui_manager.update_timebar(Callable(NetworkManager, "server_now_ms"))
+	_game_context.slots_ready = true
+	_game_context.ui_manager.init_ui_components(Callable(_game_context.ui_manager, "on_message_timeout"))
+	_game_context.layout_manager.apply_ui_layout()
+	_game_context.ui_manager.update_timebar(Callable(NetworkManager, "server_now_ms"))
 
 	board_factory.ensure_static_slots_once(pioche_root)
 
@@ -155,40 +140,27 @@ func _ready() -> void:
 		_on_evt(event.get("type", ""), event.get("data", {}))
 	pending_events.clear()
 
-# ============= LAYOUT INITIALIZATION (SIMPLIFIÉ) =============
+# ============= LAYOUT =============
 
 func _do_layout(create_slots: bool, apply_ui: bool, refresh_rows: bool) -> void:
-	"""Centralised layout computation and application
-	
-	Args:
-		create_slots: Whether to create/recreate player slots
-		apply_ui: Whether to apply UI layout (timebar, messages, etc)
-		refresh_rows: Whether to refresh slot row positions
-	"""
-	if layout_manager == null:
+	if _game_context == null or _game_context.layout_manager == null:
 		return
-	
-	var ctx: Dictionary = layout_manager.compute_layout()
+	var ctx: Dictionary = _game_context.layout_manager.compute_layout()
 	_positions_cache = ctx
 	_slot_spacing = float(ctx.get("slot_spacing", GameLayoutConfig.DEFAULT_SLOT_SPACING))
-	layout_manager.apply_layout(ctx)
+	_game_context.layout_manager.apply_layout(ctx)
 	_apply_players_layout(create_slots)
 	_ensure_static_slots_once()
-	
 	if refresh_rows:
 		board_factory.update_all_slot_rows(_slot_spacing)
-	
 	if apply_ui:
-		layout_manager.apply_ui_layout()
+		_game_context.layout_manager.apply_ui_layout()
 
 func _init_layout() -> void:
-	"""Initialise layout + UI"""
 	_do_layout(true, false, false)
 
-func _compute_layout_context() -> Dictionary:
-	if layout_manager != null:
-		return layout_manager.compute_layout()
-	return {}
+func _relayout_board() -> void:
+	_do_layout(false, true, true)
 
 func _apply_players_layout(create_slots: bool) -> void:
 	_setup_player(player1_root, 1, create_slots)
@@ -197,43 +169,33 @@ func _apply_players_layout(create_slots: bool) -> void:
 func _ensure_static_slots_once() -> void:
 	board_factory.ensure_static_slots_once(pioche_root)
 
-func _relayout_board() -> void:
-	_do_layout(false, true, true)
-
 func _setup_player(player: Node, player_id: int, create_slots: bool = false) -> void:
-	"""Setup unique pour création/repositionnement d'un joueur"""
-	var layout = GameLayoutConfig.get_player_layout(player_id, _positions_cache, _slot_spacing)
-	
-	player.position = Vector2(0, layout["root_y"])
+	var layout := GameLayoutConfig.get_player_layout(player_id, _positions_cache, _slot_spacing)
+	player.position                  = Vector2(0, layout["root_y"])
 	player.get_node("Deck").position = Vector2(layout["deck_x"], 0)
 	player.get_node("Main").position = Vector2(layout["main_x"], 0)
 	player.get_node("Banc").position = Vector2(layout["banc_x"], 0)
-	
 	if create_slots:
 		board_factory.create_player_slots(player, player_id, _slot_spacing)
 
-# ============= LAYOUT SIGNALS & RESIZE (SIMPLIFIÉ) =============
+# ============= SIGNAUX =============
 
 func _safe_connect(sig: Signal, target: Object, method: String) -> void:
-	"""Helper: Safe signal connection with existence check and deduplication"""
-	if target == null:
+	if target == null or not target.has_method(method):
 		return
-	if not target.has_method(method):
-		return
-	var callable := Callable(target, method)
-	if not sig.is_connected(callable):
-		sig.connect(callable)
+	var c := Callable(target, method)
+	if not sig.is_connected(c):
+		sig.connect(c)
 
 func _connect_network_signals() -> void:
-	"""Extract all network signal connections to a single method"""
-	_safe_connect(NetworkManager.evt,               game_state_manager, "handle_event")
-	_safe_connect(NetworkManager.response,          game_state_manager, "on_response")
-	_safe_connect(NetworkManager.connection_lost,   game_state_manager, "on_connection_lost")
+	_safe_connect(NetworkManager.evt,                 game_state_manager, "handle_event")
+	_safe_connect(NetworkManager.response,            game_state_manager, "on_response")
+	_safe_connect(NetworkManager.connection_lost,     game_state_manager, "on_connection_lost")
 	_safe_connect(NetworkManager.connection_restored, game_state_manager, "on_connection_restored")
-	_safe_connect(NetworkManager.reconnect_failed,  game_state_manager, "on_reconnect_failed")
-	_safe_connect(NetworkManager.server_closed,     game_state_manager, "on_server_closed")
-	_safe_connect(PopupUi.action_selected,          self,               "_on_popup_action")
-	_safe_connect(quitter_button.pressed,           self,               "_on_quitter_pressed")
+	_safe_connect(NetworkManager.reconnect_failed,    game_state_manager, "on_reconnect_failed")
+	_safe_connect(NetworkManager.server_closed,       game_state_manager, "on_server_closed")
+	_safe_connect(PopupUi.action_selected,            self,               "_on_popup_action")
+	_safe_connect(quitter_button.pressed,             self,               "_on_quitter_pressed")
 
 func _connect_layout_signals() -> void:
 	var vp := get_viewport()
@@ -243,58 +205,49 @@ func _connect_layout_signals() -> void:
 func _on_viewport_size_changed() -> void:
 	_relayout_board()
 
-
-# ============= EVENTS & RESPONSES (ORIGINAL COMPLET) =============
+# ============= EVENTS =============
 
 func _on_evt(type: String, data: Dictionary) -> void:
-	# Forward all events to the GameStateManager (new service layer)
 	if game_state_manager != null:
 		game_state_manager.handle_event(type, data)
 
-# ============= GAME EVENT HANDLERS =============
 func _reset_deck_counts() -> void:
-	"""Reset deck count tracking"""
 	if typeof(_deck_count_state) == TYPE_DICTIONARY:
 		DeckCountUtil.reset_counts(_deck_count_state)
-
-# ============= UI MESSAGES =============
-
-# Migrées vers GameUIManager.gd - voir show_game_feedback(), display_rule_message(), etc.
 
 # ============= TIMEBAR =============
 
 func _process(_delta: float) -> void:
-	if ui_manager != null:
-		ui_manager.update_timebar(Callable(NetworkManager, "server_now_ms"))
+	if _game_context != null and _game_context.ui_manager != null:
+		_game_context.ui_manager.update_timebar(Callable(NetworkManager, "server_now_ms"))
 
 func _set_turn_timer(turn: Dictionary) -> void:
-	if ui_manager != null:
-		ui_manager.set_turn_timer(turn, Callable(NetworkManager, "sync_server_clock"), bool(Global.is_spectator), String(Global.username))
+	if _game_context != null and _game_context.ui_manager != null:
+		_game_context.ui_manager.set_turn_timer(
+			turn,
+			Callable(NetworkManager, "sync_server_clock"),
+			bool(Global.is_spectator),
+			String(Global.username)
+		)
 
 # ============= QUITTER =============
 
 func _on_quitter_pressed() -> void:
 	PopupUi.show_code(
-		PopupUi.MODE_CONFIRM,
-		Protocol.POPUP_QUIT_CONFIRM,
-		{},
-		{},
-		{"yes_action_id": ACTION_QUIT_CANCEL, "no_action_id": ACTION_QUIT_CONFIRM, "yes_label_key": "UI_LABEL_CANCEL", "no_label_key": "UI_LABEL_QUIT"}
+		PopupUi.MODE_CONFIRM, Protocol.POPUP_QUIT_CONFIRM, {}, {},
+		{"yes_action_id": ACTION_QUIT_CANCEL, "no_action_id": ACTION_QUIT_CONFIRM,
+		 "yes_label_key": "UI_LABEL_CANCEL",  "no_label_key": "UI_LABEL_QUIT"}
 	)
 
 func _on_game_end(data: Dictionary) -> void:
-	"""Handle game end - show appropriate end popup using PopupMessage logic"""
 	if _game_end_prompted:
 		return
 	_game_end_prompted = true
 	Global.result = data.get("result", {})
-	
-	# Use PopupMessage to calculate correct popup code and params (handles spectators, winner logic, etc)
-	var popup_msg := PopupMessage.game_end_popup_message(data, String(Global.username), bool(Global.is_spectator))
-	var rematch_allowed := bool(data.get("rematch_allowed", true))
-	if _opponent_disconnected:
-		rematch_allowed = false
-	
+
+	var popup_msg      := PopupMessage.game_end_popup_message(data, String(Global.username), bool(Global.is_spectator))
+	var rematch_allowed := bool(data.get("rematch_allowed", true)) and not _opponent_disconnected
+
 	if bool(Global.is_spectator) or not rematch_allowed:
 		PopupUi.show_code(
 			PopupUi.MODE_INFO,
@@ -310,26 +263,22 @@ func _on_game_end(data: Dictionary) -> void:
 		String(popup_msg.get("message_code", "")),
 		popup_msg.get("message_params", {}) as Dictionary,
 		{"game_id": String(Global.current_game_id)},
-		{"yes_action_id": ACTION_GAME_END_LEAVE, "no_action_id": ACTION_GAME_END_REMATCH, "yes_label_key": "UI_LABEL_BACK_LOBBY", "no_label_key": "UI_LABEL_REMATCH"}
+		{"yes_action_id": ACTION_GAME_END_LEAVE,    "no_action_id": ACTION_GAME_END_REMATCH,
+		 "yes_label_key": "UI_LABEL_BACK_LOBBY",    "no_label_key": "UI_LABEL_REMATCH"}
 	)
 
 func _show_pause_choice(who: String) -> void:
 	PopupUi.show_code(
-		PopupUi.MODE_CONFIRM,
-		Protocol.POPUP_OPPONENT_DISCONNECTED_CHOICE,
-		{"name": who},
-		{},
-		{"yes_action_id": ACTION_PAUSE_WAIT, "no_action_id": ACTION_PAUSE_LEAVE, "yes_label_key": "UI_LABEL_WAIT", "no_label_key": "UI_LABEL_BACK_LOBBY"}
+		PopupUi.MODE_CONFIRM, Protocol.POPUP_OPPONENT_DISCONNECTED_CHOICE, {"name": who}, {},
+		{"yes_action_id": ACTION_PAUSE_WAIT, "no_action_id": ACTION_PAUSE_LEAVE,
+		 "yes_label_key": "UI_LABEL_WAIT",   "no_label_key": "UI_LABEL_BACK_LOBBY"}
 	)
 
 func _schedule_disconnect_choice(who: String) -> void:
 	_disconnect_prompt_seq += 1
 	var seq := _disconnect_prompt_seq
-	var timer := get_tree().create_timer(5.0)
-	timer.timeout.connect(func() -> void:
-		if seq != _disconnect_prompt_seq:
-			return
-		if not _opponent_disconnected:
+	get_tree().create_timer(5.0).timeout.connect(func() -> void:
+		if seq != _disconnect_prompt_seq or not _opponent_disconnected:
 			return
 		_show_pause_choice(who)
 	)
@@ -356,26 +305,18 @@ func _on_popup_action(action_id: String, payload: Dictionary) -> void:
 		ACTION_REMATCH_DECLINED_LEAVE:
 			if game_state_manager != null and game_state_manager.has_method("_ack_end_and_go_lobby"):
 				await game_state_manager._ack_end_and_go_lobby()
-		_:
-			pass
 
 func _leave_current_and_go_lobby() -> void:
 	if _leave_sent:
 		return
 	_leave_sent = true
-
 	var gid := String(Global.current_game_id)
 	if gid != "":
-		var has_result := (Global.result is Dictionary and (Global.result as Dictionary).size() > 0)
-
-		if has_result:
+		var has_result := Global.result is Dictionary and (Global.result as Dictionary).size() > 0
+		if has_result or bool(Global.is_spectator):
 			await NetworkManager.request_async(REQ_ACK_GAME_END, {"game_id": gid}, 4.0)
 		else:
-			if Global.is_spectator:
-				await NetworkManager.request_async(REQ_ACK_GAME_END, {"game_id": gid}, 4.0)
-			else:
-				NetworkManager.request(REQ_LEAVE_GAME, {"game_id": gid})
-
+			NetworkManager.request(REQ_LEAVE_GAME, {"game_id": gid})
 	Global.reset_game_state()
 	await _go_to_lobby_safe()
 
@@ -383,37 +324,39 @@ func _go_to_lobby_safe() -> void:
 	if _is_changing_scene:
 		return
 	_is_changing_scene = true
-
 	get_viewport().gui_disable_input = true
 	await get_tree().process_frame
 	get_viewport().gui_disable_input = false
-
 	get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
+
+# ============= CLEANUP =============
 
 func _exit_tree() -> void:
 	if String(Global.current_game_id) != "":
 		NetworkManager.request(REQ_ACK_GAME_END, {"game_id": String(Global.current_game_id)})
 
-	if game_state_manager != null and game_state_manager.has_method("handle_event") and NetworkManager.evt.is_connected(game_state_manager.handle_event):
-		NetworkManager.evt.disconnect(game_state_manager.handle_event)
-	if game_state_manager != null and game_state_manager.has_method("on_response") and NetworkManager.response.is_connected(game_state_manager.on_response):
-		NetworkManager.response.disconnect(game_state_manager.on_response)
-	if game_state_manager != null and game_state_manager.has_method("on_connection_lost") and NetworkManager.connection_lost.is_connected(game_state_manager.on_connection_lost):
-		NetworkManager.connection_lost.disconnect(game_state_manager.on_connection_lost)
-	if game_state_manager != null and game_state_manager.has_method("on_connection_restored") and NetworkManager.connection_restored.is_connected(game_state_manager.on_connection_restored):
-		NetworkManager.connection_restored.disconnect(game_state_manager.on_connection_restored)
-	if game_state_manager != null and game_state_manager.has_method("on_reconnect_failed") and NetworkManager.reconnect_failed.is_connected(game_state_manager.on_reconnect_failed):
-		NetworkManager.reconnect_failed.disconnect(game_state_manager.on_reconnect_failed)
-	if game_state_manager != null and game_state_manager.has_method("on_server_closed") and NetworkManager.server_closed.is_connected(game_state_manager.on_server_closed):
-		NetworkManager.server_closed.disconnect(game_state_manager.on_server_closed)
+	if game_state_manager != null:
+		for pair in [
+			[NetworkManager.evt,                 "handle_event"],
+			[NetworkManager.response,            "on_response"],
+			[NetworkManager.connection_lost,     "on_connection_lost"],
+			[NetworkManager.connection_restored, "on_connection_restored"],
+			[NetworkManager.reconnect_failed,    "on_reconnect_failed"],
+			[NetworkManager.server_closed,       "on_server_closed"],
+		]:
+			var s: Signal = pair[0]
+			var m: String = pair[1]
+			if game_state_manager.has_method(m):
+				var c := Callable(game_state_manager, m)
+				if s.is_connected(c):
+					s.disconnect(c)
+
 	if PopupUi.action_selected.is_connected(_on_popup_action):
 		PopupUi.action_selected.disconnect(_on_popup_action)
 
-	# Cleanup managers
-	if ui_manager != null:
-		ui_manager.cleanup()
+	if _game_context != null and _game_context.ui_manager != null:
+		_game_context.ui_manager.cleanup()
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		if String(Global.current_game_id) != "":
-			NetworkManager.request(REQ_ACK_GAME_END, {"game_id": String(Global.current_game_id)})
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and String(Global.current_game_id) != "":
+		NetworkManager.request(REQ_ACK_GAME_END, {"game_id": String(Global.current_game_id)})

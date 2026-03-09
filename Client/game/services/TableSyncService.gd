@@ -9,12 +9,16 @@ var context: GameContext = null
 func _init(ctx: GameContext) -> void:
 	context = ctx
 
+# ============= GUARD =============
+func _is_ready() -> bool:
+	return context != null and context.card_context != null
+
 # ============= PUBLIC METHODS =============
 func sync_table_slots(table: Node, slot_scene: PackedScene, allowed_table_slots: Dictionary, active_slots: Array, spacing: int = 100, start_pos: Vector2 = Vector2.ZERO) -> void:
 	"""Synchronise les slots de la table"""
-	if context == null or context.card_context == null:
+	if not _is_ready():
 		return
-	
+
 	var wanted := _collect_wanted_slots(active_slots)
 	_sync_allowed_table_slots(allowed_table_slots, wanted)
 	_remove_stale_table_slots(table, wanted)
@@ -23,9 +27,9 @@ func sync_table_slots(table: Node, slot_scene: PackedScene, allowed_table_slots:
 
 func update_table_positions(table: Node, spacing: int = 100, start_pos: Vector2 = Vector2.ZERO) -> void:
 	"""Positionne les slots de la table"""
-	if context == null or context.card_context == null:
+	if not _is_ready():
 		return
-	
+
 	var slots := _collect_live_table_slots(table)
 	if slots.is_empty():
 		return
@@ -35,7 +39,7 @@ func update_table_positions(table: Node, spacing: int = 100, start_pos: Vector2 
 
 # ============= PRIVATE HELPERS =============
 func _collect_wanted_slots(active_slots: Array) -> Dictionary:
-	"""Collects les slots souhaités"""
+	"""Collecte les slots souhaités"""
 	var wanted: Dictionary = {}
 	for s in active_slots:
 		var normalized := SlotIdHelper.normalize_slot_id(String(s))
@@ -51,9 +55,9 @@ func _sync_allowed_table_slots(allowed_table_slots: Dictionary, wanted: Dictiona
 
 func _remove_stale_table_slots(table: Node, wanted: Dictionary) -> void:
 	"""Supprime les slots de table qui ne sont plus actifs"""
-	if context == null or context.card_context == null:
+	if not _is_ready():
 		return
-	
+
 	for child in table.get_children():
 		if not is_instance_valid(child):
 			continue
@@ -63,29 +67,26 @@ func _remove_stale_table_slots(table: Node, wanted: Dictionary) -> void:
 			continue
 		if wanted.has(cid):
 			continue
-		
-		# Nettoyer le slot
+
 		if child.has_method("clear_slot"):
 			child.clear_slot()
-		
-		# Retirer de index
+
 		if context.card_context.slots_by_id != null:
 			context.card_context.slots_by_id.erase(cid)
-		
-		# Retirer du tableau parent
+
 		if child.get_parent() == table:
 			table.remove_child(child)
 		child.queue_free()
 
 func _upsert_wanted_table_slots(table: Node, slot_scene: PackedScene, wanted: Dictionary) -> void:
 	"""Crée ou met à jour les slots de table"""
-	if context == null or context.card_context == null or context.card_context.slots_by_id == null:
+	if not _is_ready() or context.card_context.slots_by_id == null:
 		return
-	
+
 	for slot_id in wanted.keys():
 		var node_name := SlotIdHelper.slot_node_name(slot_id)
 		var existing := table.get_node_or_null(node_name)
-		
+
 		if existing != null and existing is Node and existing.is_queued_for_deletion():
 			if existing.get_parent() == table:
 				table.remove_child(existing)
@@ -127,7 +128,7 @@ func _position_table_slots(slots: Array, spacing: int, start_pos: Vector2) -> vo
 	"""Positionne les slots sur la table"""
 	if slots.is_empty():
 		return
-	
+
 	var start_offset := -float(slots.size() - 1) / 2.0 * spacing
 	for i in range(slots.size()):
 		slots[i].position = start_pos + Vector2(start_offset + i * spacing, 0)

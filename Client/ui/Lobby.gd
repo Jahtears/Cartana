@@ -3,24 +3,30 @@ extends Control
 
 const Protocol = preload("res://Client/net/Protocol.gd")
 
-const REQ_GET_PLAYERS := "get_players"
-const REQ_GET_LEADERBOARD := "get_leaderboard"
-const REQ_JOIN_GAME := "join_game"
-const REQ_INVITE := "invite"
-const REQ_INVITE_RESPONSE := "invite_response"
-const REQ_SPECTATE_GAME := "spectate_game"
-const REQ_LOGOUT := "logout"
+# ============= REQUEST ALIASES =============
+const REQ_GET_PLAYERS    := Protocol.REQ_GET_PLAYERS
+const REQ_GET_LEADERBOARD := Protocol.REQ_GET_LEADERBOARD
+const REQ_JOIN_GAME      := Protocol.REQ_JOIN_GAME
+const REQ_INVITE         := Protocol.REQ_INVITE
+const REQ_INVITE_RESPONSE := Protocol.REQ_INVITE_RESPONSE
+const REQ_SPECTATE_GAME  := Protocol.REQ_SPECTATE_GAME
+const REQ_LOGOUT         := Protocol.REQ_LOGOUT
 
-const FLOW_SPECTATE_GAME := REQ_SPECTATE_GAME
-const FLOW_LOGOUT := REQ_LOGOUT
+# ============= ACTION ALIASES =============
+const ACTION_NETWORK_RETRY := Protocol.ACTION_NETWORK_RETRY
+
+# ============= FLOW IDs (identifiants popup, pas des types réseau) =============
+const FLOW_SPECTATE_GAME  := Protocol.REQ_SPECTATE_GAME   # "spectate_game"
+const FLOW_LOGOUT         := Protocol.REQ_LOGOUT           # "logout"
 const FLOW_INVITE_REQUEST := Protocol.POPUP_FLOW_INVITE_REQUEST
-const ACTION_NETWORK_RETRY := "network_retry"
+
+# ============= LEADERBOARD LAYOUT =============
 const LEADERBOARD_COL_WIDTH_RANK := 46.0
 const LEADERBOARD_COL_WIDTH_NAME := 150.0
-const LEADERBOARD_COL_WIDTH_WIN := 60.0
+const LEADERBOARD_COL_WIDTH_WIN  := 60.0
 const LEADERBOARD_COL_WIDTH_LOSE := 60.0
 const LEADERBOARD_COL_WIDTH_DRAW := 60.0
-const LEADERBOARD_ROW_MIN_WIDTH := (
+const LEADERBOARD_ROW_MIN_WIDTH  := (
 	LEADERBOARD_COL_WIDTH_RANK
 	+ LEADERBOARD_COL_WIDTH_NAME
 	+ LEADERBOARD_COL_WIDTH_WIN
@@ -29,30 +35,32 @@ const LEADERBOARD_ROW_MIN_WIDTH := (
 )
 const LEADERBOARD_ROW_HEIGHT := 38.0
 
-# --- Leaderboard colors ---
-const COLOR_HEADER_BG     := Color(0.07, 0.07, 0.11, 1.0)
-const COLOR_HEADER_TEXT   := Color(0.60, 0.62, 0.72, 1.0)
-const COLOR_HEADER_WIN    := Color(0.30, 0.78, 0.40, 1.0)
-const COLOR_HEADER_LOSE   := Color(0.85, 0.32, 0.32, 1.0)
-const COLOR_HEADER_DRAW   := Color(0.82, 0.78, 0.28, 1.0)
+# ============= LEADERBOARD COLORS =============
+const COLOR_HEADER_BG       := Color(0.07, 0.07, 0.11, 1.0)
+const COLOR_HEADER_TEXT     := Color(0.60, 0.62, 0.72, 1.0)
+const COLOR_HEADER_WIN      := Color(0.30, 0.78, 0.40, 1.0)
+const COLOR_HEADER_LOSE     := Color(0.85, 0.32, 0.32, 1.0)
+const COLOR_HEADER_DRAW     := Color(0.82, 0.78, 0.28, 1.0)
 
-const COLOR_ROW_ODD       := Color(0.10, 0.10, 0.15, 1.0)
-const COLOR_ROW_EVEN      := Color(0.14, 0.14, 0.20, 1.0)
-const COLOR_ROW_SELF      := Color(0.14, 0.26, 0.42, 1.0)
+const COLOR_ROW_ODD         := Color(0.10, 0.10, 0.15, 1.0)
+const COLOR_ROW_EVEN        := Color(0.14, 0.14, 0.20, 1.0)
+const COLOR_ROW_SELF        := Color(0.14, 0.26, 0.42, 1.0)
 const COLOR_ROW_BORDER_SELF := Color(0.30, 0.55, 0.90, 1.0)
 
-const COLOR_TEXT_DEFAULT  := Color(0.88, 0.88, 0.90, 1.0)
-const COLOR_TEXT_SELF     := Color(0.85, 0.93, 1.00, 1.0)
-const COLOR_RANK_GOLD     := Color(1.00, 0.84, 0.00, 1.0)
-const COLOR_RANK_SILVER   := Color(0.78, 0.78, 0.82, 1.0)
-const COLOR_RANK_BRONZE   := Color(0.82, 0.52, 0.22, 1.0)
+const COLOR_TEXT_DEFAULT    := Color(0.88, 0.88, 0.90, 1.0)
+const COLOR_TEXT_SELF       := Color(0.85, 0.93, 1.00, 1.0)
+const COLOR_RANK_GOLD       := Color(1.00, 0.84, 0.00, 1.0)
+const COLOR_RANK_SILVER     := Color(0.78, 0.78, 0.82, 1.0)
+const COLOR_RANK_BRONZE     := Color(0.82, 0.52, 0.22, 1.0)
 
-const COLOR_STAT_WIN      := Color(0.35, 0.88, 0.45, 1.0)
-const COLOR_STAT_LOSE     := Color(0.92, 0.38, 0.38, 1.0)
-const COLOR_STAT_DRAW     := Color(0.88, 0.82, 0.32, 1.0)
-const SHOP_SOURCE_A := "A"
-const SHOP_SOURCE_B := "B"
-const SHOP_CARD_MIN_WIDTH := 220.0
+const COLOR_STAT_WIN        := Color(0.35, 0.88, 0.45, 1.0)
+const COLOR_STAT_LOSE       := Color(0.92, 0.38, 0.38, 1.0)
+const COLOR_STAT_DRAW       := Color(0.88, 0.82, 0.32, 1.0)
+
+# ============= SHOP =============
+const SHOP_SOURCE_A        := "A"
+const SHOP_SOURCE_B        := "B"
+const SHOP_CARD_MIN_WIDTH  := 220.0
 const SHOP_BACK_PREVIEW_SIZE := Vector2(88, 132)
 
 var _is_changing_scene := false
@@ -107,7 +115,7 @@ func _ready() -> void:
 # --------------------
 # REQ/RES
 # --------------------
-func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
+func _on_response(rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
 	match type:
 		REQ_GET_PLAYERS:
 			if ok:
