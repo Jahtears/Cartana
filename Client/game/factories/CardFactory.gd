@@ -10,7 +10,7 @@ const META_LAST_SLOT_ID := "last_slot_id"
 const META_SERVER_ARRAY_ORDER := "_server_array_order"
 
 # ============= PUBLIC METHODS =============
-static func get_or_create_card(ctx: CardContext, card_id: String) -> Node2D:
+func get_or_create_card(ctx: CardContext, card_id: String) -> Node2D:
 	"""Récupère une carte existante ou en crée une nouvelle"""
 	if ctx == null or ctx.cards == null:
 		return null
@@ -31,7 +31,7 @@ static func get_or_create_card(ctx: CardContext, card_id: String) -> Node2D:
 	
 	return card
 
-static func update_card_data(card: Node2D, data: Dictionary) -> void:
+func update_card_data(card: Node2D, data: Dictionary) -> void:
 	"""Met à jour les données visibles d'une carte"""
 	if card == null or not card.has_method("set_card_data"):
 		return
@@ -45,7 +45,7 @@ static func update_card_data(card: Node2D, data: Dictionary) -> void:
 		bool(payload.get("draggable", true))
 	)
 
-static func set_card_server_order(card: Node2D, data: Dictionary) -> void:
+func set_card_server_order(card: Node2D, data: Dictionary) -> void:
 	"""Définit l'ordre serveur de la carte"""
 	if card == null:
 		return
@@ -56,18 +56,18 @@ static func set_card_server_order(card: Node2D, data: Dictionary) -> void:
 	else:
 		card.set_meta(META_SERVER_ARRAY_ORDER, UNKNOWN_ORDER_SENTINEL)
 
-static func mark_card_synced(card: Node2D) -> void:
+func mark_card_synced(card: Node2D) -> void:
 	"""Marque la carte comme synchronisée"""
 	if card != null:
 		card.set_meta(META_JUST_CREATED, false)
 
-static func update_card_last_slot(card: Node2D, slot_id: String) -> void:
+func update_card_last_slot(card: Node2D, slot_id: String) -> void:
 	"""Met à jour le dernier slot de la carte"""
 	if card != null:
 		card.set_meta(META_LAST_SLOT_ID, slot_id)
 
 # ============= PRIVATE HELPERS =============
-static func _extract_card_payload(data: Dictionary) -> Dictionary:
+func _extract_card_payload(data: Dictionary) -> Dictionary:
 	"""Extrait les données visuelles de la carte"""
 	return {
 		"value": String(data.get("valeur", "")),
@@ -77,7 +77,7 @@ static func _extract_card_payload(data: Dictionary) -> Dictionary:
 		"draggable": bool(data.get("draggable", true)),
 	}
 
-static func _resolve_order_from_payload(data: Dictionary) -> int:
+func _resolve_order_from_payload(data: Dictionary) -> int:
 	"""Résout l'ordre de la carte depuis le payload"""
 	var order_from_array := int(data.get("_array_order", -1))
 	if order_from_array < 0:

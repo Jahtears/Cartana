@@ -23,7 +23,6 @@ const POPUP_PLAYER_DISCONNECTED := "POPUP_PLAYER_DISCONNECTED"
 const POPUP_PLAYER_RECONNECTED := "POPUP_PLAYER_RECONNECTED"
 const POPUP_PLAYER_RECONNECT_FAIL := "POPUP_PLAYER_RECONNECT_FAIL"
 
-
 const POPUP_INVITE_NOT_FOUND := "POPUP_INVITE_NOT_FOUND"
 const POPUP_INVITE_DECLINED := "POPUP_INVITE_DECLINED"
 const POPUP_INVITE_RECEIVED := "POPUP_INVITE_RECEIVED"
@@ -74,6 +73,40 @@ const POPUP_ACTION := {
 	"CONFIRM_NO": POPUP_ACTION_CONFIRM_NO,
 	"INFO_OK": POPUP_ACTION_INFO_OK,
 }
+
+# ============= REQUEST TYPES =============
+
+const REQ_LOGIN            := "login"
+const REQ_LOGOUT           := "logout"
+const REQ_PING             := "ping"
+const REQ_GET_PLAYERS      := "get_players"
+const REQ_GET_LEADERBOARD  := "get_leaderboard"
+const REQ_INVITE           := "invite"
+const REQ_INVITE_RESPONSE  := "invite_response"
+const REQ_JOIN_GAME        := "join_game"
+const REQ_SPECTATE_GAME    := "spectate_game"
+const REQ_LEAVE_GAME       := "leave_game"
+const REQ_ACK_GAME_END     := "ack_game_end"
+const REQ_MOVE_REQUEST     := "move_request"
+
+# ============= POPUP ACTION IDs =============
+
+const ACTION_NETWORK_RETRY        := "network_retry"
+const ACTION_QUIT_CANCEL          := "quit_cancel"
+const ACTION_QUIT_CONFIRM         := "quit_confirm"
+const ACTION_PAUSE_WAIT           := "pause_wait"
+const ACTION_PAUSE_LEAVE          := "pause_leave"
+const ACTION_GAME_END_LEAVE       := "game_end_leave"
+const ACTION_GAME_END_REMATCH     := "game_end_rematch"
+const ACTION_REMATCH_DECLINED_LEAVE := "rematch_declined_leave"
+
+# ============= GAME CONTEXT =============
+
+const REMATCH_CONTEXT        := "rematch"
+const ACK_INTENT_REMATCH     := "rematch"
+const UI_GAME_QUIT_BUTTON_KEY := "UI_GAME_QUIT_BUTTON"
+
+# ============= HELPERS =============
 
 static func invite_action_request(action_id: String, payload: Dictionary) -> Dictionary:
 	var flow := String(payload.get("flow", ""))

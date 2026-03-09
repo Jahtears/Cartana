@@ -328,8 +328,7 @@ func _get_back_color(code: String) -> Color:
 
 func _get_back_texture(code: String) -> Texture2D:
 	var source := String(code).strip_edges().to_upper()
-	if source != "A" and source != "B":
-		source = "B"
+	Global.get_back_texture_for_source(source)
 
 	var selected_texture := Global.get_back_texture_for_source(source)
 	if selected_texture != null:
