@@ -167,8 +167,11 @@ func has_login_credentials() -> bool:
 	return String(_auth_credentials.get("username", "")) != "" and String(_auth_credentials.get("pin", "")) != ""
 
 func _try_auto_login() -> void:
+	print("[NET] _try_auto_login: _is_authenticated=%s, _login_in_flight=%s, has_credentials=%s" % [_is_authenticated, _login_in_flight, has_login_credentials()])
 	if _is_authenticated or _login_in_flight or not has_login_credentials():
+		print("[NET] _try_auto_login: skipped (already auth or in-flight or no credentials)")
 		return
+	print("[NET] _try_auto_login: sending login request with username=%s" % String(_auth_credentials.get("username", "")))
 	_login_in_flight = true
 	request("login", _auth_credentials.duplicate(true), RequestPriority.CRITICAL)
 
@@ -314,6 +317,7 @@ func _process(_delta: float) -> void:
 	if st == WebSocketPeer.STATE_OPEN:
 		if not _was_open:
 			var was_recovering := _connection_state == ConnectionState.RECOVERING and _client_connection_lost
+			print("[NET] Connection opened, was_recovering=%s, has_credentials=%s, is_authenticated=%s" % [was_recovering, has_login_credentials(), _is_authenticated])
 			_was_open = true
 			_connect_in_flight = false
 			_clear_activity_probe()
@@ -321,8 +325,10 @@ func _process(_delta: float) -> void:
 			_reset_reconnect_state()  #  Reset backoff on success
 			_connection_state = ConnectionState.CONNECTED
 			if has_login_credentials() and not _is_authenticated:
+				print("[NET] Attempting auto-login...")
 				_try_auto_login()
 			else:
+				print("[NET] Draining queue (no auto-login needed)")
 				_drain_queue()
 			connected.emit()
 			if was_recovering:
@@ -514,8 +520,12 @@ func _handle_packet(pkt: String) -> void:
 		var err := env.get("error", {}) as Dictionary
 
 		if type == "login":
+			print("[NET] Login response: ok=%s, username=%s" % [ok, String(data.get("username", ""))])
 			_login_in_flight = false
 			_is_authenticated = ok
+			if ok:
+				print("[NET] Authentication successful, draining queue")
+				_drain_queue()
 		elif type == "logout":
 			clear_login_credentials()
 			_allow_reconnect = false

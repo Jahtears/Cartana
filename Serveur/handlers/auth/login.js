@@ -189,11 +189,26 @@ export async function handleLogin(ctx, ws, req, data) {
 
     clearLoginFailures(rateLimitKeys);
 
+    const existingWs = state.getWS(username);
+    console.log('[LOGIN] Checking if user already connected:', { username, hasExistingWs: !!existingWs, isSameWs: existingWs === ws });
+    
+    
     if (state.getWS(username)) {
       sendRes(ws, req, false, {
         message_code: POPUP_MESSAGE.AUTH_ALREADY_CONNECTED,
       });
       return true;
+    }
+    // Si l'utilisateur a déjà un websocket différent (reconnexion), on ferme proprement l'ancien
+    if (existingWs && existingWs !== ws) {
+      console.log('[LOGIN] Reconnection detected, closing old websocket for:', username);
+      try {
+        existingWs.close(1000, 'Reconnection from new client');
+      } catch (err) {
+        console.warn('[LOGIN] Failed to close old websocket:', err.message);
+      }
+      // Nettoyer l'ancien mapping immédiatement
+      state.unregisterUser(username, existingWs);
     }
 
     state.registerUser(username, ws);

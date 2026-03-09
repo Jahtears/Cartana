@@ -135,7 +135,7 @@ func _apply_language_to_popup() -> void:
 func _on_language_changed(_language_code: String) -> void:
 	_apply_language_to_popup()
 
-func _resolve_actions(p_mode: int, options: Dictionary) -> Dictionary:
+func _resolve_actions(_p_mode: int, options: Dictionary) -> Dictionary:
 	return {
 		"ok": options.get("ok_action_id", ACTION_INFO_OK),
 		"yes": options.get("yes_action_id", ACTION_CONFIRM_YES),

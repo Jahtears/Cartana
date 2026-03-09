@@ -1,5 +1,6 @@
 # Slot.gd - Refactorisé sans redondances
 extends Area2D
+class_name Slot
 
 # ============= EXPORTS =============
 @export var slot_id: String = ""
