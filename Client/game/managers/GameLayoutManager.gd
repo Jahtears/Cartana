@@ -106,12 +106,20 @@ func apply_ui_layout() -> void:
 
 # === NEW: Player-linked UI positioning ===
 func _apply_timebar_layout() -> void:
+	print("[GameLayoutManager._apply_timebar_layout] p1_banc_anchor = ", p1_banc_anchor, " _timebar_state.size() = ", _timebar_state.size())
 	if p1_banc_anchor != null and _timebar_state.size() > 0:
+		print("[GameLayoutManager._apply_timebar_layout] Calling TimebarUtil.apply_layout")
 		TimebarUtil.apply_layout(_timebar_state, p1_banc_anchor.global_position)
+	else:
+		print("[GameLayoutManager._apply_timebar_layout] Skipping timebar layout")
 
 func _apply_game_message_layout() -> void:
+	print("[GameLayoutManager._apply_game_message_layout] p1_main_anchor = ", p1_main_anchor, " _game_message_state.size() = ", _game_message_state.size())
 	if p1_main_anchor != null and _game_message_state.size() > 0:
+		print("[GameLayoutManager._apply_game_message_layout] Calling GameMessage.apply_layout")
 		GameMessage.apply_layout(_game_message_state, p1_main_anchor.global_position)
+	else:
+		print("[GameLayoutManager._apply_game_message_layout] Skipping game message layout")
 
 func _apply_player_linked_ui_layout() -> void:
 	"""Apply layout for all player-linked UI elements"""

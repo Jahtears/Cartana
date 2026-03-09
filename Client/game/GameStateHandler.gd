@@ -5,9 +5,17 @@ const Protocol = preload("res://Client/net/Protocol.gd")
 
 var game: Node = null
 var _waiting_for_reauth := false
+var _card_sync_service: CardSyncService = null
+var _table_sync_service: TableSyncService = null
 
 func setup(game_ref: Node) -> void:
 	game = game_ref
+	# Initialiser les services (sera appelé avant handle_event)
+	if game != null and game.has_meta("game_context"):
+		var game_context = game.get_meta("game_context")
+		if game_context is GameContext:
+			_card_sync_service = CardSyncService.new(game_context.card_context)
+			_table_sync_service = TableSyncService.new(game_context)
 
 func handle_event(type: String, data: Dictionary) -> void:
 	if game == null:
@@ -156,7 +164,8 @@ func _handle_start_game(data: Dictionary) -> void:
 
 func _handle_table_sync(data: Dictionary) -> void:
 	if game.slots_ready:
-		TableSyncHelper.sync_table_slots(game.table_root, game.slot_scene, game.slots_by_id, game.allowed_table_slots, data.get("slots", []), game._table_spacing, GameLayoutConfig.START_POS)
+		if _table_sync_service != null:
+			_table_sync_service.sync_table_slots(game.table_root, game.slot_scene, game.allowed_table_slots, data.get("slots", []), game._table_spacing, GameLayoutConfig.START_POS)
 	else:
 		game.pending_events.append({"type": "table_sync", "data": data})
 
@@ -283,7 +292,8 @@ func _apply_slot_cards_update(slot_id: String, slot, arr: Array, count_for_slot:
 		var payload = arr[i]
 		if payload is Dictionary:
 			payload["_array_order"] = i
-			CardSyncHelper.apply_card_update(game._card_ctx, payload)
+			if _card_sync_service != null:
+				_card_sync_service.sync_card(payload)
 
 	if slot != null and slot.has_method("finalize_server_sync"):
 		slot.call("finalize_server_sync")
@@ -294,7 +304,8 @@ func _apply_state_snapshot(data: Dictionary) -> void:
 			s.clear_slot()
 	DeckCountUtil.reset_counts(game._deck_count_state)
 
-	TableSyncHelper.sync_table_slots(game.table_root, game.slot_scene, game.slots_by_id, game.allowed_table_slots, data.get("table", []), game._table_spacing, GameLayoutConfig.START_POS)
+	if _table_sync_service != null:
+		_table_sync_service.sync_table_slots(game.table_root, game.slot_scene, game.allowed_table_slots, data.get("table", []), game._table_spacing, GameLayoutConfig.START_POS)
 
 	var slots_dict: Dictionary = data.get("slots", {})
 	var slot_counts_val = data.get("slot_counts", null)
@@ -431,7 +442,9 @@ func _on_invalid_move(data: Dictionary) -> void:
 	if card_id == "" or from_slot_id == "":
 		return
 
-	var card = CardSyncHelper.get_or_create_card(game._card_ctx, card_id)
+	var card = null
+	if _card_sync_service != null and game._card_ctx != null:
+		card = CardFactory.get_or_create_card(game._card_ctx, card_id)
 	var slot = game.slots_by_id.get(from_slot_id)
 	if slot:
 		slot.snap_card(card, true)
@@ -443,7 +456,8 @@ func _reset_board_state() -> void:
 			s.clear_slot()
 	DeckCountUtil.reset_counts(game._deck_count_state)
 
-	TableSyncHelper.sync_table_slots(game.table_root, game.slot_scene, game.slots_by_id, game.allowed_table_slots, ["0:TABLE:1"], game._table_spacing, GameLayoutConfig.START_POS)
+	if _table_sync_service != null:
+		_table_sync_service.sync_table_slots(game.table_root, game.slot_scene, game.allowed_table_slots, ["0:TABLE:1"], game._table_spacing, GameLayoutConfig.START_POS)
 
 	for k in game.cards.keys():
 		var c = game.cards[k]
