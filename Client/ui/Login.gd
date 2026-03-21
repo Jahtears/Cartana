@@ -21,208 +21,208 @@ var _network_disconnected := false
 @onready var _close_button: Button = $Fermer
 
 func _ready() -> void:
-	if not NetworkManager.is_open():
-		NetworkManager.connect_to_server()
-	if not NetworkManager.response.is_connected(_on_response):
-		NetworkManager.response.connect(_on_response)
-	if not NetworkManager.disconnected.is_connected(_on_network_disconnected):
-		NetworkManager.disconnected.connect(_on_network_disconnected)
-	if not NetworkManager.connection_restored.is_connected(_on_connection_restored):
-		NetworkManager.connection_restored.connect(_on_connection_restored)
-	if not LanguageManager.language_changed.is_connected(_on_language_changed):
-		LanguageManager.language_changed.connect(_on_language_changed)
-	PopupUi.hide_and_reset()
-	_setup_language_option_button()
-	_load_login_preferences()
-	_apply_language_to_login_ui()
+    if not NetworkManager.is_open():
+        NetworkManager.connect_to_server()
+    if not NetworkManager.response.is_connected(_on_response):
+        NetworkManager.response.connect(_on_response)
+    if not NetworkManager.disconnected.is_connected(_on_network_disconnected):
+        NetworkManager.disconnected.connect(_on_network_disconnected)
+    if not NetworkManager.connection_restored.is_connected(_on_connection_restored):
+        NetworkManager.connection_restored.connect(_on_connection_restored)
+    if not LanguageManager.language_changed.is_connected(_on_language_changed):
+        LanguageManager.language_changed.connect(_on_language_changed)
+    PopupUi.hide_and_reset()
+    _setup_language_option_button()
+    _load_login_preferences()
+    _apply_language_to_login_ui()
 
 func _on_response(rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
-	if type != "login":
-		return
+    if type != "login":
+        return
 
-	_login_pending = false
+    _login_pending = false
 
-	if ok:
-		var u := String(data.get("username", ""))
-		if u == "":
-			u = _last_username
-		Global.username = u
-		get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
-	else:
-		_show_login_error(error)
+    if ok:
+        var u := String(data.get("username", ""))
+        if u == "":
+            u = _last_username
+        Global.username = u
+        get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
+    else:
+        _show_login_error(error)
 
 func _on_network_disconnected(_code: int, reason: String) -> void:
-	if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
-		return
-	_network_disconnected = true
-	PopupUi.show_code(PopupUi.MODE_PASSIVE, Protocol.POPUP_AUTH_CONNECTION_ERROR)
+    if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
+        return
+    _network_disconnected = true
+    PopupUi.show_code(PopupUi.MODE_PASSIVE, Protocol.POPUP_AUTH_CONNECTION_ERROR)
 
 func _on_connection_restored() -> void:
-	if not _network_disconnected:
-		return
-	_network_disconnected = false
-	PopupUi.hide_and_reset()
+    if not _network_disconnected:
+        return
+    _network_disconnected = false
+    PopupUi.hide_and_reset()
 
 func _show_login_error(error: Dictionary) -> void:
-	var popup := _normalize_login_error(error)
-	PopupUi.show_normalized(PopupUi.MODE_INFO, popup)
+    var popup := _normalize_login_error(error)
+    PopupUi.show_normalized(PopupUi.MODE_INFO, popup)
 
 func _normalize_login_error(error: Dictionary) -> Dictionary:
-	var normalized := PopupMessage.normalize_popup_error(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
-	var message_code := String(normalized.get("message_code", "")).strip_edges()
-	if message_code != Protocol.POPUP_AUTH_MAX_TRY:
-		return normalized
+    var normalized := PopupMessage.normalize_popup_error(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
+    var message_code := String(normalized.get("message_code", "")).strip_edges()
+    if message_code != Protocol.POPUP_AUTH_MAX_TRY:
+        return normalized
 
-	var params_val = normalized.get("message_params", {})
-	var params: Dictionary = params_val if params_val is Dictionary else {}
-	if params.has("retry_after_s"):
-		return normalized
+    var params_val = normalized.get("message_params", {})
+    var params: Dictionary = params_val if params_val is Dictionary else {}
+    if params.has("retry_after_s"):
+        return normalized
 
-	var details_val = error.get("details", {})
-	var details: Dictionary = details_val if details_val is Dictionary else {}
-	var retry_after_ms := int(details.get("retry_after_ms", 0))
-	if retry_after_ms <= 0:
-		return normalized
+    var details_val = error.get("details", {})
+    var details: Dictionary = details_val if details_val is Dictionary else {}
+    var retry_after_ms := int(details.get("retry_after_ms", 0))
+    if retry_after_ms <= 0:
+        return normalized
 
-	params["retry_after_s"] = (retry_after_ms + 999.0) / 1000
-	normalized["message_params"] = params
-	return normalized
+    params["retry_after_s"] = (retry_after_ms + 999.0) / 1000
+    normalized["message_params"] = params
+    return normalized
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_accept"):
-		_on_login_button_pressed()
+    if event.is_action_pressed("ui_accept"):
+        _on_login_button_pressed()
 
 func _on_login_button_pressed() -> void:
-	if _login_pending:
-		return
+    if _login_pending:
+        return
 
-	var username: String = _username_input.text.strip_edges()
-	var pin: String = _pin_input.text.strip_edges()
+    var username: String = _username_input.text.strip_edges()
+    var pin: String = _pin_input.text.strip_edges()
 
-	# --- VALIDATION MINIMUM ---
-	if username.length() < 3:
-		PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_INVALID_USERNAME_MIN)
-		return
+    # --- VALIDATION MINIMUM ---
+    if username.length() < 3:
+        PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_INVALID_USERNAME_MIN)
+        return
 
-	if pin.length() < 4:
-		PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_INVALID_PIN_MIN)
-		return
-	# ---------------------------
+    if pin.length() < 4:
+        PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_INVALID_PIN_MIN)
+        return
+    # ---------------------------
 
-	if username == "" or pin == "":
-		PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
-		return
+    if username == "" or pin == "":
+        PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
+        return
 
-	_last_username = username
-	_login_pending = true
-	_save_login_preferences(_remember_username_checkbox.button_pressed, username)
+    _last_username = username
+    _login_pending = true
+    _save_login_preferences(_remember_username_checkbox.button_pressed, username)
 
-	NetworkManager.request("login", {
-		"username": username,
-		"pin": pin
-	})
+    NetworkManager.request("login", {
+        "username": username,
+        "pin": pin
+    })
 
 func _on_username_input_text_submitted(_new_text: String) -> void:
-	_on_login_button_pressed()
+    _on_login_button_pressed()
 
 func _on_username_input_text_changed(new_text: String) -> void:
-	if _loading_preferences or not _remember_username_checkbox.button_pressed:
-		return
-	_save_login_preferences(true, String(new_text).strip_edges())
+    if _loading_preferences or not _remember_username_checkbox.button_pressed:
+        return
+    _save_login_preferences(true, String(new_text).strip_edges())
 
 func _on_pin_input_text_submitted(_new_text: String) -> void:
-	_on_login_button_pressed()
+    _on_login_button_pressed()
 
 func _on_remember_username_check_box_toggled(toggled_on: bool) -> void:
-	if _loading_preferences:
-		return
-	var username_to_store := _username_input.text.strip_edges() if toggled_on else ""
-	_save_login_preferences(toggled_on, username_to_store)
+    if _loading_preferences:
+        return
+    var username_to_store := _username_input.text.strip_edges() if toggled_on else ""
+    _save_login_preferences(toggled_on, username_to_store)
 
 func _setup_language_option_button() -> void:
-	if _language_option_button == null:
-		return
-	_language_option_button.clear()
-	_add_language_option(LanguageManager.LANG_FR)
-	_add_language_option(LanguageManager.LANG_EN)
+    if _language_option_button == null:
+        return
+    _language_option_button.clear()
+    _add_language_option(LanguageManager.LANG_FR)
+    _add_language_option(LanguageManager.LANG_EN)
 
-	var active_language := LanguageManager.get_language()
-	_select_language_option(active_language)
+    var active_language := LanguageManager.get_language()
+    _select_language_option(active_language)
 
 func _add_language_option(language_code: String) -> void:
-	var display_name := LanguageManager.language_display_name(language_code)
-	var item_index := _language_option_button.item_count
-	_language_option_button.add_item(display_name)
-	_language_option_button.set_item_metadata(item_index, language_code)
+    var display_name := LanguageManager.language_display_name(language_code)
+    var item_index := _language_option_button.item_count
+    _language_option_button.add_item(display_name)
+    _language_option_button.set_item_metadata(item_index, language_code)
 
 func _select_language_option(language_code: String) -> void:
-	var normalized := LanguageManager.normalize_language(language_code)
-	for index in range(_language_option_button.item_count):
-		var item_language := String(_language_option_button.get_item_metadata(index))
-		if item_language == normalized:
-			_language_option_button.select(index)
-			return
+    var normalized := LanguageManager.normalize_language(language_code)
+    for index in range(_language_option_button.item_count):
+        var item_language := String(_language_option_button.get_item_metadata(index))
+        if item_language == normalized:
+            _language_option_button.select(index)
+            return
 
 func _refresh_language_options_labels() -> void:
-	for index in range(_language_option_button.item_count):
-		var item_language := String(_language_option_button.get_item_metadata(index))
-		_language_option_button.set_item_text(index, LanguageManager.language_display_name(item_language))
+    for index in range(_language_option_button.item_count):
+        var item_language := String(_language_option_button.get_item_metadata(index))
+        _language_option_button.set_item_text(index, LanguageManager.language_display_name(item_language))
 
 func _apply_language_to_login_ui() -> void:
-	_username_input.placeholder_text = LanguageManager.ui_text("UI_LOGIN_USERNAME_PLACEHOLDER", "Username")
-	_pin_input.placeholder_text = LanguageManager.ui_text("UI_LOGIN_PIN_PLACEHOLDER", "PIN")
-	_remember_username_checkbox.text = LanguageManager.ui_text("UI_LOGIN_REMEMBER_USERNAME", "Remember username")
-	_login_button.text = LanguageManager.ui_text("UI_LOGIN_BUTTON", "Login")
-	_language_label.text = LanguageManager.ui_text("UI_LOGIN_LANGUAGE_LABEL", "Language")
-	_close_button.text = LanguageManager.ui_text("UI_LOGIN_CLOSE_BUTTON", "Quit")
-	_refresh_language_options_labels()
+    _username_input.placeholder_text = LanguageManager.ui_text("UI_LOGIN_USERNAME_PLACEHOLDER", "Username")
+    _pin_input.placeholder_text = LanguageManager.ui_text("UI_LOGIN_PIN_PLACEHOLDER", "PIN")
+    _remember_username_checkbox.text = LanguageManager.ui_text("UI_LOGIN_REMEMBER_USERNAME", "Remember username")
+    _login_button.text = LanguageManager.ui_text("UI_LOGIN_BUTTON", "Login")
+    _language_label.text = LanguageManager.ui_text("UI_LOGIN_LANGUAGE_LABEL", "Language")
+    _close_button.text = LanguageManager.ui_text("UI_LOGIN_CLOSE_BUTTON", "Quit")
+    _refresh_language_options_labels()
 
 func _on_language_option_button_item_selected(index: int) -> void:
-	if index < 0 or index >= _language_option_button.item_count:
-		return
-	var language_code := String(_language_option_button.get_item_metadata(index))
-	LanguageManager.set_language(language_code)
+    if index < 0 or index >= _language_option_button.item_count:
+        return
+    var language_code := String(_language_option_button.get_item_metadata(index))
+    LanguageManager.set_language(language_code)
 
 func _on_language_changed(_language_code: String) -> void:
-	_select_language_option(LanguageManager.get_language())
-	_apply_language_to_login_ui()
+    _select_language_option(LanguageManager.get_language())
+    _apply_language_to_login_ui()
 
 func _load_login_preferences() -> void:
-	_loading_preferences = true
-	var config := ConfigFile.new()
-	var load_result := config.load(SETTINGS_PATH)
-	if load_result != OK:
-		_remember_username_checkbox.button_pressed = false
-		_username_input.text = ""
-		_loading_preferences = false
-		return
+    _loading_preferences = true
+    var config := ConfigFile.new()
+    var load_result := config.load(SETTINGS_PATH)
+    if load_result != OK:
+        _remember_username_checkbox.button_pressed = false
+        _username_input.text = ""
+        _loading_preferences = false
+        return
 
-	var remember := bool(config.get_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_REMEMBER_USERNAME, false))
-	var saved_username := String(config.get_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_USERNAME, "")).strip_edges()
-	_remember_username_checkbox.button_pressed = remember
-	_username_input.text = saved_username if remember else ""
-	_loading_preferences = false
+    var remember := bool(config.get_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_REMEMBER_USERNAME, false))
+    var saved_username := String(config.get_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_USERNAME, "")).strip_edges()
+    _remember_username_checkbox.button_pressed = remember
+    _username_input.text = saved_username if remember else ""
+    _loading_preferences = false
 
 func _save_login_preferences(remember_username: bool, username: String) -> void:
-	var config := ConfigFile.new()
-	config.load(SETTINGS_PATH)
-	config.set_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_REMEMBER_USERNAME, remember_username)
-	config.set_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_USERNAME, username if remember_username else "")
-	config.save(SETTINGS_PATH)
+    var config := ConfigFile.new()
+    config.load(SETTINGS_PATH)
+    config.set_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_REMEMBER_USERNAME, remember_username)
+    config.set_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_USERNAME, username if remember_username else "")
+    config.save(SETTINGS_PATH)
 
 
 
 func _exit_tree() -> void:
-	if NetworkManager.response.is_connected(_on_response):
-		NetworkManager.response.disconnect(_on_response)
-	if NetworkManager.disconnected.is_connected(_on_network_disconnected):
-		NetworkManager.disconnected.disconnect(_on_network_disconnected)
-	if NetworkManager.connection_restored.is_connected(_on_connection_restored):
-		NetworkManager.connection_restored.disconnect(_on_connection_restored)
-	if LanguageManager.language_changed.is_connected(_on_language_changed):
-		LanguageManager.language_changed.disconnect(_on_language_changed)
+    if NetworkManager.response.is_connected(_on_response):
+        NetworkManager.response.disconnect(_on_response)
+    if NetworkManager.disconnected.is_connected(_on_network_disconnected):
+        NetworkManager.disconnected.disconnect(_on_network_disconnected)
+    if NetworkManager.connection_restored.is_connected(_on_connection_restored):
+        NetworkManager.connection_restored.disconnect(_on_connection_restored)
+    if LanguageManager.language_changed.is_connected(_on_language_changed):
+        LanguageManager.language_changed.disconnect(_on_language_changed)
 
 
 func _on_close_pressed() -> void:
-	NetworkManager.close(1000, NetworkManager.DISCONNECT_REASON_CLOSE)
-	get_tree().quit()
+    NetworkManager.close(1000, NetworkManager.DISCONNECT_REASON_CLOSE)
+    get_tree().quit()

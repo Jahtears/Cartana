@@ -12,13 +12,13 @@ const PREVIEW_CARD_GLOW_SIZE := 6
 
 # ============= STATE MACHINE =============
 enum CardState {
-	IDLE,
-	HOVER,
-	HOVER_TOP,
-	DRAG,
-	PREVIEW_SLOT,
-	DROP,
-	ANIMATING
+    IDLE,
+    HOVER,
+    HOVER_TOP,
+    DRAG,
+    PREVIEW_SLOT,
+    DROP,
+    ANIMATING
 }
 
 var state: CardState = CardState.IDLE
@@ -32,81 +32,81 @@ var _base_scale := Vector2.ONE
 
 # ============= LIFECYCLE =============
 func _ready() -> void:
-	add_to_group("card_elements")
-	_base_scale = scale
+    add_to_group("card_elements")
+    _base_scale = scale
 
 # ============= STATE MACHINE =============
 func set_state(new_state: CardState) -> void:
-	if state == new_state:
-		return
+    if state == new_state:
+        return
 
-	_exit_state(state)
-	state = new_state
-	_enter_state(state)
+    _exit_state(state)
+    state = new_state
+    _enter_state(state)
 
 func _enter_state(s: CardState) -> void:
-	match s:
-		CardState.IDLE:
-			_apply_scale(_base_scale)
-			_apply_hover_modulation(Color.WHITE)
+    match s:
+        CardState.IDLE:
+            _apply_scale(_base_scale)
+            _apply_hover_modulation(Color.WHITE)
 
-		CardState.HOVER:
-			_apply_scale(_base_scale * HOVER_SCALE)
-			_apply_hover_modulation(Color.WHITE)
+        CardState.HOVER:
+            _apply_scale(_base_scale * HOVER_SCALE)
+            _apply_hover_modulation(Color.WHITE)
 
-		CardState.HOVER_TOP:
-			_apply_scale(_base_scale * HOVER_SCALE)
-			_apply_hover_modulation(Color.WHITE)
+        CardState.HOVER_TOP:
+            _apply_scale(_base_scale * HOVER_SCALE)
+            _apply_hover_modulation(Color.WHITE)
 
-		CardState.DRAG:
-			_apply_scale(_base_scale * DRAG_SCALE)
-			_apply_hover_modulation(Color.WHITE)
+        CardState.DRAG:
+            _apply_scale(_base_scale * DRAG_SCALE)
+            _apply_hover_modulation(Color.WHITE)
 
-		CardState.PREVIEW_SLOT:
-			_apply_scale(_base_scale * DRAG_SCALE)
-			_apply_hover_modulation(Color.WHITE)
+        CardState.PREVIEW_SLOT:
+            _apply_scale(_base_scale * DRAG_SCALE)
+            _apply_hover_modulation(Color.WHITE)
 
-		CardState.DROP:
-			_apply_scale(_base_scale)
-			_apply_hover_modulation(Color.WHITE)
+        CardState.DROP:
+            _apply_scale(_base_scale)
+            _apply_hover_modulation(Color.WHITE)
 
-		CardState.ANIMATING:
-			# Ne change pas scale/color pendant animation
-			pass
+        CardState.ANIMATING:
+            # Ne change pas scale/color pendant animation
+            pass
 
 func _exit_state(_s: CardState) -> void:
-	pass
+    pass
 
 # ============= ANIMATION MANAGEMENT =============
 func start_animation(anim_type: String) -> void:
-	_is_animating = true
-	_animation_type = anim_type
-	set_state(CardState.ANIMATING)
-	EventDispatcher.emit_animation_started(self, anim_type)
+    _is_animating = true
+    _animation_type = anim_type
+    set_state(CardState.ANIMATING)
+    EventDispatcher.emit_animation_started(self, anim_type)
 
 func finish_animation() -> void:
-	var prev_anim = _animation_type
-	_is_animating = false
-	_animation_type = ""
-	set_state(CardState.IDLE)
-	EventDispatcher.emit_animation_finished(self, prev_anim)
+    var prev_anim = _animation_type
+    _is_animating = false
+    _animation_type = ""
+    set_state(CardState.IDLE)
+    EventDispatcher.emit_animation_finished(self, prev_anim)
 
 func is_animating() -> bool:
-	return _is_animating
+    return _is_animating
 
 # ============= VISUAL UPDATES =============
 func _apply_scale(new_scale: Vector2) -> void:
-	scale = new_scale
+    scale = new_scale
 
 func _apply_hover_modulation(color: Color) -> void:
-	modulate = color
+    modulate = color
 
 # ============= QUERY METHODS =============
 func can_interact() -> bool:
-	return true  # Override in Carte
+    return true  # Override in Carte
 
 func get_card_state() -> CardState:
-	return state
+    return state
 
 func get_animation_type() -> String:
-	return _animation_type
+    return _animation_type

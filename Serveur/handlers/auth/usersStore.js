@@ -1,6 +1,6 @@
 // Serveur/handlers/auth/usersStore.js
 import fs from "fs";
-import bcrypt from "bcrypt";
+import argon2 from "argon2";
 
 export let USERS_FILE = "./app/saves/Users.json";
 const SALT_ROUNDS = 10;
@@ -33,7 +33,7 @@ async function verifyExistingUserPin(existing, pin) {
   if (!storedHash) return false;
 
   try {
-    return await bcrypt.compare(pin, storedHash);
+    return await argon2.verify(storedHash, pin);
   } catch {
     return false;
   }
@@ -47,7 +47,7 @@ export async function verifyOrCreateUser(username, pin) {
   const existing = players.find((p) => p.user === username);
   if (existing) return verifyExistingUserPin(existing, pin);
 
-  const hash = await bcrypt.hash(pin, SALT_ROUNDS);
+const hash = await argon2.hash(pin);
   players.push({ user: username, hash });
   saveUsers(data);
   return true;
