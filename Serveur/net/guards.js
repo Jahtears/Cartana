@@ -1,15 +1,15 @@
-//\game\guards.js 
+//\game\guards.js
 
-import { ensureGameMeta } from "../game/meta.js";
-import { resError } from "./transport.js";
-import { POPUP_MESSAGE } from "../shared/popupMessages.js";
+import { ensureGameMeta } from '../game/meta.js';
+import { resError } from './transport.js';
+import { POPUP_MESSAGE } from '../shared/popupMessages.js';
 
 function getResponder(ctx) {
   return ctx?.sendRes;
 }
 
 export function requireParam(sendRes, ws, req, data, key, label = key) {
-  const value = String(data?.[key] ?? "").trim();
+  const value = String(data?.[key] ?? '').trim();
   if (!value) {
     resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_REQUEST, {
       field: label,
@@ -52,17 +52,17 @@ export function getGameIdFromDataOrMapping(
   req,
   data,
   actor,
-      {
-    key = "game_id",
+  {
+    key = 'game_id',
     required = true,
     preferMapping = false,
     allowedKeys = null, // ex: ["game_id"] ou ["game_id","to"]
-  } = {}
+  } = {},
 ) {
   const { state } = ctx;
   const sendRes = getResponder(ctx);
 
-    // whitelist des clés acceptées (anti-typo)
+  // whitelist des clés acceptées (anti-typo)
   if (Array.isArray(allowedKeys) && allowedKeys.length) {
     if (!allowedKeys.includes(key)) {
       if (required) {
@@ -76,30 +76,36 @@ export function getGameIdFromDataOrMapping(
 
     // si le client envoie une clé "proche" non autorisée, on renvoie une erreur explicite
     // (évite silence si data contient gameId au lieu de game_id)
-    const norm = (s) => String(s).toLowerCase().replace(/_/g, "");
+    const norm = (s) => String(s).toLowerCase().replace(/_/g, '');
     const expected = norm(key);
-    const dataKeys = data && typeof data === "object" ? Object.keys(data) : [];
+    const dataKeys = data && typeof data === 'object' ? Object.keys(data) : [];
     for (const k of dataKeys) {
-      if (allowedKeys.includes(k)) continue;
+      if (allowedKeys.includes(k)) {
+        continue;
+      }
       // détecte gameId vs game_id (ou autres variantes équivalentes)
       if (norm(k) === expected) {
         resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_REQUEST, {
           field: k,
           allowed_keys: allowedKeys,
-          message_params: { field: k, allowed: allowedKeys.join(", ") },
+          message_params: { field: k, allowed: allowedKeys.join(', ') },
         });
         return null;
       }
     }
   }
   // data key (optionnel) : on ne force pas l’erreur ici, car fallback mapping possible
-  const fromData = String(data?.[key] ?? "").trim();
-  const inferred = String(state.userToGame.get(actor) ?? state.userToSpectate.get(actor) ?? "").trim();
+  const fromData = String(data?.[key] ?? '').trim();
+  const inferred = String(
+    state.userToGame.get(actor) ?? state.userToSpectate.get(actor) ?? '',
+  ).trim();
 
-  const game_id = preferMapping ? (inferred || fromData) : (fromData || inferred);
+  const game_id = preferMapping ? inferred || fromData : fromData || inferred;
 
   if (!game_id) {
-      if (required) return requireParam(sendRes, ws, req, data, key, key); // génère l’erreur standard
+    if (required) {
+      return requireParam(sendRes, ws, req, data, key, key);
+    } // génère l’erreur standard
 
     return null;
   }
@@ -110,8 +116,8 @@ export function rejectIfBusyOrRes(ctx, ws, req, username, message = POPUP_MESSAG
   const sendRes = getResponder(ctx);
   const state = ctx.state;
 
-  const inGame = !!state.userToGame.get(username);
-  const inEndGame = !!state.userToEndGame?.get(username);
+  const inGame = Boolean(state.userToGame.get(username));
+  const inEndGame = Boolean(state.userToEndGame?.get(username));
 
   if (inGame || inEndGame) {
     resError(sendRes, ws, req, message);
@@ -126,14 +132,14 @@ export function rejectIfSpectatorOrRes(
   req,
   game_id,
   actor,
-  message = POPUP_MESSAGE.TECH_FORBIDDEN
+  message = POPUP_MESSAGE.TECH_FORBIDDEN,
 ) {
   const sendRes = getResponder(ctx);
   const state = ctx.state;
 
   const spectatingGameId = state.userToSpectate.get(actor);
 
-  const sameGameAsSpectator = String(spectatingGameId ?? "") === String(game_id ?? "");
+  const sameGameAsSpectator = String(spectatingGameId ?? '') === String(game_id ?? '');
 
   if (sameGameAsSpectator) {
     resError(sendRes, ws, req, message);
@@ -145,7 +151,7 @@ export function rejectIfSpectatorOrRes(
 export function rejectIfEndedOrRes(ctx, ws, req, game_id, game) {
   const { state } = ctx;
   const sendRes = getResponder(ctx);
-  const meta = ensureGameMeta(state.gameMeta, game_id, { initialSent: !!game?.turn });
+  const meta = ensureGameMeta(state.gameMeta, game_id, { initialSent: Boolean(game?.turn) });
   if (meta?.result) {
     resError(sendRes, ws, req, POPUP_MESSAGE.GAME_ENDED);
     return true;

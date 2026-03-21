@@ -1,14 +1,7 @@
 // handlers/auth/logout.js - Handle user logout
 
 export function handleLogout(ctx, ws, req, data, actor) {
-  const {
-    state,
-    sendRes,
-    clearInvitesForUser,
-    setUserActivity,
-    Activity,
-    refreshLobby,
-  } = ctx;
+  const { state, sendRes, clearInvitesForUser, setUserActivity, Activity, refreshLobby } = ctx;
 
   // Unregister user from state
   const user = actor; // actor is the authenticated user

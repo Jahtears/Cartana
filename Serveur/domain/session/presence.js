@@ -1,12 +1,16 @@
 // services/session/presence.js v1.1
-import { ensureGameMeta } from "../../game/meta.js";
-import { pauseTurnClock, resumeTurnClock } from "../../game/turnClock.js";
+import { ensureGameMeta } from '../../game/meta.js';
+import { pauseTurnClock, resumeTurnClock } from '../../game/turnClock.js';
 
 function notifyOpponent(sendEvtUser, game, actor, evtType, data) {
-  if (typeof sendEvtUser !== "function" || !game) return;
+  if (typeof sendEvtUser !== 'function' || !game) {
+    return;
+  }
   for (const player of game.players ?? []) {
-    const username = typeof player === "string" ? player : String(player?.username ?? "");
-    if (!username || username === actor) continue;
+    const username = typeof player === 'string' ? player : String(player?.username ?? '');
+    if (!username || username === actor) {
+      continue;
+    }
     sendEvtUser(username, evtType, data);
   }
 }
@@ -38,23 +42,19 @@ export function createPresence(ctx) {
     emitStartGameToUser,
     emitSnapshotsToAudience,
   } = ctx;
-  const {
-    games,
-    gameMeta,
-    gameSpectators,
-    userToGame,
-    userToSpectate,
-    userByWs,
-    wsByUser,
-  } = state;
+  const { games, gameMeta, gameSpectators, userToGame, userToSpectate, userByWs, wsByUser } = state;
 
   function pauseTurnForDisconnect(game) {
-    if (!game?.turn) return false;
+    if (!game?.turn) {
+      return false;
+    }
     return pauseTurnClock(game.turn, Date.now());
   }
 
   function resumeTurnAfterReconnect(game) {
-    if (!game?.turn) return false;
+    if (!game?.turn) {
+      return false;
+    }
     return resumeTurnClock(game.turn, Date.now());
   }
 
@@ -62,15 +62,19 @@ export function createPresence(ctx) {
     const spectate_id = userToSpectate.get(username);
     if (spectate_id) {
       detachSpectator(spectate_id, username);
-      console.log("[SPECTATE] disconnected -> removed", { username, game_id: spectate_id });
+      console.log('[SPECTATE] disconnected -> removed', { username, game_id: spectate_id });
       return;
     }
 
     const game_id = userToGame.get(username);
-    if (!game_id) return;
+    if (!game_id) {
+      return;
+    }
 
     const game = games.get(game_id);
-    if (!game) return;
+    if (!game) {
+      return;
+    }
 
     const meta = ensureGameMeta(gameMeta, game_id, { initialSent: false });
     meta.disconnected.add(username);
@@ -79,12 +83,12 @@ export function createPresence(ctx) {
 
     saveGameState(game_id, game);
     if (paused) {
-      emitSnapshotsToAudience(game_id, { reason: "opponent_disconnect_pause" });
+      emitSnapshotsToAudience(game_id, { reason: 'opponent_disconnect_pause' });
     }
 
     for (const p of game.players) {
       if (p !== username) {
-        sendEvtUser(p, "opponent_disconnected", { game_id, username });
+        sendEvtUser(p, 'opponent_disconnected', { game_id, username });
       }
     }
 
@@ -92,7 +96,7 @@ export function createPresence(ctx) {
     if (spectators?.size) {
       for (const s of spectators) {
         if (s && s !== username) {
-          sendEvtUser(s, "opponent_disconnected", { game_id, username });
+          sendEvtUser(s, 'opponent_disconnected', { game_id, username });
         }
       }
     }
@@ -102,7 +106,9 @@ export function createPresence(ctx) {
     console.log('[RECONNECT] handleReconnect called for:', username);
     // 1) spectateur: rien à faire
     const spectate_id = userToSpectate.get(username);
-    if (spectate_id) return;
+    if (spectate_id) {
+      return;
+    }
 
     // 2) joueur
     const game_id = userToGame.get(username);
@@ -118,14 +124,14 @@ export function createPresence(ctx) {
       if (loaded) {
         game = loaded;
         games.set(game_id, game);
-        console.log("[RECONNECT] game loaded from save", game_id);
+        console.log('[RECONNECT] game loaded from save', game_id);
       } else {
-        console.warn("[RECONNECT] no in-mem game and no save", { username, game_id });
+        console.warn('[RECONNECT] no in-mem game and no save', { username, game_id });
         return;
       }
     }
 
-    const meta = ensureGameMeta(gameMeta, game_id, { initialSent: !!game.turn });
+    const meta = ensureGameMeta(gameMeta, game_id, { initialSent: Boolean(game.turn) });
     meta.disconnected.delete(username);
     meta.lastSeen[username] = Date.now();
     let resumed = false;
@@ -136,16 +142,16 @@ export function createPresence(ctx) {
     // Retour direct en game pour le joueur reconnecté.
     emitStartGameToUser(username, game_id, { spectator: false });
     if (resumed) {
-      emitSnapshotsToAudience(game_id, { reason: "opponent_rejoined_resume" });
+      emitSnapshotsToAudience(game_id, { reason: 'opponent_rejoined_resume' });
     }
 
-    notifyOpponent(sendEvtUser, game, username, "opponent_rejoined", { game_id, username });
+    notifyOpponent(sendEvtUser, game, username, 'opponent_rejoined', { game_id, username });
 
     const spectators = gameSpectators.get(game_id);
     if (spectators?.size) {
       for (const s of spectators) {
         if (s && s !== username) {
-          sendEvtUser(s, "opponent_rejoined", { game_id, username });
+          sendEvtUser(s, 'opponent_rejoined', { game_id, username });
         }
       }
     }
@@ -153,8 +159,10 @@ export function createPresence(ctx) {
 
   function onSocketClose(ws) {
     const username = userByWs.get(ws);
-    console.log('[PRESENCE] onSocketClose:', { username, hasUsername: !!username });
-    if (!username) return;
+    console.log('[PRESENCE] onSocketClose:', { username, hasUsername: Boolean(username) });
+    if (!username) {
+      return;
+    }
 
     // purge invites avant suppression wsByUser
     clearInvitesForUser(username);

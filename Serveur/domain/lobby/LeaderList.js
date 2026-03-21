@@ -1,19 +1,19 @@
-import fs from "fs";
-import path from "path";
+import fs from 'fs';
+import path from 'path';
 
-export let LEADERBOARD_FILE = "./app/saves/Leaderboard.json";
+export let LEADERBOARD_FILE = './app/saves/Leaderboard.json';
 
 function ensurePositiveInt(value) {
   const num = Number(value);
-  if (!Number.isFinite(num)) return 0;
+  if (!Number.isFinite(num)) {
+    return 0;
+  }
   const floored = Math.floor(num);
   return floored > 0 ? floored : 0;
 }
 
 function normalizeLeaderboardEntry(stats) {
-  const safeStats = stats && typeof stats === "object" && !Array.isArray(stats)
-    ? stats
-    : {};
+  const safeStats = stats && typeof stats === 'object' && !Array.isArray(stats) ? stats : {};
 
   return {
     wins: ensurePositiveInt(safeStats.wins),
@@ -23,12 +23,16 @@ function normalizeLeaderboardEntry(stats) {
 }
 
 function normalizeLeaderboard(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {};
+  }
 
   const normalized = {};
   for (const [usernameRaw, stats] of Object.entries(raw)) {
-    const username = String(usernameRaw ?? "").trim();
-    if (!username) continue;
+    const username = String(usernameRaw ?? '').trim();
+    if (!username) {
+      continue;
+    }
     normalized[username] = normalizeLeaderboardEntry(stats);
   }
 
@@ -37,7 +41,9 @@ function normalizeLeaderboard(raw) {
 
 function ensureLeaderboardDir() {
   const dir = path.dirname(LEADERBOARD_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 }
 
 export function setLeaderboardFileForTests(filePath) {
@@ -47,17 +53,19 @@ export function setLeaderboardFileForTests(filePath) {
 export function loadLeaderboard() {
   ensureLeaderboardDir();
   if (!fs.existsSync(LEADERBOARD_FILE)) {
-    fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify({}, null, 2), "utf8");
+    fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify({}, null, 2), 'utf8');
     return {};
   }
 
   try {
-    const rawContent = fs.readFileSync(LEADERBOARD_FILE, "utf8");
-    if (!rawContent.trim()) return {};
+    const rawContent = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
+    if (!rawContent.trim()) {
+      return {};
+    }
     const parsed = JSON.parse(rawContent);
     return normalizeLeaderboard(parsed);
   } catch (err) {
-    console.error("[LEADERBOARD] Corrupted Leaderboard.json, fallback empty", err);
+    console.error('[LEADERBOARD] Corrupted Leaderboard.json, fallback empty', err);
     return {};
   }
 }
@@ -65,7 +73,7 @@ export function loadLeaderboard() {
 export function saveLeaderboard(data) {
   ensureLeaderboardDir();
   const normalized = normalizeLeaderboard(data);
-  fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(normalized, null, 2), "utf8");
+  fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(normalized, null, 2), 'utf8');
 }
 
 function ensurePlayerStats(board, username) {
@@ -79,11 +87,11 @@ function ensurePlayerStats(board, username) {
 
 export function recordLeaderboardResult(players, winner) {
   const normalizedPlayers = Array.isArray(players)
-    ? players.map((p) => String(p ?? "").trim()).filter(Boolean)
+    ? players.map((p) => String(p ?? '').trim()).filter(Boolean)
     : [];
 
   if (normalizedPlayers.length !== 2 || normalizedPlayers[0] === normalizedPlayers[1]) {
-    console.warn("[LEADERBOARD] invalid players payload, skipping update", { players });
+    console.warn('[LEADERBOARD] invalid players payload, skipping update', { players });
     return false;
   }
 
@@ -99,7 +107,7 @@ export function recordLeaderboardResult(players, winner) {
     return true;
   }
 
-  const normalizedWinner = String(winner ?? "").trim();
+  const normalizedWinner = String(winner ?? '').trim();
   if (normalizedWinner === p1) {
     p1Stats.wins += 1;
     p2Stats.losses += 1;
@@ -113,7 +121,7 @@ export function recordLeaderboardResult(players, winner) {
     return true;
   }
 
-  console.warn("[LEADERBOARD] invalid winner payload, skipping update", {
+  console.warn('[LEADERBOARD] invalid winner payload, skipping update', {
     players: normalizedPlayers,
     winner,
   });
@@ -124,12 +132,13 @@ export function getLeaderboardRows() {
   const board = loadLeaderboard();
   const sortedRows = Object.entries(board)
     .map(([username, stats]) => ({ username, ...normalizeLeaderboardEntry(stats) }))
-    .sort((a, b) => (
-      b.wins - a.wins
-      || b.draws - a.draws
-      || a.losses - b.losses
-      || a.username.localeCompare(b.username)
-    ));
+    .sort(
+      (a, b) =>
+        b.wins - a.wins ||
+        b.draws - a.draws ||
+        a.losses - b.losses ||
+        a.username.localeCompare(b.username),
+    );
 
   let position = 0;
   let currentRank = 0;
@@ -140,10 +149,10 @@ export function getLeaderboardRows() {
   return sortedRows.map((row) => {
     position += 1;
     if (
-      position === 1
-      || row.wins !== prevWins
-      || row.draws !== prevDraws
-      || row.losses !== prevLosses
+      position === 1 ||
+      row.wins !== prevWins ||
+      row.draws !== prevDraws ||
+      row.losses !== prevLosses
     ) {
       currentRank = position;
     }

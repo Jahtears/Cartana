@@ -2,8 +2,12 @@
 
 export function createLobbyRefresher({ broadcastPlayersList, broadcastGamesList }) {
   return function refreshLobby() {
-    if (typeof broadcastPlayersList === "function") broadcastPlayersList();
-    if (typeof broadcastGamesList === "function") broadcastGamesList();
+    if (typeof broadcastPlayersList === 'function') {
+      broadcastPlayersList();
+    }
+    if (typeof broadcastGamesList === 'function') {
+      broadcastGamesList();
+    }
   };
 }
 
@@ -30,7 +34,7 @@ export function createLobbyLists(ctx) {
         return {
           game_id: id,
           players: game.players,
-          result: !!meta?.result,
+          result: Boolean(meta?.result),
           disconnected: meta?.disconnected ? [...meta.disconnected] : [],
           spectators: spectators ? spectators.size : 0,
         };
@@ -44,22 +48,26 @@ export function createLobbyLists(ctx) {
   function playersStatuses() {
     const all = new Set(playersList());
     for (const [, g] of games.entries()) {
-      for (const p of g.players) all.add(p);
+      for (const p of g.players) {
+        all.add(p);
+      }
     }
     const out = {};
-    for (const u of all) out[u] = getUserStatus(u);
+    for (const u of all) {
+      out[u] = getUserStatus(u);
+    }
     return out;
   }
 
   function broadcastPlayersList() {
-    sendEvtLobby("players_list", {
+    sendEvtLobby('players_list', {
       players: playersList(),
       statuses: playersStatuses(),
     });
   }
 
   function broadcastGamesList() {
-    sendEvtLobby("games_list", { games: gamesList() });
+    sendEvtLobby('games_list', { games: gamesList() });
   }
 
   const refreshLobby = createLobbyRefresher({ broadcastPlayersList, broadcastGamesList });

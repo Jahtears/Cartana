@@ -1,9 +1,9 @@
 // roles/roles.js v1.0
 
 export const Activity = {
-  LOBBY: "lobby",
-  IN_GAME: "in_game",
-  SPECTATING: "spectating",
+  LOBBY: 'lobby',
+  IN_GAME: 'in_game',
+  SPECTATING: 'spectating',
 };
 
 export function createRoles(ctx) {
@@ -21,13 +21,19 @@ export function createRoles(ctx) {
 
   function _removeFromSpectatorsSet(username, gidOverride = null) {
     const gid = gidOverride ?? userToSpectate.get(username);
-    if (!gid) return;
+    if (!gid) {
+      return;
+    }
 
     const set = gameSpectators.get(gid);
-    if (!set) return;
+    if (!set) {
+      return;
+    }
 
     set.delete(username);
-    if (set.size === 0) gameSpectators.delete(gid);
+    if (set.size === 0) {
+      gameSpectators.delete(gid);
+    }
   }
 
   /**
@@ -46,8 +52,11 @@ export function createRoles(ctx) {
     }
 
     if (activity === Activity.IN_GAME) {
-      if (game_id) userToGame.set(username, game_id);
-      else userToGame.delete(username);
+      if (game_id) {
+        userToGame.set(username, game_id);
+      } else {
+        userToGame.delete(username);
+      }
       userToEndGame.delete(username);
 
       //  ex-spectateur -> clean
@@ -59,11 +68,16 @@ export function createRoles(ctx) {
       userToGame.delete(username);
       userToEndGame.delete(username);
 
-      if (game_id) userToSpectate.set(username, game_id);
-      else userToSpectate.delete(username);
+      if (game_id) {
+        userToSpectate.set(username, game_id);
+      } else {
+        userToSpectate.delete(username);
+      }
 
       if (game_id) {
-        if (!gameSpectators.has(game_id)) gameSpectators.set(game_id, new Set());
+        if (!gameSpectators.has(game_id)) {
+          gameSpectators.set(game_id, new Set());
+        }
         gameSpectators.get(game_id).add(username);
       }
       return;
@@ -91,7 +105,7 @@ export function createRoles(ctx) {
       const game_id = userToGame.get(username);
       if (game_id) {
         const meta = gameMeta.get(game_id);
-        const result = !!meta?.result;
+        const result = Boolean(meta?.result);
         activity = { type: Activity.IN_GAME, game_id, result };
       } else {
         const endGameId = userToEndGame.get(username);
@@ -105,12 +119,12 @@ export function createRoles(ctx) {
     let invite = null;
     const invToMe = pendingInviteTo.get(username);
     if (invToMe) {
-      invite = { type: "invited", from: invToMe.from, createdAt: invToMe.createdAt };
+      invite = { type: 'invited', from: invToMe.from, createdAt: invToMe.createdAt };
     } else {
       const invitedTo = inviteFrom.get(username);
       const invFromMe = invitedTo ? pendingInviteTo.get(invitedTo) : null;
       if (invFromMe) {
-        invite = { type: "inviting", to: invFromMe.to, createdAt: invFromMe.createdAt };
+        invite = { type: 'inviting', to: invFromMe.to, createdAt: invFromMe.createdAt };
       }
     }
 
@@ -131,9 +145,11 @@ export function createRoles(ctx) {
     if (pendingInviteTo.has(username)) {
       const inv = pendingInviteTo.get(username);
       pendingInviteTo.delete(username);
-      if (inv?.from) inviteFrom.delete(inv.from);
       if (inv?.from) {
-        sendEvtUser(inv.from, "invite_cancelled", { name: username, reason: "offline" });
+        inviteFrom.delete(inv.from);
+      }
+      if (inv?.from) {
+        sendEvtUser(inv.from, 'invite_cancelled', { name: username, reason: 'offline' });
       }
     }
 
@@ -142,7 +158,7 @@ export function createRoles(ctx) {
     if (to) {
       pendingInviteTo.delete(to);
       inviteFrom.delete(username);
-      sendEvtUser(to, "invite_cancelled", { name: username, reason: "offline" });
+      sendEvtUser(to, 'invite_cancelled', { name: username, reason: 'offline' });
     }
   }
 
@@ -153,6 +169,5 @@ export function createRoles(ctx) {
     attachSpectator,
     detachSpectator,
     clearInvitesForUser,
-
   };
 }

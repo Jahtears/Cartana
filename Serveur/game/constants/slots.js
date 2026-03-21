@@ -22,11 +22,11 @@ class SlotId {
 }
 
 const SLOT_TYPES = {
-  DECK: "DECK",
-  HAND: "HAND",
-  BENCH: "BENCH",
-  TABLE: "TABLE",
-  PILE: "PILE",
+  DECK: 'DECK',
+  HAND: 'HAND',
+  BENCH: 'BENCH',
+  TABLE: 'TABLE',
+  PILE: 'PILE',
 };
 
 const SLOT_TYPE_SET = new Set(Object.values(SLOT_TYPES));

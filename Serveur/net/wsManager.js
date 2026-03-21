@@ -1,11 +1,7 @@
 // net/wsManager.js v2.0 - Gestion des métadonnées de connexion
 // Le heartbeat est maintenant centralisé dans heartbeat.js
 
-import {
-  initHeartbeat,
-  markHeartbeatActivity,
-  startHeartbeatManager,
-} from './heartbeat.js';
+import { initHeartbeat, markHeartbeatActivity, startHeartbeatManager } from './heartbeat.js';
 
 export function createWSManager({ wss, trace }) {
   const clientMeta = new Map(); // ws => {username, connected_at, lastActivityAt}
@@ -17,7 +13,7 @@ export function createWSManager({ wss, trace }) {
   function initClient(ws) {
     // Initialiser le heartbeat
     initHeartbeat(ws);
-    ws.on?.('pong', () => markActivity(ws, "pong"));
+    ws.on?.('pong', () => markActivity(ws, 'pong'));
 
     const now = Date.now();
     // Mémoriser les métadonnées
@@ -25,8 +21,8 @@ export function createWSManager({ wss, trace }) {
       connected_at: now,
       lastPing: now,
       lastActivityAt: now,
-      lastActivitySource: "connect",
-      username: null
+      lastActivitySource: 'connect',
+      username: null,
     });
   }
 
@@ -35,17 +31,19 @@ export function createWSManager({ wss, trace }) {
    * @param {WebSocket} ws - Client WebSocket
    * @param {string} source - Source de l'activité (inbound/outbound/pong)
    */
-  function markActivity(ws, source = "inbound") {
+  function markActivity(ws, source = 'inbound') {
     const now = Date.now();
-    const confirmsAlive = source === "inbound" || source === "pong";
+    const confirmsAlive = source === 'inbound' || source === 'pong';
     if (confirmsAlive) {
       markHeartbeatActivity(ws, now);
     }
     const meta = clientMeta.get(ws);
-    if (!meta) return;
+    if (!meta) {
+      return;
+    }
     meta.lastActivityAt = now;
     meta.lastActivitySource = source;
-    if (source === "pong") {
+    if (source === 'pong') {
       meta.lastPing = now;
     }
   }
@@ -57,7 +55,9 @@ export function createWSManager({ wss, trace }) {
    */
   function registerUsername(ws, username) {
     const meta = clientMeta.get(ws);
-    if (meta) meta.username = username;
+    if (meta) {
+      meta.username = username;
+    }
   }
 
   /**

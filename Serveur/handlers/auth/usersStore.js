@@ -1,8 +1,8 @@
 // Serveur/handlers/auth/usersStore.js
-import fs from "fs";
-import argon2 from "argon2";
+import fs from 'fs';
+import argon2 from 'argon2';
 
-export let USERS_FILE = "./app/saves/Users.json";
+export let USERS_FILE = './app/saves/Users.json';
 const SALT_ROUNDS = 10;
 
 export function setUsersFileForTests(filePath) {
@@ -15,11 +15,13 @@ export function loadUsers() {
   }
 
   try {
-    const parsed = JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
-    if (parsed && Array.isArray(parsed.players)) return parsed;
+    const parsed = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+    if (parsed && Array.isArray(parsed.players)) {
+      return parsed;
+    }
     return { players: [] };
   } catch (err) {
-    console.error("[USERS] Corrupted Users.json, resetting", err);
+    console.error('[USERS] Corrupted Users.json, resetting', err);
     return { players: [] };
   }
 }
@@ -29,8 +31,10 @@ export function saveUsers(data) {
 }
 
 async function verifyExistingUserPin(existing, pin) {
-  const storedHash = String(existing?.hash ?? "");
-  if (!storedHash) return false;
+  const storedHash = String(existing?.hash ?? '');
+  if (!storedHash) {
+    return false;
+  }
 
   try {
     return await argon2.verify(storedHash, pin);
@@ -45,9 +49,11 @@ export async function verifyOrCreateUser(username, pin) {
   data.players = players;
 
   const existing = players.find((p) => p.user === username);
-  if (existing) return verifyExistingUserPin(existing, pin);
+  if (existing) {
+    return verifyExistingUserPin(existing, pin);
+  }
 
-const hash = await argon2.hash(pin);
+  const hash = await argon2.hash(pin);
   players.push({ user: username, hash });
   saveUsers(data);
   return true;

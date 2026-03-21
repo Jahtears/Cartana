@@ -9,8 +9,11 @@
     "start:http": "npm run start:backend",
     "start:https": "node -e \"process.env.SERVER_MODE='tls_direct'; process.env.TLS_CERT_PATH=process.env.TLS_CERT_PATH||'../certs/cartana.pem'; process.env.TLS_KEY_PATH=process.env.TLS_KEY_PATH||'../certs/cartana-key.pem'; import('./app/server.js')\"",
     "start:trace": "node -e \"process.env.SERVER_MODE='backend_http'; process.env.BACKEND_PORT=process.env.BACKEND_PORT||'3001'; process.env.DEBUG_TRACE='1'; import('./app/server.js')\"",
-    "vitest": "vitest"
-
+    "vitest": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,json,md}\""
   },
   "dependencies": {
     "argon2": "^0.44.0",
@@ -21,7 +24,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-
+    "@eslint/js": "^10.0.1",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/eslint-plugin": "^1.6.12",
     "@vitest/ui": "^4.0.18",

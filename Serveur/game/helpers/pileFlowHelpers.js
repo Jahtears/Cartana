@@ -1,26 +1,27 @@
 // helpers/pileFlowHelpers.js - Pile refill/recycle flow helpers
 
-import { SLOT_TYPES, SlotId } from "../constants/slots.js";
-import {
-  DEFAULT_HAND_SIZE,
-  TABLE_RECYCLE_CARD_COUNT,
-} from "../constants/turnFlow.js";
-import { shuffle } from "../state/cardStore.js";
-import { removeTableslot } from "./tableHelper.js";
+import { SLOT_TYPES, SlotId } from '../constants/slots.js';
+import { DEFAULT_HAND_SIZE, TABLE_RECYCLE_CARD_COUNT } from '../constants/turnFlow.js';
+import { shuffle } from '../state/cardStore.js';
+import { removeTableslot } from './tableHelper.js';
 import {
   getSlotCount,
   getSlotStack,
   getTableSlots,
   putCardtoHandFromPile,
   getHandSize,
-} from "../state/slotStore.js";
-import { debugLog } from "./debugHelpers.js";
+} from '../state/slotStore.js';
+import { debugLog } from './debugHelpers.js';
 
 function refillEmptyHandSlotsFromPile(game, player, maxCards = DEFAULT_HAND_SIZE) {
-  if (!game || !Array.isArray(game.players)) return [];
+  if (!game || !Array.isArray(game.players)) {
+    return [];
+  }
 
   const playerIndex = game.players.indexOf(player);
-  if (playerIndex === -1) return [];
+  if (playerIndex === -1) {
+    return [];
+  }
   const slotPlayerIndex = playerIndex + 1;
 
   const handSlot = SlotId.create(slotPlayerIndex, SLOT_TYPES.HAND, 1);
@@ -32,7 +33,9 @@ function refillEmptyHandSlotsFromPile(game, player, maxCards = DEFAULT_HAND_SIZE
 
   for (let i = 0; i < needed; i++) {
     const cardId = pileStack.length ? pileStack.pop() : null;
-    if (!cardId) break;
+    if (!cardId) {
+      break;
+    }
     const inserted = putCardtoHandFromPile(game, handSlot, cardId);
     if (!inserted) {
       pileStack.push(cardId);
@@ -45,16 +48,22 @@ function refillEmptyHandSlotsFromPile(game, player, maxCards = DEFAULT_HAND_SIZE
 }
 
 function isHandCompletelyEmpty(game, player) {
-  if (!game || !Array.isArray(game.players)) return false;
+  if (!game || !Array.isArray(game.players)) {
+    return false;
+  }
 
   const playerArrayIndex = game.players.indexOf(player);
-  if (playerArrayIndex === -1) return false;
+  if (playerArrayIndex === -1) {
+    return false;
+  }
 
   return getHandSize(game, playerArrayIndex + 1) === 0;
 }
 
 function refillHandIfEmpty(game, player, handSize = DEFAULT_HAND_SIZE) {
-  if (!isHandCompletelyEmpty(game, player)) return [];
+  if (!isHandCompletelyEmpty(game, player)) {
+    return [];
+  }
   return refillEmptyHandSlotsFromPile(game, player, handSize);
 }
 
@@ -70,21 +79,27 @@ function recycleFullTableSlotsToPile(game) {
 
   for (const slotId of getTableSlots(game)) {
     const content = getSlotStack(game, slotId);
-    if (!Array.isArray(content)) continue;
-    if (content.length !== TABLE_RECYCLE_CARD_COUNT) continue;
+    if (!Array.isArray(content)) {
+      continue;
+    }
+    if (content.length !== TABLE_RECYCLE_CARD_COUNT) {
+      continue;
+    }
 
     const ids = content.slice();
     shuffle(ids);
 
     for (const id of ids) {
-      if (typeof id === "string") pile.unshift(id);
+      if (typeof id === 'string') {
+        pile.unshift(id);
+      }
     }
 
     if (removeTableslot(game, slotId.index)) {
       recycledSlots.push(slotId);
     }
 
-    debugLog("[PILE] RECYCLE_TABLE_TO_PILE", {
+    debugLog('[PILE] RECYCLE_TABLE_TO_PILE', {
       slotId,
       count: ids.length,
       pileLength: pile.length,
@@ -97,8 +112,4 @@ function recycleFullTableSlotsToPile(game) {
   return { recycledSlots, pileTopChanged };
 }
 
-export {
-  recycleFullTableSlotsToPile,
-  refillEmptyHandSlotsFromPile,
-  refillHandIfEmpty,
-};
+export { recycleFullTableSlotsToPile, refillEmptyHandSlotsFromPile, refillHandIfEmpty };

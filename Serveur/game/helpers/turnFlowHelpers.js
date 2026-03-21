@@ -1,56 +1,44 @@
 // helpers/turnFlowHelpers.js - Turn start/end/timeout flow helpers
 
-import { SLOT_TYPES, SlotId } from "../constants/slots.js";
+import { SLOT_TYPES, SlotId } from '../constants/slots.js';
 import {
   DEFAULT_HAND_SIZE,
   INITIAL_TURN_NUMBER,
   MAX_CONSECUTIVE_TIMEOUTS,
-} from "../constants/turnFlow.js";
-import { GAME_END_REASONS } from "../constants/gameEnd.js";
-import {
-  TURN_MS,
-  isTurnExpired,
-  startTurnClock,
-} from "../turnClock.js";
-import {
-  compareCardsByTurnValue,
-  findAceCardInHand,
-  slotTopHasAce,
-} from "../state/cardStore.js";
-import {
-  addTableSlot,
-} from "./tableHelper.js";
-import {
-  getTableSlots,
-  getSlotStack,
-  removeCardFromSlot,
-} from "../state/slotStore.js";
-import {
-  recycleFullTableSlotsToPile,
-  refillEmptyHandSlotsFromPile,
-} from "./pileFlowHelpers.js";
-import { debugLog } from "./debugHelpers.js";
+} from '../constants/turnFlow.js';
+import { GAME_END_REASONS } from '../constants/gameEnd.js';
+import { TURN_MS, isTurnExpired, startTurnClock } from '../turnClock.js';
+import { compareCardsByTurnValue, findAceCardInHand, slotTopHasAce } from '../state/cardStore.js';
+import { addTableSlot } from './tableHelper.js';
+import { getTableSlots, getSlotStack, removeCardFromSlot } from '../state/slotStore.js';
+import { recycleFullTableSlotsToPile, refillEmptyHandSlotsFromPile } from './pileFlowHelpers.js';
+import { debugLog } from './debugHelpers.js';
 
 function ensureTimeoutStreakMap(game) {
-  if (!game || typeof game !== "object") return Object.create(null);
-  if (!game.turn || typeof game.turn !== "object") game.turn = {};
+  if (!game || typeof game !== 'object') {
+    return Object.create(null);
+  }
+  if (!game.turn || typeof game.turn !== 'object') {
+    game.turn = {};
+  }
 
   if (
-    !game.turn.timeoutStreakByPlayer
-    || typeof game.turn.timeoutStreakByPlayer !== "object"
-    || Array.isArray(game.turn.timeoutStreakByPlayer)
+    !game.turn.timeoutStreakByPlayer ||
+    typeof game.turn.timeoutStreakByPlayer !== 'object' ||
+    Array.isArray(game.turn.timeoutStreakByPlayer)
   ) {
     game.turn.timeoutStreakByPlayer = Object.create(null);
   }
 
   if (Array.isArray(game.players)) {
     for (const player of game.players) {
-      const username = String(player ?? "").trim();
-      if (!username) continue;
+      const username = String(player ?? '').trim();
+      if (!username) {
+        continue;
+      }
       const current = Number(game.turn.timeoutStreakByPlayer[username] ?? 0);
-      game.turn.timeoutStreakByPlayer[username] = Number.isFinite(current) && current > 0
-        ? Math.floor(current)
-        : 0;
+      game.turn.timeoutStreakByPlayer[username] =
+        Number.isFinite(current) && current > 0 ? Math.floor(current) : 0;
     }
   }
 
@@ -58,8 +46,10 @@ function ensureTimeoutStreakMap(game) {
 }
 
 function registerTurnTimeoutStreak(game, player) {
-  const username = String(player ?? "").trim();
-  if (!username) return 0;
+  const username = String(player ?? '').trim();
+  if (!username) {
+    return 0;
+  }
 
   const streakByPlayer = ensureTimeoutStreakMap(game);
   const current = Number(streakByPlayer[username] ?? 0);
@@ -71,8 +61,10 @@ function registerTurnTimeoutStreak(game, player) {
 }
 
 function resetTurnTimeoutStreak(game, player) {
-  const username = String(player ?? "").trim();
-  if (!username) return 0;
+  const username = String(player ?? '').trim();
+  if (!username) {
+    return 0;
+  }
 
   const streakByPlayer = ensureTimeoutStreakMap(game);
   streakByPlayer[username] = 0;
@@ -109,13 +101,13 @@ function initTurnForGame(game) {
   ensureTimeoutStreakMap(game);
   startTurnClock(game.turn, Date.now(), TURN_MS);
 
-  debugLog("[TURN] INIT", {
+  debugLog('[TURN] INIT', {
     starter,
     p1_top: top1 ? top1.value : null,
     p2_top: top2 ? top2.value : null,
   });
 
-  return { starter, reason: "RULE_TURN_START_FIRST" };
+  return { starter, reason: 'RULE_TURN_START_FIRST' };
 }
 
 function endTurnAfterBenchPlay(game, actor) {
@@ -130,18 +122,24 @@ function endTurnAfterBenchPlay(game, actor) {
   game.turn.number = (game.turn.number ?? INITIAL_TURN_NUMBER) + 1;
   startTurnClock(game.turn, Date.now(), TURN_MS);
 
-  debugLog("[TURN] SWITCH", { endedBy: actor, next, turnNumber: game.turn.number });
+  debugLog('[TURN] SWITCH', { endedBy: actor, next, turnNumber: game.turn.number });
 
   return { next, given, recycled };
 }
 
 function tryExpireTurn(game, now = Date.now()) {
   const t = game?.turn;
-  if (!t) return { expired: false };
-  if (!isTurnExpired(t, now)) return { expired: false };
+  if (!t) {
+    return { expired: false };
+  }
+  if (!isTurnExpired(t, now)) {
+    return { expired: false };
+  }
 
-  const prev = String(t.current ?? "").trim();
-  if (!prev) return { expired: false };
+  const prev = String(t.current ?? '').trim();
+  if (!prev) {
+    return { expired: false };
+  }
 
   let playedAce = false;
   let aceFrom = null;
@@ -151,18 +149,16 @@ function tryExpireTurn(game, now = Date.now()) {
 
   const prevPlayerArrayIndex = game.players.indexOf(prev);
   const playerIndex = prevPlayerArrayIndex === -1 ? null : prevPlayerArrayIndex + 1;
-  const deckSlot = playerIndex === null
-    ? null
-    : SlotId.create(playerIndex, SLOT_TYPES.DECK, 1);
-  const handSlot = playerIndex === null
-    ? null
-    : SlotId.create(playerIndex, SLOT_TYPES.HAND, 1);
+  const deckSlot = playerIndex === null ? null : SlotId.create(playerIndex, SLOT_TYPES.DECK, 1);
+  const handSlot = playerIndex === null ? null : SlotId.create(playerIndex, SLOT_TYPES.HAND, 1);
 
   function pickNextAce() {
     if (deckSlot && slotTopHasAce(game, deckSlot)) {
       const deckStack = getSlotStack(game, deckSlot);
       const deckTopCardId = deckStack.length ? deckStack[deckStack.length - 1] : null;
-      if (deckTopCardId) return { slotId: deckSlot, cardId: deckTopCardId };
+      if (deckTopCardId) {
+        return { slotId: deckSlot, cardId: deckTopCardId };
+      }
     }
     if (handSlot) {
       return findAceCardInHand(game, handSlot, DEFAULT_HAND_SIZE);
@@ -172,51 +168,59 @@ function tryExpireTurn(game, now = Date.now()) {
 
   while (true) {
     const ace = pickNextAce();
-    if (!ace) break;
+    if (!ace) {
+      break;
+    }
 
     const removed = removeCardFromSlot(game, ace.slotId, ace.cardId);
-    if (!removed) break;
+    if (!removed) {
+      break;
+    }
 
     const tableSlots = getTableSlots(game);
-    const tableSlot = tableSlots.length
-      ? tableSlots[tableSlots.length - 1]
-      : addTableSlot(game);
+    const tableSlot = tableSlots.length ? tableSlots[tableSlots.length - 1] : addTableSlot(game);
 
-    if (!tableSlots.length) tableSyncNeeded = true;
+    if (!tableSlots.length) {
+      tableSyncNeeded = true;
+    }
 
     const tableStack = getSlotStack(game, tableSlot);
     tableStack.push(ace.cardId);
     playedAce = true;
-    if (!aceFrom) aceFrom = ace.slotId;
-    if (!aceTo) aceTo = tableSlot;
+    if (!aceFrom) {
+      aceFrom = ace.slotId;
+    }
+    if (!aceTo) {
+      aceTo = tableSlot;
+    }
     autoPlayedAces.push({ cardId: ace.cardId, from: ace.slotId, to: tableSlot });
     addTableSlot(game);
     tableSyncNeeded = true;
 
-    debugLog("[TURN] TIMEOUT_AUTO_ACE", { prev, from: ace.slotId, to: tableSlot });
+    debugLog('[TURN] TIMEOUT_AUTO_ACE', { prev, from: ace.slotId, to: tableSlot });
   }
 
   const { next, given, recycled } = endTurnAfterBenchPlay(game, prev);
   const timeoutStreak = registerTurnTimeoutStreak(game, prev);
-  const reachedTimeoutLimit = !!(next && timeoutStreak >= MAX_CONSECUTIVE_TIMEOUTS);
+  const reachedTimeoutLimit = Boolean(next && timeoutStreak >= MAX_CONSECUTIVE_TIMEOUTS);
 
   const pileSlot = SlotId.create(0, SLOT_TYPES.PILE, 1);
   const pileStack = getSlotStack(game, pileSlot);
   const pileEmptyAtTurnEnd = pileStack.length === 0;
   const endGamePatch = pileEmptyAtTurnEnd
     ? {
-      winner: null,
-      reason: GAME_END_REASONS.PILE_EMPTY,
-      by: prev,
-      at: now,
-    }
-    : reachedTimeoutLimit
-      ? {
-        winner: next,
-        reason: GAME_END_REASONS.TIMEOUT_STREAK,
+        winner: null,
+        reason: GAME_END_REASONS.PILE_EMPTY,
         by: prev,
         at: now,
       }
+    : reachedTimeoutLimit
+      ? {
+          winner: next,
+          reason: GAME_END_REASONS.TIMEOUT_STREAK,
+          by: prev,
+          at: now,
+        }
       : null;
 
   startTurnClock(game.turn, now, TURN_MS);
@@ -239,7 +243,7 @@ function tryExpireTurn(game, now = Date.now()) {
     endGamePatch,
   };
 
-  debugLog("[TURN] TIMEOUT_EXPIRED", {
+  debugLog('[TURN] TIMEOUT_EXPIRED', {
     prev: result.prev,
     next: result.next,
     playedAce: result.playedAce,
