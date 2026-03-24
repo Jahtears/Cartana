@@ -1,23 +1,27 @@
 // net/transport.js v3.0 - Transport et réponses
 // Le heartbeat est maintenant centralisé dans heartbeat.js
-import { POPUP_MESSAGE } from "../shared/popupMessages.js";
+import { POPUP_MESSAGE } from '../shared/popupMessages.js';
 
 /**
  * Vérifier si un WebSocket est ouvert
  */
 function wsIsOpen(ws) {
-  return !!ws && ws.readyState === 1;
+  return Boolean(ws) && ws.readyState === 1;
 }
 
 function safeObject(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
   return value;
 }
 
 function normalizeMessageCode(raw, fallback = POPUP_MESSAGE.TECH_ERROR_GENERIC) {
-  const candidate = String(raw ?? "").trim();
-  if (!candidate) return fallback;
-  if (candidate.startsWith("POPUP_") || candidate.startsWith("RULE_")) {
+  const candidate = String(raw ?? '').trim();
+  if (!candidate) {
+    return fallback;
+  }
+  if (candidate.startsWith('POPUP_') || candidate.startsWith('RULE_')) {
     return candidate;
   }
   return fallback;
@@ -38,8 +42,12 @@ function normalizeErrorPayload(payload) {
     message_code,
   };
 
-  if (Object.keys(message_params).length > 0) out.message_params = message_params;
-  if (Object.keys(details).length > 0) out.details = details;
+  if (Object.keys(message_params).length > 0) {
+    out.message_params = message_params;
+  }
+  if (Object.keys(details).length > 0) {
+    out.details = details;
+  }
   return out;
 }
 
@@ -51,10 +59,14 @@ function normalizeErrorPayload(payload) {
  * @returns {boolean} true si envoyé, false sinon
  */
 function safeSend(ws, envelope, onSend) {
-  if (!wsIsOpen(ws)) return false;
+  if (!wsIsOpen(ws)) {
+    return false;
+  }
   try {
     ws.send(JSON.stringify(envelope));
-    if (typeof onSend === "function") onSend(ws, envelope);
+    if (typeof onSend === 'function') {
+      onSend(ws, envelope);
+    }
     return true;
   } catch {
     return false;
@@ -75,13 +87,19 @@ export function createTransport({ wsByUser, onSend }) {
    * @param {Object} payload - Données ou erreur
    */
   function sendRes(ws, req, ok, payload) {
-    const base = { kind: "res", type: req.type, rid: req.rid, ok: !!ok };
-    if (ok) return safeSend(ws, { ...base, data: payload ?? {} }, onSend);
+    const base = { kind: 'res', type: req.type, rid: req.rid, ok: Boolean(ok) };
+    if (ok) {
+      return safeSend(ws, { ...base, data: payload ?? {} }, onSend);
+    }
     const error = normalizeErrorPayload(payload);
-    return safeSend(ws, {
-      ...base,
-      error,
-    }, onSend);
+    return safeSend(
+      ws,
+      {
+        ...base,
+        error,
+      },
+      onSend,
+    );
   }
 
   /**
@@ -91,7 +109,7 @@ export function createTransport({ wsByUser, onSend }) {
    * @param {Object} data - Données de l'événement
    */
   function sendEvtSocket(ws, type, data) {
-    return safeSend(ws, { kind: "evt", type, data: data ?? {} }, onSend);
+    return safeSend(ws, { kind: 'evt', type, data: data ?? {} }, onSend);
   }
 
   /**
@@ -111,16 +129,18 @@ export function createTransport({ wsByUser, onSend }) {
    * @param {Object} data - Données de l'événement
    */
   function sendEvtLobby(type, data) {
-    for (const ws of wsByUser.values()) sendEvtSocket(ws, type, data);
+    for (const ws of wsByUser.values()) {
+      sendEvtSocket(ws, type, data);
+    }
   }
 
-  return { 
+  return {
     sendRes,
     sendEvtSocket,
     sendEvtUser,
     sendEvtLobby,
     safeSend, // Exporter pour usage interne si needed
-    wsIsOpen,  // Exporter pour vérifications
+    wsIsOpen, // Exporter pour vérifications
   };
 }
 
@@ -139,7 +159,9 @@ export function createTransport({ wsByUser, onSend }) {
  */
 export function resError(sendRes, ws, req, message_code, details) {
   const error = { message_code };
-  if (details && typeof details === "object") error.details = details;
+  if (details && typeof details === 'object') {
+    error.details = details;
+  }
   sendRes(ws, req, false, error);
   return true;
 }

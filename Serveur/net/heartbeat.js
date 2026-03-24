@@ -14,7 +14,9 @@ function nowMs() {
  * @param {number} atMs - Timestamp de l'activite
  */
 export function markHeartbeatActivity(ws, atMs = nowMs()) {
-  if (!ws) return;
+  if (!ws) {
+    return;
+  }
   ws.isAlive = true;
   ws.lastActivityAt = atMs;
   ws.awaitingHeartbeatProbe = false;
@@ -49,24 +51,25 @@ export function initHeartbeat(ws) {
  * @returns {NodeJS.Timer} Timer pour cleanup
  */
 export function startHeartbeatManager(wss, onClientDead, options = {}) {
-  const normalizedOptions = typeof options === "number"
-    ? { checkIntervalMs: options }
-    : (options ?? {});
+  const normalizedOptions =
+    typeof options === 'number' ? { checkIntervalMs: options } : (options ?? {});
 
   const checkIntervalMs = Number(
-    normalizedOptions.checkIntervalMs ?? DEFAULT_HEARTBEAT_CHECK_INTERVAL_MS
+    normalizedOptions.checkIntervalMs ?? DEFAULT_HEARTBEAT_CHECK_INTERVAL_MS,
   );
   const idleBeforePingMs = Number(
-    normalizedOptions.idleBeforePingMs ?? DEFAULT_HEARTBEAT_IDLE_BEFORE_PING_MS
+    normalizedOptions.idleBeforePingMs ?? DEFAULT_HEARTBEAT_IDLE_BEFORE_PING_MS,
   );
   const heartbeatTimeoutMs = Number(
-    normalizedOptions.heartbeatTimeoutMs ?? DEFAULT_HEARTBEAT_TIMEOUT_MS
+    normalizedOptions.heartbeatTimeoutMs ?? DEFAULT_HEARTBEAT_TIMEOUT_MS,
   );
 
   const heartbeatTimer = setInterval(() => {
     const now = nowMs();
     for (const ws of wss.clients) {
-      if (!ws || ws.readyState !== 1) continue;
+      if (!ws || ws.readyState !== 1) {
+        continue;
+      }
 
       const lastActivityAt = Number(ws.lastActivityAt ?? now);
       if (ws.awaitingHeartbeatProbe) {
@@ -79,7 +82,9 @@ export function startHeartbeatManager(wss, onClientDead, options = {}) {
       }
 
       // Trafic recent -> inutile de ping
-      if (now - lastActivityAt < idleBeforePingMs) continue;
+      if (now - lastActivityAt < idleBeforePingMs) {
+        continue;
+      }
 
       ws.awaitingHeartbeatProbe = true;
       ws.heartbeatProbeSentAt = now;

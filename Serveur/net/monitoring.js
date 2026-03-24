@@ -50,8 +50,12 @@ export class Metrics {
    */
   getMessagesPerSecond() {
     const elapsed = (Date.now() - this.startTime) / 1000;
-    if (elapsed === 0) return 0;
-    return Math.round((this.totalMessagesSent + this.totalMessagesReceived) / elapsed * 100) / 100;
+    if (elapsed === 0) {
+      return 0;
+    }
+    return (
+      Math.round(((this.totalMessagesSent + this.totalMessagesReceived) / elapsed) * 100) / 100
+    );
   }
 
   /**

@@ -1,6 +1,6 @@
-import { SlotId, SLOT_TYPES } from "../constants/slots.js";
-import { NEVER_DRAGGABLE_SLOT_TYPES } from "../helpers/slotViewHelpers.js";
-import { slotIdToString } from "../state/slotStore.js";
+import { SlotId, SLOT_TYPES } from '../constants/slots.js';
+import { NEVER_DRAGGABLE_SLOT_TYPES } from '../helpers/slotViewHelpers.js';
+import { slotIdToString } from '../state/slotStore.js';
 
 function buildCardPayload(
   card,
@@ -8,16 +8,17 @@ function buildCardPayload(
   isOwner,
   disableDrag = false,
   slotIdForClient = null,
-  forceBack = false
+  forceBack = false,
 ) {
   const normalizedSlotId = slotIdToString(slotIdForClient ?? slotId);
   const slotType = slotId instanceof SlotId ? slotId.type : null;
 
-  const isFaceDown = !!forceBack
-    || slotType === SLOT_TYPES.PILE
-    || (slotType === SLOT_TYPES.HAND && !isOwner);
+  const isFaceDown =
+    Boolean(forceBack) ||
+    slotType === SLOT_TYPES.PILE ||
+    (slotType === SLOT_TYPES.HAND && !isOwner);
 
-  let draggable = !!isOwner;
+  let draggable = Boolean(isOwner);
   if (NEVER_DRAGGABLE_SLOT_TYPES.has(slotType)) {
     draggable = false;
   }
@@ -27,8 +28,8 @@ function buildCardPayload(
 
   return {
     card_id: card.id,
-    valeur: isFaceDown ? "" : card.value,
-    couleur: isFaceDown ? "" : card.color,
+    valeur: isFaceDown ? '' : card.value,
+    couleur: isFaceDown ? '' : card.color,
     dos: isFaceDown,
     source: card.source,
     draggable,
@@ -36,6 +37,4 @@ function buildCardPayload(
   };
 }
 
-export {
-  buildCardPayload,
-};
+export { buildCardPayload };

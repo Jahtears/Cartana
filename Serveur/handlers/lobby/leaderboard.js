@@ -1,4 +1,4 @@
-import { getLeaderboardRows } from "../../domain/lobby/LeaderList.js";
+import { getLeaderboardRows } from '../../domain/lobby/LeaderList.js';
 
 export function handleGetLeaderboard(ctx, ws, req) {
   const leaderboard = getLeaderboardRows();

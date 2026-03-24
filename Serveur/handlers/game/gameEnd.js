@@ -1,19 +1,19 @@
 // handlers/gameEnd.js v1.1
 
-import { getExistingGameOrRes, getGameIdFromDataOrMapping } from "../../net/guards.js";
-import { resError } from "../../net/transport.js";
-import { ensureGameMeta } from "../../game/meta.js";
-import { GAME_END_REASONS } from "../../game/constants/gameEnd.js";
-import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
+import { getExistingGameOrRes, getGameIdFromDataOrMapping } from '../../net/guards.js';
+import { resError } from '../../net/transport.js';
+import { ensureGameMeta } from '../../game/meta.js';
+import { GAME_END_REASONS } from '../../game/constants/gameEnd.js';
+import { POPUP_MESSAGE } from '../../shared/popupMessages.js';
 
 const CLEANUP_TTL_MS = 2 * 60 * 1000;
-const ACK_INTENT_REMATCH = "rematch";
+const ACK_INTENT_REMATCH = 'rematch';
 
 export const POST_GAME_STATES = Object.freeze({
-  ENDED: "ended",
-  REMATCH_PENDING: "rematch_pending",
-  RESOLVED: "resolved",
-  EXPIRED: "expired",
+  ENDED: 'ended',
+  REMATCH_PENDING: 'rematch_pending',
+  RESOLVED: 'resolved',
+  EXPIRED: 'expired',
 });
 
 function isPostGameState(value) {
@@ -22,11 +22,17 @@ function isPostGameState(value) {
 
 export function ensureGameEndMeta(gameMeta, game_id, { initialSent = true } = {}) {
   const meta = ensureGameMeta(gameMeta, game_id, { initialSent });
-  if (!(meta.acks instanceof Set)) meta.acks = new Set();
-  if (typeof meta.endedAt !== "number" || !Number.isFinite(meta.endedAt)) meta.endedAt = 0;
-  if (typeof meta.lastAckAt !== "number" || !Number.isFinite(meta.lastAckAt)) meta.lastAckAt = 0;
+  if (!(meta.acks instanceof Set)) {
+    meta.acks = new Set();
+  }
+  if (typeof meta.endedAt !== 'number' || !Number.isFinite(meta.endedAt)) {
+    meta.endedAt = 0;
+  }
+  if (typeof meta.lastAckAt !== 'number' || !Number.isFinite(meta.lastAckAt)) {
+    meta.lastAckAt = 0;
+  }
   if (!isPostGameState(meta.post_game_state)) {
-    meta.post_game_state = meta.result ? POST_GAME_STATES.ENDED : "";
+    meta.post_game_state = meta.result ? POST_GAME_STATES.ENDED : '';
   }
   return meta;
 }
@@ -38,12 +44,8 @@ function clearCleanupTimer(meta) {
   }
 }
 
-export function cleanupIfOrphaned(ctx, game_id, { reason = "", allowPending = false } = {}) {
-  const {
-    state,
-    deleteGameState,
-    refreshLobby,
-  } = ctx;
+export function cleanupIfOrphaned(ctx, game_id, { reason = '', allowPending = false } = {}) {
+  const { state, deleteGameState, refreshLobby } = ctx;
   const { games, gameMeta, readyPlayers, gameSpectators, userToGame, userToEndGame } = state;
 
   if (!games.has(game_id)) {
@@ -60,12 +62,16 @@ export function cleanupIfOrphaned(ctx, game_id, { reason = "", allowPending = fa
   const stillPlayersInEndGame = game.players.some((p) => userToEndGame?.get(p) === game_id);
   const spectatorsCount = gameSpectators.get(game_id)?.size ?? 0;
 
-  if (stillPlayersAttached || stillPlayersInEndGame || spectatorsCount > 0) return false;
+  if (stillPlayersAttached || stillPlayersInEndGame || spectatorsCount > 0) {
+    return false;
+  }
 
   const meta = gameMeta.get(game_id);
-  if (meta?.post_game_state === POST_GAME_STATES.REMATCH_PENDING && !allowPending) return false;
+  if (meta?.post_game_state === POST_GAME_STATES.REMATCH_PENDING && !allowPending) {
+    return false;
+  }
 
-  if (reason === "ttl" && meta?.post_game_state === POST_GAME_STATES.REMATCH_PENDING) {
+  if (reason === 'ttl' && meta?.post_game_state === POST_GAME_STATES.REMATCH_PENDING) {
     meta.post_game_state = POST_GAME_STATES.EXPIRED;
   }
   clearCleanupTimer(meta);
@@ -79,10 +85,14 @@ export function cleanupIfOrphaned(ctx, game_id, { reason = "", allowPending = fa
 function scheduleCleanup(ctx, game_id, reason) {
   const { state } = ctx;
   const { gameMeta } = state;
-  if (!gameMeta || !game_id) return;
+  if (!gameMeta || !game_id) {
+    return;
+  }
 
   const meta = ensureGameEndMeta(gameMeta, game_id, { initialSent: true });
-  if (meta.cleanupTimer) return;
+  if (meta.cleanupTimer) {
+    return;
+  }
 
   meta.cleanupTimer = setTimeout(() => {
     meta.cleanupTimer = null;
@@ -90,14 +100,18 @@ function scheduleCleanup(ctx, game_id, reason) {
     if (liveMeta?.post_game_state === POST_GAME_STATES.REMATCH_PENDING) {
       liveMeta.post_game_state = POST_GAME_STATES.EXPIRED;
     }
-    cleanupIfOrphaned(ctx, game_id, { reason: reason || "ttl", allowPending: true });
+    cleanupIfOrphaned(ctx, game_id, { reason: reason || 'ttl', allowPending: true });
   }, CLEANUP_TTL_MS);
 
-  if (typeof meta.cleanupTimer?.unref === "function") meta.cleanupTimer.unref();
+  if (typeof meta.cleanupTimer?.unref === 'function') {
+    meta.cleanupTimer.unref();
+  }
 }
 
 function endGame(ctx, game_id, result, { exclude = [] } = {}) {
-  if (!game_id) return { payload: null, created: false };
+  if (!game_id) {
+    return { payload: null, created: false };
+  }
 
   const sessionUsecases = ctx.usecases?.session ?? ctx;
   const { state } = ctx;
@@ -112,9 +126,11 @@ function endGame(ctx, game_id, result, { exclude = [] } = {}) {
     meta.post_game_state = POST_GAME_STATES.ENDED;
   }
 
-  sessionUsecases.emitSnapshotsToAudience(game_id, { reason: "game_end" });
+  sessionUsecases.emitSnapshotsToAudience(game_id, { reason: 'game_end' });
 
-  if (res.created) scheduleCleanup(ctx, game_id, "game_end");
+  if (res.created) {
+    scheduleCleanup(ctx, game_id, 'game_end');
+  }
   return res;
 }
 
@@ -123,17 +139,17 @@ function resolveAckGameId(ctx, ws, req, data, actor) {
     getGameIdFromDataOrMapping(ctx, ws, req, data, actor, {
       required: false,
       preferMapping: true,
-      allowedKeys: ["game_id"],
-    }) ?? ""
+      allowedKeys: ['game_id'],
+    }) ?? ''
   );
 }
 
 function getAckMembership(state, game_id, actor) {
   const { gameSpectators, userToGame, userToSpectate } = state;
-  const wasPlayer = !!(game_id && userToGame.get(actor) === game_id);
-  const wasSpec = !!(
+  const wasPlayer = Boolean(game_id && userToGame.get(actor) === game_id);
+  const wasSpec = Boolean(
     game_id &&
-    (userToSpectate.get(actor) === game_id || (gameSpectators.get(game_id)?.has(actor) ?? false))
+    (userToSpectate.get(actor) === game_id || (gameSpectators.get(game_id)?.has(actor) ?? false)),
   );
   return { wasPlayer, wasSpec };
 }
@@ -145,7 +161,9 @@ function sendAckResponse(refreshLobby, sendRes, ws, req, payload) {
 }
 
 function handleAlreadyGoneAck(games, gameMeta, game_id) {
-  if (game_id && games.has(game_id)) return false;
+  if (game_id && games.has(game_id)) {
+    return false;
+  }
   if (gameMeta.has(game_id)) {
     const meta = gameMeta.get(game_id);
     clearCleanupTimer(meta);
@@ -155,43 +173,48 @@ function handleAlreadyGoneAck(games, gameMeta, game_id) {
 }
 
 function maybeEndByAckAsAbandon(ctx, game_id, game, actor, wasPlayer, meta) {
-  if (!wasPlayer || meta.result) return;
+  if (!wasPlayer || meta.result) {
+    return;
+  }
   const winner = game.players.find((p) => p !== actor) ?? null;
   endGame(
     ctx,
     game_id,
     { winner, reason: GAME_END_REASONS.ABANDON, by: actor, at: Date.now() },
-    { exclude: [actor] }
+    { exclude: [actor] },
   );
 }
 
 function recordAckAndSchedule(ctx, meta, game_id, actor) {
   meta.acks.add(actor);
   meta.lastAckAt = Date.now();
-  if (meta.result && !meta.endedAt) meta.endedAt = Date.now();
-  if (meta.result && !meta.cleanupTimer) scheduleCleanup(ctx, game_id, "ack");
+  if (meta.result && !meta.endedAt) {
+    meta.endedAt = Date.now();
+  }
+  if (meta.result && !meta.cleanupTimer) {
+    scheduleCleanup(ctx, game_id, 'ack');
+  }
 }
 
 export function handleLeaveGame(ctx, ws, req, data, actor) {
-  const {
-    setUserActivity,
-    Activity,
-    sendRes,
-    refreshLobby,
-  } = ctx;
+  const { setUserActivity, Activity, sendRes, refreshLobby } = ctx;
   const game_id = getGameIdFromDataOrMapping(ctx, ws, req, data, actor, {
     required: true,
     preferMapping: true,
-    allowedKeys: ["game_id"],
+    allowedKeys: ['game_id'],
   });
 
-  if (!game_id) return true;
+  if (!game_id) {
+    return true;
+  }
 
   const game = getExistingGameOrRes(ctx, ws, req, game_id);
-  if (!game) return true;
+  if (!game) {
+    return true;
+  }
 
   if (!game.players.includes(actor)) {
-    return resError(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN)
+    return resError(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN);
   }
 
   // abandonneur sort (l’adversaire / specs restent attachés jusqu’à ack)
@@ -204,7 +227,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
     ctx,
     game_id,
     { winner, reason: GAME_END_REASONS.ABANDON, by: actor, at: Date.now() },
-    { exclude: [actor] }
+    { exclude: [actor] },
   );
 
   refreshLobby();
@@ -214,23 +237,19 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
 }
 
 export function handleAckGameEnd(ctx, ws, req, data, actor) {
-  const {
-    state,
-    setUserActivity,
-    Activity,
-    sendRes,
-    refreshLobby,
-  } = ctx;
+  const { state, setUserActivity, Activity, sendRes, refreshLobby } = ctx;
   const { games, gameMeta, userToEndGame } = state;
   const game_id = resolveAckGameId(ctx, ws, req, data, actor);
-  const ackIntent = String(data?.intent ?? "").trim().toLowerCase();
+  const ackIntent = String(data?.intent ?? '')
+    .trim()
+    .toLowerCase();
 
   // idempotent: sans game_id -> OK
   if (!game_id) {
     userToEndGame?.delete(actor);
     return sendAckResponse(refreshLobby, sendRes, ws, req, {
       ack: true,
-      game_id: "",
+      game_id: '',
       alreadyGone: true,
     });
   }
@@ -271,7 +290,7 @@ export function handleAckGameEnd(ctx, ws, req, data, actor) {
   }
   recordAckAndSchedule(ctx, meta, game_id, actor);
 
-  cleanupIfOrphaned(ctx, game_id, { reason: "ack" });
+  cleanupIfOrphaned(ctx, game_id, { reason: 'ack' });
 
   return sendAckResponse(refreshLobby, sendRes, ws, req, { ack: true, game_id });
 }

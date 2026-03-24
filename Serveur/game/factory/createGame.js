@@ -1,17 +1,17 @@
-import crypto from "crypto";
-import { SlotId, SLOT_CONFIG } from "../constants/slots.js";
-import { DEFAULT_HAND_SIZE } from "../constants/turnFlow.js";
-import { shuffle } from "../state/cardStore.js";
-import { debugLog } from "../helpers/debugHelpers.js";
+import crypto from 'crypto';
+import { SlotId, SLOT_CONFIG } from '../constants/slots.js';
+import { DEFAULT_HAND_SIZE } from '../constants/turnFlow.js';
+import { shuffle } from '../state/cardStore.js';
+import { debugLog } from '../helpers/debugHelpers.js';
 
-const CARD_VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "V", "D", "R"];
-const CARD_COLORS = ["H", "C", "P", "S"];
+const CARD_VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'V', 'D', 'R'];
+const CARD_COLORS = ['H', 'C', 'P', 'S'];
 
 const INITIAL_DISTRIBUTION = {
-  HAND: { player: null, source: "A", count: (cfg) => cfg.handSize },
-  DECK: { player: null, source: "B", count: (cfg) => cfg.personalDeckSize },
+  HAND: { player: null, source: 'A', count: (cfg) => cfg.handSize },
+  DECK: { player: null, source: 'B', count: (cfg) => cfg.personalDeckSize },
   BENCH: { player: null, source: null, count: () => 0 },
-  PILE: { player: 0, source: "A", count: "ALL" },
+  PILE: { player: 0, source: 'A', count: 'ALL' },
   TABLE: { player: 0, source: null, count: () => 0 },
 };
 
@@ -58,8 +58,8 @@ function generateCards(source, copies = 1) {
 
 function createShuffledSources() {
   const sources = {
-    A: generateCards("A"),
-    B: generateCards("B"),
+    A: generateCards('A'),
+    B: generateCards('B'),
   };
   shuffle(sources.A);
   shuffle(sources.B);
@@ -67,15 +67,23 @@ function createShuffledSources() {
 }
 
 function resolveRuleCardCount(rule, ctx) {
-  if (rule.count === "ALL") return ctx.sources[rule.source].length;
-  if (typeof rule.count === "function") return rule.count(ctx);
+  if (rule.count === 'ALL') {
+    return ctx.sources[rule.source].length;
+  }
+  if (typeof rule.count === 'function') {
+    return rule.count(ctx);
+  }
   return rule.count;
 }
 
 function takeCardsForRule(rule, ctx) {
-  if (!rule.source) return [];
+  if (!rule.source) {
+    return [];
+  }
   const source = ctx.sources[rule.source];
-  if (!Array.isArray(source)) return [];
+  if (!Array.isArray(source)) {
+    return [];
+  }
   const cardCount = resolveRuleCardCount(rule, ctx);
   return source.splice(0, cardCount);
 }
@@ -88,7 +96,9 @@ function distributeInitialSlots(slots, sources, config = {}) {
 
   for (const [slotKey, rule] of Object.entries(INITIAL_DISTRIBUTION)) {
     const cfg = SLOT_CONFIG[slotKey];
-    if (!cfg) continue;
+    if (!cfg) {
+      continue;
+    }
 
     if (rule.player === null) {
       for (let playerIndex = 1; playerIndex <= 2; playerIndex++) {
@@ -96,7 +106,10 @@ function distributeInitialSlots(slots, sources, config = {}) {
           const slotId = SlotId.create(playerIndex, cfg.type, i);
           const cards = takeCardsForRule(rule, ctx);
 
-          slots.set(slotId, cards.map((card) => card.id));
+          slots.set(
+            slotId,
+            cards.map((card) => card.id),
+          );
           allCards.push(...cards);
         }
       }
@@ -107,7 +120,10 @@ function distributeInitialSlots(slots, sources, config = {}) {
       const slotId = SlotId.create(rule.player, cfg.type, i);
       const cards = takeCardsForRule(rule, ctx);
 
-      slots.set(slotId, cards.map((card) => card.id));
+      slots.set(
+        slotId,
+        cards.map((card) => card.id),
+      );
       allCards.push(...cards);
     }
   }
@@ -116,16 +132,20 @@ function distributeInitialSlots(slots, sources, config = {}) {
 }
 
 function initCardsById(game, cards = null) {
-  if (!game) return;
+  if (!game) {
+    return;
+  }
 
-  if (!game.cardsById || typeof game.cardsById !== "object") {
+  if (!game.cardsById || typeof game.cardsById !== 'object') {
     game.cardsById = Object.create(null);
   }
 
-  if (!Array.isArray(cards)) return;
+  if (!Array.isArray(cards)) {
+    return;
+  }
 
   for (const card of cards) {
-    if (card && typeof card.id === "string") {
+    if (card && typeof card.id === 'string') {
       game.cardsById[card.id] = card;
     }
   }
@@ -158,11 +178,8 @@ function createGame(player1, player2) {
   // 5) Build card lookup index.
   initCardsById(game, allCards);
 
-  debugLog("[GAME] CREATE", { player1, player2 });
+  debugLog('[GAME] CREATE', { player1, player2 });
   return game;
 }
 
-export {
-  createEmptySlots,
-  createGame,
-};
+export { createEmptySlots, createGame };

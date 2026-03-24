@@ -1,15 +1,19 @@
-const GAME_MESSAGE_EVENT = "show_game_message";
+const GAME_MESSAGE_EVENT = 'show_game_message';
 
 function firstNonEmpty(...values) {
   for (const value of values) {
-    const s = String(value ?? "").trim();
-    if (s) return s;
+    const s = String(value ?? '').trim();
+    if (s) {
+      return s;
+    }
   }
-  return "";
+  return '';
 }
 
 function safeParams(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
   return value;
 }
 
@@ -19,8 +23,8 @@ function safeParams(value) {
  * - message_params: paramètres de template optionnels
  */
 export function toUiMessage(input = {}, defaults = {}) {
-  const src = input && typeof input === "object" ? input : {};
-  const dft = defaults && typeof defaults === "object" ? defaults : {};
+  const src = input && typeof input === 'object' ? input : {};
+  const dft = defaults && typeof defaults === 'object' ? defaults : {};
 
   const message_code = firstNonEmpty(src.message_code, dft.message_code);
 
@@ -30,7 +34,9 @@ export function toUiMessage(input = {}, defaults = {}) {
   };
 
   const out = { message_code };
-  if (Object.keys(message_params).length > 0) out.message_params = message_params;
+  if (Object.keys(message_params).length > 0) {
+    out.message_params = message_params;
+  }
   return out;
 }
 
@@ -44,14 +50,18 @@ function normalizeTargets(to) {
  * - Payload: { message_code, message_params? }
  */
 export function emitGameMessage(sendEvtUser, to, input = {}, defaults = {}) {
-  if (typeof sendEvtUser !== "function") return false;
+  if (typeof sendEvtUser !== 'function') {
+    return false;
+  }
 
   const payload = toUiMessage(input, defaults);
   const targets = normalizeTargets(to);
   let sent = false;
 
   for (const username of targets) {
-    if (!username) continue;
+    if (!username) {
+      continue;
+    }
     sendEvtUser(username, GAME_MESSAGE_EVENT, payload);
     sent = true;
   }
@@ -71,21 +81,26 @@ export function emitPopupMessage(
   envelope = {},
   input = {},
   defaults = {},
-  field = "ui"
+  field = 'ui',
 ) {
-  if (typeof sendEvtUser !== "function") return false;
-  if (!eventType || typeof eventType !== "string") return false;
+  if (typeof sendEvtUser !== 'function') {
+    return false;
+  }
+  if (!eventType || typeof eventType !== 'string') {
+    return false;
+  }
 
   const ui = toUiMessage(input, defaults);
-  const baseEnvelope =
-    envelope && typeof envelope === "object" ? envelope : {};
+  const baseEnvelope = envelope && typeof envelope === 'object' ? envelope : {};
   const payload = { ...baseEnvelope, [field]: ui };
 
   const targets = normalizeTargets(to);
   let sent = false;
 
   for (const username of targets) {
-    if (!username) continue;
+    if (!username) {
+      continue;
+    }
     sendEvtUser(username, eventType, payload);
     sent = true;
   }

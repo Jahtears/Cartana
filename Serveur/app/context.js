@@ -1,37 +1,41 @@
 // server/context.js v3.1 - Utilise StateManager + Notifier pour émission
 
-import { randomUUID } from "node:crypto";
-import { createTransport } from "../net/transport.js";
-import { createBroadcaster } from "../net/broadcast/broadcaster.js";
-import { createFlush } from "../net/broadcast/flush.js";
-import { createRoles } from "../domain/roles/roles.js";
-import { createLobbyLists } from "../domain/lobby/lists.js";
-import { createGameNotifier } from "../domain/session/notifier.js";
-import { emitSlotState, emitFullState } from "../domain/session/emitter.js";
-import { createPresence } from "../domain/session/presence.js";
-import { createGame } from "../game/factory/createGame.js";
-import { SLOT_TYPES, SlotId } from "../game/constants/slots.js";
-import { getCardById } from "../game/state/cardStore.js";
-import { getTableSlots } from "../game/state/slotStore.js";
-import { mapSlotFromClientToServer, mapSlotForClient } from "../game/boundary/slotIdMapper.js";
-import { applyMove } from "../game/engine/applyMove.js";
-import { validateMove, refillHandIfEmpty, hasWonByEmptyDeckSlot, hasLoseByEmptyPileSlot } from "../game/rules/validateMove.js";
-import { orchestrateMove } from "../game/usecases/move/orchestrateMove.js";
+import { randomUUID } from 'node:crypto';
+import { createTransport } from '../net/transport.js';
+import { createBroadcaster } from '../net/broadcast/broadcaster.js';
+import { createFlush } from '../net/broadcast/flush.js';
+import { createRoles } from '../domain/roles/roles.js';
+import { createLobbyLists } from '../domain/lobby/lists.js';
+import { createGameNotifier } from '../domain/session/notifier.js';
+import { emitSlotState, emitFullState } from '../domain/session/emitter.js';
+import { createPresence } from '../domain/session/presence.js';
+import { createGame } from '../game/factory/createGame.js';
+import { SLOT_TYPES, SlotId } from '../game/constants/slots.js';
+import { getCardById } from '../game/state/cardStore.js';
+import { getTableSlots } from '../game/state/slotStore.js';
+import { mapSlotFromClientToServer, mapSlotForClient } from '../game/boundary/slotIdMapper.js';
+import { applyMove } from '../game/engine/applyMove.js';
+import {
+  validateMove,
+  refillHandIfEmpty,
+  hasWonByEmptyDeckSlot,
+  hasLoseByEmptyPileSlot,
+} from '../game/rules/validateMove.js';
+import { orchestrateMove } from '../game/usecases/move/orchestrateMove.js';
 import {
   initTurnForGame,
   endTurnAfterBenchPlay,
   resetTurnTimeoutStreak,
   tryExpireTurn,
-} from "../game/helpers/turnFlowHelpers.js";
-import { buildCardPayload } from "../game/payload/cardPayload.js";
-import { buildTurnPayload } from "../game/payload/turnPayload.js";
-import { buildStateSnapshotPayload } from "../game/payload/snapshotPayload.js";
-import { saveGameState, loadGameState, deleteGameState } from "../domain/session/Saves.js";
-import { verifyOrCreateUser } from "../handlers/auth/usersStore.js";
-import { createStateManager } from "./stateManager.js";
+} from '../game/helpers/turnFlowHelpers.js';
+import { buildCardPayload } from '../game/payload/cardPayload.js';
+import { buildTurnPayload } from '../game/payload/turnPayload.js';
+import { buildStateSnapshotPayload } from '../game/payload/snapshotPayload.js';
+import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
+import { verifyOrCreateUser } from '../handlers/auth/usersStore.js';
+import { createStateManager } from './stateManager.js';
 
 export function createServerContext({ onTransportSend } = {}) {
-
   // ========================
   // STATE MANAGER (CENTRALISÉ)
   // ========================
@@ -40,12 +44,7 @@ export function createServerContext({ onTransportSend } = {}) {
   // ========================
   // TRANSPORT
   // ========================
-  const {
-    sendRes,
-    sendEvtSocket,
-    sendEvtUser,
-    sendEvtLobby,
-  } = createTransport({
+  const { sendRes, sendEvtSocket, sendEvtUser, sendEvtLobby } = createTransport({
     wsByUser: state.wsByUser,
     onSend: onTransportSend,
   });
@@ -107,7 +106,9 @@ export function createServerContext({ onTransportSend } = {}) {
 
   function withGameUpdate(game_id, callback, trace) {
     const game = state.games.get(game_id);
-    if (!game) return;
+    if (!game) {
+      return;
+    }
 
     const specs = state.gameSpectators.get(game_id);
     const bc = createBroadcaster({
@@ -126,7 +127,9 @@ export function createServerContext({ onTransportSend } = {}) {
     const fx = {
       game,
       touch(slot_id) {
-        if (!slot_id) return;
+        if (!slot_id) {
+          return;
+        }
         fl.touch(slot_id);
       },
 
@@ -150,22 +153,31 @@ export function createServerContext({ onTransportSend } = {}) {
 
   function processTurnTimeout(gameId, now = Date.now()) {
     const game = state.games.get(gameId);
-    if (!game?.turn) return false;
+    if (!game?.turn) {
+      return false;
+    }
 
     const meta = state.gameMeta.get(gameId);
-    if (game.turn.paused || meta?.result) return false;
+    if (game.turn.paused || meta?.result) {
+      return false;
+    }
 
     const timeoutResult = tryExpireTurn(game, now);
-    if (!timeoutResult?.expired) return false;
+    if (!timeoutResult?.expired) {
+      return false;
+    }
 
-    const prev = String(timeoutResult.prev ?? "").trim();
-    const next = String(timeoutResult.next ?? "").trim();
+    const prev = String(timeoutResult.prev ?? '').trim();
+    const next = String(timeoutResult.next ?? '').trim();
     const endGamePatch = timeoutResult.endGamePatch;
     const pileSlotId = SlotId.create(0, SLOT_TYPES.PILE, 1);
 
     withGameUpdate(gameId, (fx) => {
       const recycledSlots = timeoutResult.recycled?.recycledSlots;
-      if (timeoutResult.tableSyncNeeded || (Array.isArray(recycledSlots) && recycledSlots.length > 0)) {
+      if (
+        timeoutResult.tableSyncNeeded ||
+        (Array.isArray(recycledSlots) && recycledSlots.length > 0)
+      ) {
         fx.syncTable(getTableSlots(game));
       }
 
@@ -174,31 +186,41 @@ export function createServerContext({ onTransportSend } = {}) {
         : [];
       if (autoPlayedAces.length > 0) {
         for (const move of autoPlayedAces) {
-          if (move?.from) fx.touch(move.from);
-          if (move?.to) fx.touch(move.to);
+          if (move?.from) {
+            fx.touch(move.from);
+          }
+          if (move?.to) {
+            fx.touch(move.to);
+          }
         }
       } else {
-        if (timeoutResult.aceFrom) fx.touch(timeoutResult.aceFrom);
-        if (timeoutResult.aceTo) fx.touch(timeoutResult.aceTo);
+        if (timeoutResult.aceFrom) {
+          fx.touch(timeoutResult.aceFrom);
+        }
+        if (timeoutResult.aceTo) {
+          fx.touch(timeoutResult.aceTo);
+        }
       }
       for (const refill of timeoutResult.given ?? []) {
-        if (refill?.slotId) fx.touch(refill.slotId);
+        if (refill?.slotId) {
+          fx.touch(refill.slotId);
+        }
       }
       fx.touch(pileSlotId);
       fx.turn();
 
       if (prev) {
-        fx.message("show_game_message", { message_code: "RULE_TURN_TIMEOUT" }, { to: prev });
+        fx.message('show_game_message', { message_code: 'RULE_TURN_TIMEOUT' }, { to: prev });
       }
       if (next && !endGamePatch) {
-        fx.message("show_game_message", { message_code: "RULE_TURN_START" }, { to: next });
+        fx.message('show_game_message', { message_code: 'RULE_TURN_START' }, { to: next });
       }
     });
 
     saveGameState(gameId, game);
     if (endGamePatch) {
       emitGameEndOnce(gameId, endGamePatch);
-      emitSnapshotsToAudience(gameId, { reason: "game_end" });
+      emitSnapshotsToAudience(gameId, { reason: 'game_end' });
     }
     return timeoutResult;
   }
@@ -324,6 +346,5 @@ export function createServerContext({ onTransportSend } = {}) {
     baseCtx,
     loginCtx,
     onSocketClose,
-    
   };
 }

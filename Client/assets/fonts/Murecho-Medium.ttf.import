@@ -3,12 +3,12 @@
 importer="font_data_dynamic"
 type="FontFile"
 uid="uid://dlqmw3c365kn7"
-path="res://.godot/imported/Murecho-Medium.ttf-3e2b2e31b61d849fbb85998d3cc89583.fontdata"
+path="res://.godot/imported/Murecho-Medium.ttf-4baf4ff0653427e537106c84e3842fa8.fontdata"
 
 [deps]
 
-source_file="res://Client/Resource/fonts/Murecho-Medium.ttf"
-dest_files=["res://.godot/imported/Murecho-Medium.ttf-3e2b2e31b61d849fbb85998d3cc89583.fontdata"]
+source_file="res://assets/fonts/Murecho-Medium.ttf"
+dest_files=["res://.godot/imported/Murecho-Medium.ttf-4baf4ff0653427e537106c84e3842fa8.fontdata"]
 
 [params]
 

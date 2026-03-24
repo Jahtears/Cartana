@@ -65,13 +65,13 @@ const POPUP_ACTION_CONFIRM_NO := "confirm_no"
 const POPUP_ACTION_INFO_OK := "info_ok"
 
 const POPUP_FLOW := {
-	"INVITE_REQUEST": POPUP_FLOW_INVITE_REQUEST,
+    "INVITE_REQUEST": POPUP_FLOW_INVITE_REQUEST,
 }
 
 const POPUP_ACTION := {
-	"CONFIRM_YES": POPUP_ACTION_CONFIRM_YES,
-	"CONFIRM_NO": POPUP_ACTION_CONFIRM_NO,
-	"INFO_OK": POPUP_ACTION_INFO_OK,
+    "CONFIRM_YES": POPUP_ACTION_CONFIRM_YES,
+    "CONFIRM_NO": POPUP_ACTION_CONFIRM_NO,
+    "INFO_OK": POPUP_ACTION_INFO_OK,
 }
 
 # ============= REQUEST TYPES =============
@@ -109,27 +109,27 @@ const UI_GAME_QUIT_BUTTON_KEY := "UI_GAME_QUIT_BUTTON"
 # ============= HELPERS =============
 
 static func invite_action_request(action_id: String, payload: Dictionary) -> Dictionary:
-	var flow := String(payload.get("flow", ""))
-	if flow != POPUP_FLOW_INVITE_REQUEST:
-		return {}
+    var flow := String(payload.get("flow", ""))
+    if flow != POPUP_FLOW_INVITE_REQUEST:
+        return {}
 
-	var from_user := String(payload.get("from", ""))
-	if from_user == "":
-		return {}
+    var from_user := String(payload.get("from", ""))
+    if from_user == "":
+        return {}
 
-	var req := {}
-	req["to"] = from_user
-	var context := String(payload.get("context", "")).strip_edges()
-	var source_game_id := String(payload.get("source_game_id", "")).strip_edges()
-	if context != "":
-		req["context"] = context
-	if source_game_id != "":
-		req["source_game_id"] = source_game_id
+    var req := {}
+    req["to"] = from_user
+    var context := String(payload.get("context", "")).strip_edges()
+    var source_game_id := String(payload.get("source_game_id", "")).strip_edges()
+    if context != "":
+        req["context"] = context
+    if source_game_id != "":
+        req["source_game_id"] = source_game_id
 
-	if action_id == POPUP_ACTION_CONFIRM_YES:
-		req["accepted"] = true
-		return req
-	if action_id == POPUP_ACTION_CONFIRM_NO:
-		req["accepted"] = false
-		return req
-	return {}
+    if action_id == POPUP_ACTION_CONFIRM_YES:
+        req["accepted"] = true
+        return req
+    if action_id == POPUP_ACTION_CONFIRM_NO:
+        req["accepted"] = false
+        return req
+    return {}

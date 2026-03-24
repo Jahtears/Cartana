@@ -1,48 +1,46 @@
 // handlers/login.js v2.1
-import { resError } from "../../net/transport.js";
-import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
+import { resError } from '../../net/transport.js';
+import { POPUP_MESSAGE } from '../../shared/popupMessages.js';
 
-const LOGIN_RATE_MAX_ATTEMPTS = parsePositiveInt(
-  process.env.LOGIN_RATE_MAX_ATTEMPTS,
-  5
-);
-const LOGIN_RATE_WINDOW_MS = parsePositiveInt(
-  process.env.LOGIN_RATE_WINDOW_MS,
-  60_000
-);
-const LOGIN_RATE_BLOCK_MS = parsePositiveInt(
-  process.env.LOGIN_RATE_BLOCK_MS,
-  5 * 60_000
-);
+const LOGIN_RATE_MAX_ATTEMPTS = parsePositiveInt(process.env.LOGIN_RATE_MAX_ATTEMPTS, 5);
+const LOGIN_RATE_WINDOW_MS = parsePositiveInt(process.env.LOGIN_RATE_WINDOW_MS, 60_000);
+const LOGIN_RATE_BLOCK_MS = parsePositiveInt(process.env.LOGIN_RATE_BLOCK_MS, 5 * 60_000);
 const LOGIN_RATE_SWEEP_EVERY = 100;
-const LOGIN_RATE_BUCKET_TTL_MS =
-  Math.max(LOGIN_RATE_WINDOW_MS, LOGIN_RATE_BLOCK_MS) * 2;
+const LOGIN_RATE_BUCKET_TTL_MS = Math.max(LOGIN_RATE_WINDOW_MS, LOGIN_RATE_BLOCK_MS) * 2;
 
 const loginRateBuckets = new Map();
 let loginRateOpCount = 0;
 
 function parsePositiveInt(rawValue, fallback) {
-  const value = Number.parseInt(String(rawValue ?? ""), 10);
+  const value = Number.parseInt(String(rawValue ?? ''), 10);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 function normalizePart(value) {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function getRemoteAddress(ws) {
   const fromSocket = ws?._socket?.remoteAddress;
   const fromUpgradeReq = ws?.upgradeReq?.socket?.remoteAddress;
-  return normalizePart(fromSocket || fromUpgradeReq || "");
+  return normalizePart(fromSocket || fromUpgradeReq || '');
 }
 
 function buildLoginRateKeys(ws, username) {
   const user = normalizePart(username);
   const ip = getRemoteAddress(ws);
 
-  if (ip && user) return [`ip:${ip}`, `ip_user:${ip}|${user}`];
-  if (ip) return [`ip:${ip}`];
-  if (user) return [`user:${user}`];
+  if (ip && user) {
+    return [`ip:${ip}`, `ip_user:${ip}|${user}`];
+  }
+  if (ip) {
+    return [`ip:${ip}`];
+  }
+  if (user) {
+    return [`user:${user}`];
+  }
   return [];
 }
 
@@ -65,7 +63,9 @@ function getOrCreateBucket(key, nowMs) {
 
 function maybeSweepBuckets(nowMs) {
   loginRateOpCount += 1;
-  if (loginRateOpCount % LOGIN_RATE_SWEEP_EVERY !== 0) return;
+  if (loginRateOpCount % LOGIN_RATE_SWEEP_EVERY !== 0) {
+    return;
+  }
 
   for (const [key, bucket] of loginRateBuckets) {
     pruneFailures(bucket, nowMs);
@@ -78,13 +78,17 @@ function maybeSweepBuckets(nowMs) {
 }
 
 function getRetryAfterMs(keys, nowMs = Date.now()) {
-  if (!Array.isArray(keys) || keys.length === 0) return 0;
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return 0;
+  }
   maybeSweepBuckets(nowMs);
 
   let retryAfter = 0;
   for (const key of keys) {
     const bucket = loginRateBuckets.get(key);
-    if (!bucket) continue;
+    if (!bucket) {
+      continue;
+    }
     bucket.lastSeen = nowMs;
     pruneFailures(bucket, nowMs);
 
@@ -116,7 +120,9 @@ function buildMaxTryError(retryAfterMs) {
 }
 
 function recordLoginFailure(keys, nowMs = Date.now()) {
-  if (!Array.isArray(keys) || keys.length === 0) return 0;
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return 0;
+  }
   maybeSweepBuckets(nowMs);
 
   let retryAfter = 0;
@@ -135,7 +141,9 @@ function recordLoginFailure(keys, nowMs = Date.now()) {
 }
 
 function clearLoginFailures(keys) {
-  if (!Array.isArray(keys) || keys.length === 0) return;
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return;
+  }
   for (const key of keys) {
     loginRateBuckets.delete(key);
   }
@@ -147,19 +155,12 @@ export function resetLoginRateLimiterForTests() {
 }
 
 export async function handleLogin(ctx, ws, req, data) {
-  const {
-    state,
-    verifyOrCreateUser,
-    getUserStatus,
-    sendRes,
-    refreshLobby,
-    handleReconnect,
-  } = ctx;
+  const { state, verifyOrCreateUser, getUserStatus, sendRes, refreshLobby, handleReconnect } = ctx;
 
   // Safely handle undefined data
   const safeData = data ?? {};
-  const username = String(safeData.username ?? "").trim();
-  const pin = String(safeData.pin ?? "").trim();
+  const username = String(safeData.username ?? '').trim();
+  const pin = String(safeData.pin ?? '').trim();
   const rateLimitKeys = buildLoginRateKeys(ws, username);
 
   if (!username || !pin) {
@@ -190,9 +191,12 @@ export async function handleLogin(ctx, ws, req, data) {
     clearLoginFailures(rateLimitKeys);
 
     const existingWs = state.getWS(username);
-    console.log('[LOGIN] Checking if user already connected:', { username, hasExistingWs: !!existingWs, isSameWs: existingWs === ws });
-    
-    
+    console.log('[LOGIN] Checking if user already connected:', {
+      username,
+      hasExistingWs: Boolean(existingWs),
+      isSameWs: existingWs === ws,
+    });
+
     if (state.getWS(username)) {
       sendRes(ws, req, false, {
         message_code: POPUP_MESSAGE.AUTH_ALREADY_CONNECTED,
@@ -214,16 +218,17 @@ export async function handleLogin(ctx, ws, req, data) {
     state.registerUser(username, ws);
 
     // Reconnexion: restaurer présence in-game si mapping existant.
-    if (typeof handleReconnect === "function") {
+    if (typeof handleReconnect === 'function') {
       handleReconnect(username);
     }
 
     sendRes(ws, req, true, { username, status: getUserStatus(username) });
-    if (typeof refreshLobby === "function") refreshLobby();
+    if (typeof refreshLobby === 'function') {
+      refreshLobby();
+    }
     return true;
-
   } catch (err) {
-    console.error("Erreur login:", err);
+    console.error('Erreur login:', err);
     resError(sendRes, ws, req, POPUP_MESSAGE.TECH_INTERNAL_ERROR);
     return true;
   }

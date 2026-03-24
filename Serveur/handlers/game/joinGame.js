@@ -1,55 +1,43 @@
 // handlers/joinGame.js
-import { ensureGameMeta } from "../../game/meta.js";
-import { emitGameMessage } from "../../shared/uiMessage.js";
-import { requireParam, getExistingGameOrRes } from "../../net/guards.js";
-import { resError } from "../../net/transport.js";
-import { saveGameState } from "../../domain/session/Saves.js";
-import { POPUP_MESSAGE } from "../../shared/popupMessages.js";
-
+import { ensureGameMeta } from '../../game/meta.js';
+import { emitGameMessage } from '../../shared/uiMessage.js';
+import { requireParam, getExistingGameOrRes } from '../../net/guards.js';
+import { resError } from '../../net/transport.js';
+import { saveGameState } from '../../domain/session/Saves.js';
+import { POPUP_MESSAGE } from '../../shared/popupMessages.js';
 
 export function handleJoinGame(ctx, ws, req, data, actor) {
   const sessionUsecases = ctx.usecases?.session ?? ctx;
   const turnUsecases = ctx.usecases?.turn ?? ctx;
 
-  const {
-    state,
-    sendRes,
-    sendEvtUser,
-    refreshLobby,
-    setUserActivity,
-    Activity,
-  } = ctx;
-  const {
-    emitStartGameToUser,
-    emitFullState,
-    emitSnapshotsToAudience,
-  } = sessionUsecases;
-  const {
-    initTurnForGame,
-  } = turnUsecases;
-  const {
-    sendEvtSocket,
-  } = ctx;
+  const { state, sendRes, sendEvtUser, refreshLobby, setUserActivity, Activity } = ctx;
+  const { emitStartGameToUser, emitFullState, emitSnapshotsToAudience } = sessionUsecases;
+  const { initTurnForGame } = turnUsecases;
+  const { sendEvtSocket } = ctx;
   const { userToGame, userToEndGame, gameMeta, readyPlayers, wsByUser } = state;
 
-  const game_id = requireParam(sendRes, ws, req, data, "game_id");
-  if (!game_id) return true;
+  const game_id = requireParam(sendRes, ws, req, data, 'game_id');
+  if (!game_id) {
+    return true;
+  }
 
   const game = getExistingGameOrRes(ctx, ws, req, game_id);
-  if (!game) return true;
+  if (!game) {
+    return true;
+  }
 
   // Interdire un join "hors players"
   if (!game.players.includes(actor)) {
     return resError(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN);
   }
 
-  const currentGameId = String(userToGame.get(actor) ?? "");
+  const currentGameId = String(userToGame.get(actor) ?? '');
   if (currentGameId && currentGameId !== game_id) {
     return resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_STATE);
   }
   const alreadyInThisGame = currentGameId === game_id;
 
-  const meta = ensureGameMeta(gameMeta, game_id, { initialSent: !!game?.turn });
+  const meta = ensureGameMeta(gameMeta, game_id, { initialSent: Boolean(game?.turn) });
 
   if (!alreadyInThisGame) {
     // Activité joueur et signal de démarrage uniquement lors de l'entrée depuis le lobby.
@@ -73,7 +61,9 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
   }
 
   // Barrière d'entrée: attendre que les 2 joueurs aient rejoint la scène.
-  if (!readyPlayers.has(game_id)) readyPlayers.set(game_id, new Set());
+  if (!readyPlayers.has(game_id)) {
+    readyPlayers.set(game_id, new Set());
+  }
   readyPlayers.get(game_id).add(actor);
 
   if (readyPlayers.get(game_id).size < game.players.length) {
@@ -90,7 +80,7 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
     });
   }
 
-  emitSnapshotsToAudience(game_id, { reason: "init" });
+  emitSnapshotsToAudience(game_id, { reason: 'init' });
 
   saveGameState(game_id, game);
   sendRes(ws, req, true, { ok: true, game_id, players: game.players });

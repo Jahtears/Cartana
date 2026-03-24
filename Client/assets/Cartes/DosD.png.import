@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://birbipg4vmclp"
-path="res://.godot/imported/DosA.png-f5e0da4305345cfb4c9906e1236791d2.ctex"
+uid="uid://bo5nxvqtee4kk"
+path="res://.godot/imported/DosD.png-9414381ed941d317d9dabc8d11f5462f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Client/Resource/Cartes/DosA.png"
-dest_files=["res://.godot/imported/DosA.png-f5e0da4305345cfb4c9906e1236791d2.ctex"]
+source_file="res://assets/Cartes/DosD.png"
+dest_files=["res://.godot/imported/DosD.png-9414381ed941d317d9dabc8d11f5462f.ctex"]
 
 [params]
 

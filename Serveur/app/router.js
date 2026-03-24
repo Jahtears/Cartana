@@ -1,18 +1,18 @@
-// router.js v2.0 
+// router.js v2.0
 
-import { POPUP_MESSAGE } from "../shared/popupMessages.js";
-const DEV_TRACE = process.env.DEBUG_TRACE === "1";
+import { POPUP_MESSAGE } from '../shared/popupMessages.js';
+const DEV_TRACE = process.env.DEBUG_TRACE === '1';
 const RID_CACHE_LIMIT = 200;
 
 function withTrace(baseCtx, req, actor = null) {
-  if (!DEV_TRACE) return baseCtx;
-  const actorTag = typeof actor === "string" && actor.trim()
-    ? `@${actor.trim()}`
-    : "";
+  if (!DEV_TRACE) {
+    return baseCtx;
+  }
+  const actorTag = typeof actor === 'string' && actor.trim() ? `@${actor.trim()}` : '';
   const traceId = `${req.type}#${req.rid}${actorTag}`;
   const ctx = Object.create(baseCtx);
   ctx.traceId = traceId;
-  ctx.trace = (...args) => console.log("[TRACE]", traceId, ...args);
+  ctx.trace = (...args) => console.log('[TRACE]', traceId, ...args);
   return ctx;
 }
 
@@ -83,12 +83,7 @@ export function createRouter({
       return;
     }
 
-    if (
-      !env ||
-      env.kind !== "req" ||
-      typeof env.type !== "string" ||
-      typeof env.rid !== "string"
-    ) {
+    if (!env || env.kind !== 'req' || typeof env.type !== 'string' || typeof env.rid !== 'string') {
       return;
     }
 
@@ -108,14 +103,10 @@ export function createRouter({
     ridState.inFlight.add(req.rid);
 
     const sendResWithRidCache = (targetWs, targetReq, ok, payload) => {
-      if (
-        targetWs === ws &&
-        targetReq &&
-        String(targetReq.rid) === String(req.rid)
-      ) {
+      if (targetWs === ws && targetReq && String(targetReq.rid) === String(req.rid)) {
         ridState.responses.set(req.rid, {
-          type: String(targetReq.type ?? ""),
-          ok: !!ok,
+          type: String(targetReq.type ?? ''),
+          ok: Boolean(ok),
           payload,
         });
         trimRidCache(ridState.responses);
@@ -125,7 +116,7 @@ export function createRouter({
 
     try {
       // ---------- LOGIN (pas d'auth requise) ----------
-      if (req.type === "login") {
+      if (req.type === 'login') {
         try {
           const loginCtxWithCache = Object.create(loginCtx);
           loginCtxWithCache.sendRes = sendResWithRidCache;
@@ -139,7 +130,7 @@ export function createRouter({
           }
           return;
         } catch (err) {
-          console.error("[ROUTE_ERROR] login", err);
+          console.error('[ROUTE_ERROR] login', err);
           sendResWithRidCache(ws, req, false, {
             message_code: POPUP_MESSAGE.TECH_INTERNAL_ERROR,
           });
@@ -149,7 +140,9 @@ export function createRouter({
 
       // ---------- Tout le reste nécessite auth ----------
       const actor = requireAuth(ws, req, { state, sendRes: sendResWithRidCache });
-      if (!actor) return;
+      if (!actor) {
+        return;
+      }
 
       const ctx = withTrace(baseCtx, req, actor);
       ctx.sendRes = sendResWithRidCache;
@@ -161,7 +154,7 @@ export function createRouter({
         },
 
         get_players: async () => {
-          ctx.trace?.("get_players");
+          ctx.trace?.('get_players');
           sendResWithRidCache(ws, req, true, {
             players: ctx.playersList?.() ?? [],
             statuses: ctx.playersStatuses?.() ?? {},
@@ -190,12 +183,12 @@ export function createRouter({
 
       try {
         const t0 = DEV_TRACE ? Date.now() : 0;
-        ctx.trace?.("BEGIN", { actor });
+        ctx.trace?.('BEGIN', { actor });
         await fn();
-        ctx.trace?.("END", { ms: Date.now() - t0 });
+        ctx.trace?.('END', { ms: Date.now() - t0 });
       } catch (err) {
-        console.error("[ROUTE_ERROR]", req.type, err);
-        ctx.trace?.("ERROR", String(err?.message ?? err));
+        console.error('[ROUTE_ERROR]', req.type, err);
+        ctx.trace?.('ERROR', String(err?.message ?? err));
         sendResWithRidCache(ws, req, false, {
           message_code: POPUP_MESSAGE.TECH_INTERNAL_ERROR,
         });

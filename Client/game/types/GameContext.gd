@@ -28,38 +28,38 @@ var disconnect_prompt_seq: int = 0
 
 # ============= INITIALIZATION =============
 func _init(game: Node) -> void:
-	game_node = game
-	card_context = CardContext.new()
-	card_context.root = game
-	slots_ready = false
-	pending_events = []
+    game_node = game
+    card_context = CardContext.new()
+    card_context.root = game
+    slots_ready = false
+    pending_events = []
 
 # ============= PUBLIC METHODS =============
 func reset_game_state() -> void:
-	current_game_id = ""
-	players_in_game = []
-	is_spectator = false
-	result = {}
-	is_changing_scene = false
-	game_end_prompted = false
-	leave_sent = false
-	opponent_disconnected = false
-	network_disconnected = false
-	disconnect_prompt_seq += 1
+    current_game_id = ""
+    players_in_game = []
+    is_spectator = false
+    result = {}
+    is_changing_scene = false
+    game_end_prompted = false
+    leave_sent = false
+    opponent_disconnected = false
+    network_disconnected = false
+    disconnect_prompt_seq += 1
 
 func is_playing() -> bool:
-	return not is_spectator and current_game_id != ""
+    return not is_spectator and current_game_id != ""
 
 func is_game_end() -> bool:
-	return result.size() > 0
+    return result.size() > 0
 
 # ============= SAFE ACCESSORS =============
 func get_card(card_id: String) -> Variant:
-	if card_context and card_context.cards:
-		return card_context.cards.get(card_id)
-	return null
+    if card_context and card_context.cards:
+        return card_context.cards.get(card_id)
+    return null
 
 func get_slot(slot_id: String) -> Variant:
-	if card_context and card_context.slots_by_id:
-		return card_context.slots_by_id.get(slot_id)
-	return null
+    if card_context and card_context.slots_by_id:
+        return card_context.slots_by_id.get(slot_id)
+    return null

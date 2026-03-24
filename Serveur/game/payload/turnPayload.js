@@ -2,7 +2,9 @@
 
 function buildTurnPayload(turn, { includeEmpty = false, serverNow = Date.now() } = {}) {
   if (!turn) {
-    if (!includeEmpty) return null;
+    if (!includeEmpty) {
+      return null;
+    }
     return {
       endsAt: 0,
       durationMs: 0,
@@ -17,12 +19,10 @@ function buildTurnPayload(turn, { includeEmpty = false, serverNow = Date.now() }
     turnNumber: turn.number,
     endsAt: turn.endsAt ?? null,
     durationMs: turn.durationMs ?? null,
-    paused: !!turn.paused,
+    paused: Boolean(turn.paused),
     remainingMs: Number(turn.remainingMs ?? 0),
     serverNow,
   };
 }
 
-export {
-  buildTurnPayload,
-};
+export { buildTurnPayload };
