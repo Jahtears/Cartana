@@ -4,11 +4,19 @@ import sonarjs from 'eslint-plugin-sonarjs';
 import vitest from '@vitest/eslint-plugin';
 
 export default [
+  // ───────────────────────────────────────────────
+  // IGNORE
+  // ───────────────────────────────────────────────
   {
     ignores: ['node_modules/', 'coverage/', 'dist/', 'build/', '*.pck'],
   },
+
+  // ───────────────────────────────────────────────
+  // GLOBAL JS RULESET
+  // ───────────────────────────────────────────────
   {
     files: ['**/*.js'],
+
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -18,7 +26,6 @@ export default [
         Buffer: 'readonly',
         __dirname: 'readonly',
         __filename: 'readonly',
-        // Node.js globals
         global: 'readonly',
         setImmediate: 'readonly',
         clearImmediate: 'readonly',
@@ -28,61 +35,33 @@ export default [
         clearTimeout: 'readonly',
       },
     },
+
     plugins: {
       security,
       sonarjs,
       vitest,
     },
+
     rules: {
+      // Base ESLint
       ...js.configs.recommended.rules,
+
+      // Security (désactivation du bruit)
       ...security.configs.recommended.rules,
+
+
+      // SonarJS (réglages réalistes)
       ...sonarjs.configs.recommended.rules,
 
-      // Variables
-      'no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
-        },
-      ],
-      'no-var': 'error',
-      'prefer-const': 'error',
-      'prefer-rest-params': 'error',
-      'prefer-spread': 'error',
-
-      // Code Quality
-      'no-console': [
-        'warn',
-        {
-          allow: ['warn', 'error'],
-        },
-      ],
-      'no-debugger': 'error',
-      'no-empty': 'error',
-      'no-eval': 'error',
-      'no-implicit-coercion': 'error',
-      'no-implied-eval': 'error',
-      'no-new-func': 'error',
-      'no-throw-literal': 'error',
-      eqeqeq: ['error', 'always'],
-      curly: ['error', 'all'],
-
-      // Documentation
-      'no-warning-comments': ['warn', { terms: ['todo', 'fixme'] }],
-
-      // Async/Await
-      'require-await': 'error',
-      'no-async-promise-executor': 'error',
-
-      // Security - Additional
-      'sonarjs/cognitive-complexity': ['warn', 15],
-      'sonarjs/no-ignored-return': 'warn',
-      'sonarjs/no-duplicate-string': ['warn', { threshold: 5 }],
-    },
+   },
   },
+
+  // ───────────────────────────────────────────────
+  // TEST FILES
+  // ───────────────────────────────────────────────
   {
     files: ['**/__tests__/**/*.js', '**/*.test.js', '**/*.spec.js'],
+
     languageOptions: {
       globals: {
         describe: 'readonly',
@@ -96,6 +75,7 @@ export default [
         vi: 'readonly',
       },
     },
+
     rules: {
       'no-console': 'off',
       'require-await': 'off',

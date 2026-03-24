@@ -47,7 +47,7 @@ function parseSlotIdString(value) {
 }
 
 function slotIdToString(slotId) {
-  if (slotId == null) {
+  if (slotId === null) {
     return '';
   }
   if (typeof slotId === 'string') {

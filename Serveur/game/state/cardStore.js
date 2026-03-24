@@ -1,5 +1,6 @@
 import { DEFAULT_HAND_SIZE } from '../constants/turnFlow.js';
 import { getSlotStack } from './slotStore.js';
+import { randomInt } from 'crypto';
 
 function getCardById(game, id) {
   if (!game || !id) {
@@ -86,7 +87,7 @@ function findAceCardInHand(game, handSlotId, handSize = DEFAULT_HAND_SIZE) {
 
 function shuffle(cards) {
   for (let i = cards.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(i + 1);
     [cards[i], cards[j]] = [cards[j], cards[i]];
   }
 }

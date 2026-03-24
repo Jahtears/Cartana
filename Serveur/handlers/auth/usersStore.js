@@ -3,7 +3,6 @@ import fs from 'fs';
 import argon2 from 'argon2';
 
 export let USERS_FILE = './app/saves/Users.json';
-const SALT_ROUNDS = 10;
 
 export function setUsersFileForTests(filePath) {
   USERS_FILE = filePath;
