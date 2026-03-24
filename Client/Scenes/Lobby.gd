@@ -58,10 +58,6 @@ const COLOR_STAT_LOSE       := Color(0.92, 0.38, 0.38, 1.0)
 const COLOR_STAT_DRAW       := Color(0.88, 0.82, 0.32, 1.0)
 
 # ============= SHOP =============
-const SHOP_SOURCE_A        := "A"
-const SHOP_SOURCE_B        := "B"
-const SHOP_CARD_MIN_WIDTH  := 220.0
-const SHOP_BACK_PREVIEW_SIZE := Vector2(88, 132)
 
 var _is_changing_scene := false
 var _statuses: Dictionary = {}            # username -> status
@@ -71,8 +67,6 @@ var _leader_search_query: String = ""
 var _all_players: Array = []
 var _all_games: Array = []
 var _all_leaderboard: Array = []
-var _shop_buttons_by_back_id: Dictionary = {}
-var _shop_no_back_label: Label = null
 
 @onready var _tab_container: TabContainer = $TabContainer
 @onready var _search_player_input: LineEdit = $TabContainer/LobbyTab/SearchPlayer
@@ -83,8 +77,6 @@ var _shop_no_back_label: Label = null
 @onready var _leader_header_win: Label = $TabContainer/LeaderboardTab/LeaderBox/LeaderHeader/HeaderWin
 @onready var _leader_header_lose: Label = $TabContainer/LeaderboardTab/LeaderBox/LeaderHeader/HeaderLose
 @onready var _leader_header_draw: Label = $TabContainer/LeaderboardTab/LeaderBox/LeaderHeader/HeaderDraw
-@onready var _shop_title_label: Label = $TabContainer/BoutiqueTab/ShopVBox/ShopTitle
-@onready var _shop_grid: GridContainer = $TabContainer/BoutiqueTab/ShopVBox/BacksScroll/BacksGrid
 
 func _ready() -> void:
     $TabContainer/LobbyTab/PlayerNameLabel.text = String(Global.username)
@@ -108,14 +100,14 @@ func _ready() -> void:
     PopupUi.hide_and_reset()
     _apply_language_to_lobby_ui()
     _style_leaderboard_header()
-    _init_shop_tab()
+    # Shop déplacé, initialisation supprimée
 
     NetworkManager.request(REQ_GET_PLAYERS, {})
 
 # --------------------
 # REQ/RES
 # --------------------
-func _on_response(rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
+func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
     match type:
         REQ_GET_PLAYERS:
             if ok:
@@ -258,136 +250,6 @@ func _refresh_games_view() -> void:
 func _refresh_leaderboard_view() -> void:
     update_leaderboard_list(_all_leaderboard)
 
-func _init_shop_tab() -> void:
-    _rebuild_shop_back_items()
-    _apply_shop_language()
-
-func _rebuild_shop_back_items() -> void:
-    _shop_buttons_by_back_id.clear()
-    _shop_no_back_label = null
-    for child in _shop_grid.get_children():
-        _shop_grid.remove_child(child)
-        child.queue_free()
-
-    var back_ids: Array[String] = Global.get_available_back_ids()
-    if back_ids.is_empty():
-        var no_back_label := Label.new()
-        no_back_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        no_back_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        _shop_grid.add_child(no_back_label)
-        _shop_no_back_label = no_back_label
-        return
-
-    for back_id in back_ids:
-        _shop_grid.add_child(_create_shop_back_item(back_id))
-    _refresh_shop_selection_buttons()
-
-func _create_shop_back_item(back_id: String) -> PanelContainer:
-    var panel := PanelContainer.new()
-    panel.custom_minimum_size = Vector2(SHOP_CARD_MIN_WIDTH, 0.0)
-    panel.size_flags_horizontal = Control.SIZE_EXPAND
-
-    var panel_style := StyleBoxFlat.new()
-    panel_style.bg_color = Color(0.12, 0.12, 0.16, 0.85)
-    panel_style.border_color = Color(0.25, 0.25, 0.30, 1.0)
-    panel_style.border_width_left = 1
-    panel_style.border_width_top = 1
-    panel_style.border_width_right = 1
-    panel_style.border_width_bottom = 1
-    panel_style.corner_radius_top_left = 6
-    panel_style.corner_radius_top_right = 6
-    panel_style.corner_radius_bottom_left = 6
-    panel_style.corner_radius_bottom_right = 6
-    panel.add_theme_stylebox_override("panel", panel_style)
-
-    var content := VBoxContainer.new()
-    content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    content.add_theme_constant_override("separation", 8)
-    panel.add_child(content)
-
-    var title := Label.new()
-    title.text = back_id
-    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    content.add_child(title)
-
-    var preview_wrap := CenterContainer.new()
-    preview_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    content.add_child(preview_wrap)
-
-    var preview := TextureRect.new()
-    preview.texture = Global.get_back_texture_by_id(back_id)
-    preview.custom_minimum_size = SHOP_BACK_PREVIEW_SIZE
-    preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-    preview.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-    preview_wrap.add_child(preview)
-
-    var buttons_row := HBoxContainer.new()
-    buttons_row.alignment = BoxContainer.ALIGNMENT_CENTER
-    buttons_row.add_theme_constant_override("separation", 8)
-    content.add_child(buttons_row)
-
-    var source_a_button := Button.new()
-    source_a_button.focus_mode = Control.FOCUS_NONE
-    source_a_button.toggle_mode = true
-    source_a_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    source_a_button.pressed.connect(func() -> void:
-        _on_shop_back_source_pressed(SHOP_SOURCE_A, back_id)
-    )
-    buttons_row.add_child(source_a_button)
-
-    var source_b_button := Button.new()
-    source_b_button.focus_mode = Control.FOCUS_NONE
-    source_b_button.toggle_mode = true
-    source_b_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    source_b_button.pressed.connect(func() -> void:
-        _on_shop_back_source_pressed(SHOP_SOURCE_B, back_id)
-    )
-    buttons_row.add_child(source_b_button)
-
-    _shop_buttons_by_back_id[back_id] = {
-        SHOP_SOURCE_A: source_a_button,
-        SHOP_SOURCE_B: source_b_button,
-    }
-    return panel
-
-func _on_shop_back_source_pressed(source: String, back_id: String) -> void:
-    Global.assign_back_to_source(source, back_id)
-    _refresh_shop_selection_buttons()
-
-func _apply_shop_language() -> void:
-    _shop_title_label.text = LanguageManager.ui_text("UI_SHOP_TITLE", "Card backs")
-    if _shop_no_back_label != null:
-        _shop_no_back_label.text = LanguageManager.ui_text("UI_SHOP_NO_BACKS", "No card backs available")
-    _refresh_shop_selection_buttons()
-
-func _shop_source_label(source: String) -> String:
-    if source == SHOP_SOURCE_A:
-        return LanguageManager.ui_text("UI_SHOP_SOURCE_A", "Source A")
-    return LanguageManager.ui_text("UI_SHOP_SOURCE_B", "Source B")
-
-func _refresh_shop_selection_buttons() -> void:
-    var selected_a := Global.get_selected_back_for_source(SHOP_SOURCE_A)
-    var selected_b := Global.get_selected_back_for_source(SHOP_SOURCE_B)
-
-    for raw_back_id in _shop_buttons_by_back_id.keys():
-        var back_id := String(raw_back_id)
-        var mapping_value = _shop_buttons_by_back_id.get(back_id, {})
-        if not (mapping_value is Dictionary):
-            continue
-        var mapping := mapping_value as Dictionary
-
-        var source_a_button := mapping.get(SHOP_SOURCE_A, null) as Button
-        var source_b_button := mapping.get(SHOP_SOURCE_B, null) as Button
-        if source_a_button != null:
-            _set_shop_button_state(source_a_button, SHOP_SOURCE_A, back_id == selected_a)
-        if source_b_button != null:
-            _set_shop_button_state(source_b_button, SHOP_SOURCE_B, back_id == selected_b)
-
-func _set_shop_button_state(button: Button, source: String, is_selected: bool) -> void:
-    var label := _shop_source_label(source)
-    button.text = label
-    button.button_pressed = is_selected
-    button.modulate = Color(0.392, 0.722, 0.0, 1.0) if is_selected else Color(0.84, 0.84, 0.84, 1)
 
 func _apply_language_to_lobby_ui() -> void:
     _logout_button.text = LanguageManager.ui_text("UI_LOBBY_LOGOUT_BUTTON", "Logout")
@@ -401,7 +263,6 @@ func _apply_language_to_lobby_ui() -> void:
     if _tab_container.get_tab_count() > 2:
         _tab_container.set_tab_title(2, LanguageManager.ui_text("UI_LOBBY_TAB_SHOP", "Shop"))
     _apply_leaderboard_header_language()
-    _apply_shop_language()
 
 func _apply_leaderboard_header_language() -> void:
     _leader_header_rank.text = LanguageManager.ui_text("UI_LOBBY_LEADERBOARD_HEADER_RANK", "#")
@@ -689,7 +550,7 @@ func _do_logout() -> void:
     #  reset "game state" (API canonique)
     Global.reset_game_state()
 
-    await _go_to_login_safe()
+    SceneManager.go_to_login()
 
 func _coerce_array(value: Variant) -> Array:
     return value if value is Array else []
@@ -705,13 +566,12 @@ func _go_to_login_safe() -> void:
     if _is_changing_scene:
         return
     _is_changing_scene = true
-    await get_tree().process_frame
-    get_tree().change_scene_to_file("res://Scenes/Login.tscn")
+    SceneManager.go_to_login()
 
 func _deferred_change_to_game() -> void:
     if not is_inside_tree():
         return
-    get_tree().change_scene_to_file("res://Scenes/Game.tscn")
+    SceneManager.go_to_game()
 
 func _exit_tree() -> void:
     if NetworkManager.evt.is_connected(_on_evt):

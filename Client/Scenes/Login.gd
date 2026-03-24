@@ -47,7 +47,7 @@ func _on_response(rid: String, type: String, ok: bool, data: Dictionary, error: 
         if u == "":
             u = _last_username
         Global.username = u
-        get_tree().change_scene_to_file("res://Scenes/Lobby.tscn")
+        SceneManager.go_to_lobby()
     else:
         _show_login_error(error)
 

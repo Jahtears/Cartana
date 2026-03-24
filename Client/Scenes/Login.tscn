@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://ch2kmbeayc3df"]
 
-[ext_resource type="Script" uid="uid://cksl68l1onqra" path="res://ui/Login.gd" id="1_leum0"]
+[ext_resource type="Script" uid="uid://dqa0dfv6g5k48" path="res://Scenes/Login.gd" id="1_leum0"]
 
 [node name="Login" type="Control" unique_id=1391658166]
 layout_mode = 3
@@ -29,7 +29,6 @@ metadata/_edit_use_anchors_ = true
 [node name="Username_input" type="LineEdit" parent="VBoxContainer" unique_id=298740430]
 layout_mode = 2
 size_flags_vertical = 0
-placeholder_text = ""
 alignment = 1
 max_length = 12
 context_menu_enabled = false
@@ -44,12 +43,10 @@ offset_right = 345.5
 offset_bottom = 30.5
 size_flags_horizontal = 4
 size_flags_vertical = 2
-text = ""
 
 [node name="Pin_input" type="LineEdit" parent="VBoxContainer" unique_id=6927831]
 layout_mode = 2
 size_flags_vertical = 4
-placeholder_text = ""
 alignment = 1
 max_length = 4
 context_menu_enabled = false
@@ -61,7 +58,6 @@ secret = true
 [node name="Login_button" type="Button" parent="VBoxContainer" unique_id=1658283452]
 layout_mode = 2
 size_flags_vertical = 10
-text = ""
 
 [node name="LanguageRow" type="VBoxContainer" parent="." unique_id=1502879070]
 layout_mode = 1
@@ -72,7 +68,6 @@ offset_bottom = 116.0
 
 [node name="LanguageLabel" type="Label" parent="LanguageRow" unique_id=1196800366]
 layout_mode = 2
-text = ""
 
 [node name="LanguageOptionButton" type="OptionButton" parent="LanguageRow" unique_id=1614029936]
 layout_mode = 2
@@ -84,7 +79,6 @@ offset_left = 1040.0
 offset_top = 16.0
 offset_right = 1136.0
 offset_bottom = 47.0
-text = ""
 
 [node name="Background" type="ColorRect" parent="." unique_id=1949501948]
 z_index = -1

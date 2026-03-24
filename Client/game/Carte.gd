@@ -328,12 +328,10 @@ func _get_back_color(code: String) -> Color:
 
 func _get_back_texture(code: String) -> Texture2D:
 	var source := String(code).strip_edges().to_upper()
-	Global.get_back_texture_for_source(source)
-
-	var selected_texture := Global.get_back_texture_for_source(source)
+	var selected_id := CardBackManager.get_selected_back_for_source(source)
+	var selected_texture := CardBackManager.get_back_texture_by_id(selected_id)
 	if selected_texture != null:
 		return selected_texture
-
 	if source == "A":
 		return BACK_TEXTURE_DECK_A
 	return BACK_TEXTURE_DECK_B

@@ -325,9 +325,7 @@ func _go_to_lobby_safe() -> void:
         return
     _is_changing_scene = true
     get_viewport().gui_disable_input = true
-    await get_tree().process_frame
-    get_viewport().gui_disable_input = false
-    get_tree().change_scene_to_file("res://Scenes/Lobby.tscn")
+    SceneManager.go_to_lobby()
 
 # ============= CLEANUP =============
 
