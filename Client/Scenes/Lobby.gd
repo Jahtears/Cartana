@@ -100,7 +100,6 @@ func _ready() -> void:
     PopupUi.hide_and_reset()
     _apply_language_to_lobby_ui()
     _style_leaderboard_header()
-    # Shop déplacé, initialisation supprimée
 
     NetworkManager.request(REQ_GET_PLAYERS, {})
 
