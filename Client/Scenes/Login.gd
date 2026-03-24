@@ -36,7 +36,7 @@ func _ready() -> void:
     _load_login_preferences()
     _apply_language_to_login_ui()
 
-func _on_response(rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
+func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
     if type != "login":
         return
 

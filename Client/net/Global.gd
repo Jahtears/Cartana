@@ -10,11 +10,8 @@ var current_games: Array = []
 var is_spectator: bool = false
 var result: Dictionary = {} # {} si pas fini, sinon {winner}
 
-
-
 func reset_game_state() -> void:
     current_game_id = ""
     players_in_game.clear()
     is_spectator = false
     result.clear()
-

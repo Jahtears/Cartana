@@ -324,7 +324,6 @@ func _go_to_lobby_safe() -> void:
     if _is_changing_scene:
         return
     _is_changing_scene = true
-    get_viewport().gui_disable_input = true
     SceneManager.go_to_lobby()
 
 # ============= CLEANUP =============

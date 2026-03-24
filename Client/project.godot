@@ -22,7 +22,7 @@ config/features=PackedStringArray("4.6", "GL Compatibility")
 
 Global="*res://net/Global.gd"
 NetworkManager="*res://net/NetworkManager.gd"
-LanguageManager="*res://Lang/LanguageManager.gd"
+LanguageManager="*res://Script/LanguageManager.gd"
 PopupUi="*uid://3jldn8mj4lx4"
 SceneManager="*uid://cjplqqjybnynv"
 CardBackManager="*uid://yw3b5hb8t2mp"

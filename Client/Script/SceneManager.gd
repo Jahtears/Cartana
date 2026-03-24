@@ -24,6 +24,11 @@ func _change_to(path: String) -> void:
     if _is_changing:
         return
     _is_changing = true
-    await get_tree().process_frame
-    _is_changing = false
+    var viewport := get_viewport()
+    if viewport:
+        viewport.gui_disable_input = true
     get_tree().change_scene_to_file(path)
+    await get_tree().process_frame
+    if viewport:
+        viewport.gui_disable_input = false
+    _is_changing = false
