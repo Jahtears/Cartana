@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://3jldn8mj4lx4"]
 
-[ext_resource type="Script" uid="uid://dynq7oy7c436i" path="res://Client/ui/WindowPopup.gd" id="1_2sagy"]
+[ext_resource type="Script" uid="uid://dynq7oy7c436i" path="res://ui/WindowPopup.gd" id="1_2sagy"]
 
 [node name="Window" type="Window" unique_id=1102157404]
 oversampling_override = 1.0

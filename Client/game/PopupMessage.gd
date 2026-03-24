@@ -3,7 +3,7 @@
 extends RefCounted
 class_name PopupMessage
 
-const Protocol = preload("res://Client/net/Protocol.gd")
+const Protocol = preload("res://net/Protocol.gd")
 
 static func normalize_popup_message(payload: Dictionary) -> Dictionary:
     var params := _extract_message_params(payload)

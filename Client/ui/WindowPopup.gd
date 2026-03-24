@@ -1,7 +1,7 @@
 extends Window
 class_name WindowPopup
 
-const Protocol = preload("res://Client/net/Protocol.gd")
+const Protocol = preload("res://net/Protocol.gd")
 
 signal action_selected(action_id: String, payload: Dictionary)
 

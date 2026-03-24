@@ -2,11 +2,11 @@
 extends Control
 
 # ============= SCENES =============
-var slot_scene: PackedScene = preload("res://Client/Scenes/Slot.tscn")
-var card_scene: PackedScene = preload("res://Client/Scenes/Carte.tscn")
+var slot_scene: PackedScene = preload("res://Scenes/Slot.tscn")
+var card_scene: PackedScene = preload("res://Scenes/Carte.tscn")
 
 # ============= CONFIG & HELPERS =============
-const Protocol = preload("res://Client/net/Protocol.gd")
+const Protocol = preload("res://net/Protocol.gd")
 
 # ============= PROTOCOL ALIASES =============
 # Alias locaux pour les nodes fils (GameStateHandler/Manager) qui lisent game.REQ_* / game.ACTION_*.
@@ -76,12 +76,12 @@ var _game_message_state: Dictionary = GameMessage.create_ui_state()
 func _ready() -> void:
     _connect_layout_signals()
 
-    board_factory = preload("res://Client/game/factories/BoardFactory.gd").new()
+    board_factory = preload("res://game/factories/BoardFactory.gd").new()
     board_factory.setup(slot_scene, slots_by_id, START_POS)
 
-    _card_ctx = preload("res://Client/game/types/CardContext.gd").new(cards, card_scene, slots_by_id, self)
+    _card_ctx = preload("res://game/types/CardContext.gd").new(cards, card_scene, slots_by_id, self)
 
-    var layout_manager: GameLayoutManager = preload("res://Client/game/managers/GameLayoutManager.gd").new()
+    var layout_manager: GameLayoutManager = preload("res://game/managers/GameLayoutManager.gd").new()
     layout_manager.setup(self, {
         "player1_root":   player1_root,
         "player2_root":   player2_root,
@@ -96,14 +96,14 @@ func _ready() -> void:
         "deck_count":   _deck_count_state,
     }, GameLayoutConfig)
 
-    var ui_manager: GameUIManager = preload("res://Client/game/managers/GameUIManager.gd").new()
+    var ui_manager: GameUIManager = preload("res://game/managers/GameUIManager.gd").new()
     ui_manager.setup(self, {
         "game_message": _game_message_state,
         "timebar":      _timebar_state,
         "deck_count":   _deck_count_state,
     })
 
-    _game_context = preload("res://Client/game/types/GameContext.gd").new(self)
+    _game_context = preload("res://game/types/GameContext.gd").new(self)
     _game_context.card_context    = _card_ctx
     _game_context.ui_manager      = ui_manager
     _game_context.layout_manager  = layout_manager
@@ -112,7 +112,7 @@ func _ready() -> void:
     _game_context.players_in_game = Global.players_in_game.duplicate()
     _game_context.result          = Global.result.duplicate() if Global.result is Dictionary else {}
 
-    game_state_manager = preload("res://Client/game/managers/GameStateManager.gd").new(_game_context)
+    game_state_manager = preload("res://game/managers/GameStateManager.gd").new(_game_context)
 
     _init_layout()
     _connect_network_signals()
@@ -327,7 +327,7 @@ func _go_to_lobby_safe() -> void:
     get_viewport().gui_disable_input = true
     await get_tree().process_frame
     get_viewport().gui_disable_input = false
-    get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
+    get_tree().change_scene_to_file("res://Scenes/Lobby.tscn")
 
 # ============= CLEANUP =============
 

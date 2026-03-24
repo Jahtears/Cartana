@@ -20,295 +20,295 @@ var _server_sync_animate_on_finalize: bool = false
 # ============= LIFECYCLE =============
 
 func _ready() -> void:
-	add_to_group("slots")
-	_apply_slot_type_mode()
-	modulate = GameLayoutConfig.PREVIEW_NORMAL_COLOR
+    add_to_group("slots")
+    _apply_slot_type_mode()
+    modulate = GameLayoutConfig.PREVIEW_NORMAL_COLOR
 
 func _process(_delta: float) -> void:
-	if _rect_cache_dirty:
-		_update_cached_rect()
-		_rect_cache_dirty = false
+    if _rect_cache_dirty:
+        _update_cached_rect()
+        _rect_cache_dirty = false
 
 # ============= PUBLIC API =============
 
 func get_slot_id() -> String:
-	return SlotIdHelper.normalize_slot_id(String(slot_id))
+    return SlotIdHelper.normalize_slot_id(String(slot_id))
 
 func get_cached_rect() -> Rect2:
-	if _rect_cache_dirty:
-		_update_cached_rect()
-	return _cached_rect
+    if _rect_cache_dirty:
+        _update_cached_rect()
+    return _cached_rect
 
 func begin_server_sync(animate_on_finalize: bool = false) -> void:
-	_server_sync_active = true
-	_server_sync_animate_on_finalize = animate_on_finalize
+    _server_sync_active = true
+    _server_sync_animate_on_finalize = animate_on_finalize
 
 # ============= PREVIEW (VISUAL FEEDBACK) =============
 
 func on_card_enter_preview() -> void:
-	_set_preview(true)
+    _set_preview(true)
 
 func on_card_exit_preview() -> void:
-	_set_preview(false)
+    _set_preview(false)
 
 func _set_preview(active: bool) -> void:
-	if _is_hand_slot_type():
-		preview_active = false
-		return
+    if _is_hand_slot_type():
+        preview_active = false
+        return
 
-	if preview_active == active:
-		return
-	preview_active = active
-	_apply_preview_visual(active)
+    if preview_active == active:
+        return
+    preview_active = active
+    _apply_preview_visual(active)
 
 # ============= SNAP (PLACEMENT) =============
 
 func _remove_card_ref(card: Node) -> void:
-	if stacked_cards.has(card):
-		stacked_cards.erase(card)
+    if stacked_cards.has(card):
+        stacked_cards.erase(card)
 
 func snap_card(card: Node2D, animate: bool = true) -> void:
-	if card.slot != null and card.slot != self and card.slot.has_method("_remove_card_ref"):
-		card.slot.call("_remove_card_ref", card)
+    if card.slot != null and card.slot != self and card.slot.has_method("_remove_card_ref"):
+        card.slot.call("_remove_card_ref", card)
 
-	if card.get_parent() != self:
-		card.reparent(self, true)
+    if card.get_parent() != self:
+        card.reparent(self, true)
 
-	card.slot = self
-	card.set_meta("last_slot_id", get_slot_id())
-	card.visible = true
+    card.slot = self
+    card.set_meta("last_slot_id", get_slot_id())
+    card.visible = true
 
-	_remove_card_ref(card)
-	stacked_cards.append(card)
-	_sort_stacked_cards_by_server_order()
+    _remove_card_ref(card)
+    stacked_cards.append(card)
+    _sort_stacked_cards_by_server_order()
 
-	_kill_card_snap_tween(card)
+    _kill_card_snap_tween(card)
 
-	var should_defer_layout := _server_sync_active and _is_hand_slot_type()
-	if not should_defer_layout:
-		_layout_stack(animate)
-	_rect_cache_dirty = true
+    var should_defer_layout := _server_sync_active and _is_hand_slot_type()
+    if not should_defer_layout:
+        _layout_stack(animate)
+    _rect_cache_dirty = true
 
 func _sort_stacked_cards_by_server_order() -> void:
-	if stacked_cards.size() <= 1:
-		return
+    if stacked_cards.size() <= 1:
+        return
 
-	stacked_cards.sort_custom(func(a, b):
-		var ao := 2147483647
-		var bo := 2147483647
-		if a is Node and (a as Node).has_meta("_server_array_order"):
-			ao = int((a as Node).get_meta("_server_array_order"))
-		if b is Node and (b as Node).has_meta("_server_array_order"):
-			bo = int((b as Node).get_meta("_server_array_order"))
-		return ao < bo
-	)
+    stacked_cards.sort_custom(func(a, b):
+        var ao := 2147483647
+        var bo := 2147483647
+        if a is Node and (a as Node).has_meta("_server_array_order"):
+            ao = int((a as Node).get_meta("_server_array_order"))
+        if b is Node and (b as Node).has_meta("_server_array_order"):
+            bo = int((b as Node).get_meta("_server_array_order"))
+        return ao < bo
+    )
 
 func finalize_server_sync() -> void:
-	_server_sync_active = false
-	_sort_stacked_cards_by_server_order()
-	_kill_snap_tweens()
-	_layout_stack(_server_sync_animate_on_finalize)
-	_server_sync_animate_on_finalize = false
+    _server_sync_active = false
+    _sort_stacked_cards_by_server_order()
+    _kill_snap_tweens()
+    _layout_stack(_server_sync_animate_on_finalize)
+    _server_sync_animate_on_finalize = false
 
 func clear_slot() -> void:
-	_server_sync_active = false
-	_server_sync_animate_on_finalize = false
-	if stacked_cards.is_empty():
-		_reset_background()
-		return
+    _server_sync_active = false
+    _server_sync_animate_on_finalize = false
+    if stacked_cards.is_empty():
+        _reset_background()
+        return
 
-	var root := get_tree().current_scene if is_inside_tree() else null
+    var root := get_tree().current_scene if is_inside_tree() else null
 
-	for c in stacked_cards:
-		if not is_instance_valid(c):
-			continue
+    for c in stacked_cards:
+        if not is_instance_valid(c):
+            continue
 
-		_kill_card_snap_tween(c)
+        _kill_card_snap_tween(c)
 
-		c.slot = null
-		c.set_meta("last_slot_id", get_slot_id())
-		c.visible = false
+        c.slot = null
+        c.set_meta("last_slot_id", get_slot_id())
+        c.visible = false
 
-		if root:
-			c.reparent(root, true)
+        if root:
+            c.reparent(root, true)
 
-	stacked_cards.clear()
-	_reset_background()
-	_rect_cache_dirty = true
+    stacked_cards.clear()
+    _reset_background()
+    _rect_cache_dirty = true
 
 # ============= LAYOUT =============
 
 func _layout_stack(animate: bool) -> void:
-	var parsed := SlotIdHelper.parse_slot_id(get_slot_id())
-	var stype := String(parsed.get("type", ""))
-	var player_id := int(parsed.get("player", 0))
+    var parsed := SlotIdHelper.parse_slot_id(get_slot_id())
+    var stype := String(parsed.get("type", ""))
+    var player_id := int(parsed.get("player", 0))
 
-	match stype:
-		"HAND":
-			_layout_hand_fan(animate, player_id)
-		"BENCH":
-			_layout_cascade(animate, GameLayoutConfig.CASCADE_BANC)
-		"TABLE":
-			_layout_cascade(animate, GameLayoutConfig.CASCADE_TABLE)
-		_:
-			_layout_cascade(animate, GameLayoutConfig.CASCADE_DEFAULT)
+    match stype:
+        "HAND":
+            _layout_hand_fan(animate, player_id)
+        "BENCH":
+            _layout_cascade(animate, GameLayoutConfig.CASCADE_BANC)
+        "TABLE":
+            _layout_cascade(animate, GameLayoutConfig.CASCADE_TABLE)
+        _:
+            _layout_cascade(animate, GameLayoutConfig.CASCADE_DEFAULT)
 
 func _layout_hand_fan(animate: bool, player_id: int) -> void:
-	var card_count: int = stacked_cards.size()
-	if card_count <= 0:
-		return
+    var card_count: int = stacked_cards.size()
+    if card_count <= 0:
+        return
 
-	var order_by_card: Dictionary = {}
-	var max_order := -1
+    var order_by_card: Dictionary = {}
+    var max_order := -1
 
-	for i in range(card_count):
-		var cc := stacked_cards[i] as Node2D
-		if cc == null or !is_instance_valid(cc):
-			continue
-		var order := _get_effective_server_order(cc, i)
-		order_by_card[cc] = order
-		if order > max_order:
-			max_order = order
+    for i in range(card_count):
+        var cc := stacked_cards[i] as Node2D
+        if cc == null or !is_instance_valid(cc):
+            continue
+        var order := _get_effective_server_order(cc, i)
+        order_by_card[cc] = order
+        if order > max_order:
+            max_order = order
 
-	var span := maxi(card_count, max_order + 1)
-	var fan_count: int = mini(span, GameLayoutConfig.HAND_FAN_MAX_CARDS)
-	var x_radius: float = GameLayoutConfig.HAND_FAN_X_STEP * float(maxi(1, fan_count - 1)) * 0.5
-	var vertical_sign: float = -1.0 if player_id == 1 else 1.0
-	var angle_sign: float = 1.0 if player_id == 1 else -1.0
+    var span := maxi(card_count, max_order + 1)
+    var fan_count: int = mini(span, GameLayoutConfig.HAND_FAN_MAX_CARDS)
+    var x_radius: float = GameLayoutConfig.HAND_FAN_X_STEP * float(maxi(1, fan_count - 1)) * 0.5
+    var vertical_sign: float = -1.0 if player_id == 1 else 1.0
+    var angle_sign: float = 1.0 if player_id == 1 else -1.0
 
-	for i in range(card_count):
-		var c := stacked_cards[i] as Node2D
-		if c == null or !is_instance_valid(c):
-			continue
+    for i in range(card_count):
+        var c := stacked_cards[i] as Node2D
+        if c == null or !is_instance_valid(c):
+            continue
 
-		var order := int(order_by_card.get(c, i))
-		var clamped_order := clampi(order, 0, maxi(0, span - 1))
-		c.z_index = clamped_order
+        var order := int(order_by_card.get(c, i))
+        var clamped_order := clampi(order, 0, maxi(0, span - 1))
+        c.z_index = clamped_order
 
-		var target_pos := Vector2.ZERO
-		var target_rot := 0.0
+        var target_pos := Vector2.ZERO
+        var target_rot := 0.0
 
-		if span > 1:
-			var t: float = float(clamped_order) / float(span - 1)
-			var centered: float = t * 2.0 - 1.0
-			var arc: float = 1.0 - centered * centered
+        if span > 1:
+            var t: float = float(clamped_order) / float(span - 1)
+            var centered: float = t * 2.0 - 1.0
+            var arc: float = 1.0 - centered * centered
 
-			target_pos = Vector2(
-				centered * x_radius,
-				vertical_sign * GameLayoutConfig.HAND_FAN_CENTER_LIFT * arc
-			)
-			target_rot = deg_to_rad(angle_sign * centered * GameLayoutConfig.HAND_FAN_MAX_ANGLE_DEG)
-		else:
-			target_pos = Vector2.ZERO
-			target_rot = 0.0
+            target_pos = Vector2(
+                centered * x_radius,
+                vertical_sign * GameLayoutConfig.HAND_FAN_CENTER_LIFT * arc
+            )
+            target_rot = deg_to_rad(angle_sign * centered * GameLayoutConfig.HAND_FAN_MAX_ANGLE_DEG)
+        else:
+            target_pos = Vector2.ZERO
+            target_rot = 0.0
 
-		_snap_card_position(c, target_pos, target_rot, animate)
+        _snap_card_position(c, target_pos, target_rot, animate)
 
 func _layout_cascade(animate: bool, cascade_offset: Vector2) -> void:
-	var count: int = stacked_cards.size()
-	for i in range(count):
-		var c := stacked_cards[i] as Node2D
-		if c == null or !is_instance_valid(c):
-			continue
-		c.z_index = i
-		var target_pos: Vector2 = cascade_offset * i
-		_snap_card_position(c, target_pos, 0.0, animate)
+    var count: int = stacked_cards.size()
+    for i in range(count):
+        var c := stacked_cards[i] as Node2D
+        if c == null or !is_instance_valid(c):
+            continue
+        c.z_index = i
+        var target_pos: Vector2 = cascade_offset * i
+        _snap_card_position(c, target_pos, 0.0, animate)
 
 func _snap_card_position(card: Node2D, target_pos: Vector2, target_rot: float, animate: bool) -> void:
-	if not animate:
-		card.position = target_pos
-		card.rotation = target_rot
-		card.scale = Vector2.ONE
-		return
+    if not animate:
+        card.position = target_pos
+        card.rotation = target_rot
+        card.scale = Vector2.ONE
+        return
 
-	_kill_card_snap_tween(card)
+    _kill_card_snap_tween(card)
 
-	var tween_duration := maxf(0.01, snap_duration)
-	var tween := create_tween()
-	tween.set_ease(Tween.EASE_OUT)
-	tween.set_trans(Tween.TRANS_CUBIC)
-	tween.set_parallel(true)
-	tween.tween_property(card, "position", target_pos, tween_duration)
-	tween.tween_property(card, "rotation", target_rot, tween_duration)
-	tween.tween_property(card, "scale", Vector2.ONE, tween_duration)
-	card.set_meta("_snap_tween", tween)
+    var tween_duration := maxf(0.01, snap_duration)
+    var tween := create_tween()
+    tween.set_ease(Tween.EASE_OUT)
+    tween.set_trans(Tween.TRANS_CUBIC)
+    tween.set_parallel(true)
+    tween.tween_property(card, "position", target_pos, tween_duration)
+    tween.tween_property(card, "rotation", target_rot, tween_duration)
+    tween.tween_property(card, "scale", Vector2.ONE, tween_duration)
+    card.set_meta("_snap_tween", tween)
 
 # ============= RECT CACHE =============
 
 func _update_cached_rect() -> void:
-	if _is_hand_slot_type():
-		_cached_rect = Rect2()
-		return
+    if _is_hand_slot_type():
+        _cached_rect = Rect2()
+        return
 
-	if _collision_shape == null:
-		_cached_rect = Rect2()
-		return
+    if _collision_shape == null:
+        _cached_rect = Rect2()
+        return
 
-	var shape := _collision_shape.shape
-	if shape is RectangleShape2D:
-		var rect_shape := shape as RectangleShape2D
-		var size: Vector2 = rect_shape.size
-		var node_scale: Vector2 = _collision_shape.global_transform.get_scale()
-		var scaled: Vector2 = Vector2(size.x * absf(scale.x), size.y * absf(node_scale.y))
-		_cached_rect = Rect2(_collision_shape.global_position - scaled * 0.5, scaled)
-	else:
-		_cached_rect = Rect2()
+    var shape := _collision_shape.shape
+    if shape is RectangleShape2D:
+        var rect_shape := shape as RectangleShape2D
+        var size: Vector2 = rect_shape.size
+        var node_scale: Vector2 = _collision_shape.global_transform.get_scale()
+        var scaled: Vector2 = Vector2(size.x * absf(scale.x), size.y * absf(node_scale.y))
+        _cached_rect = Rect2(_collision_shape.global_position - scaled * 0.5, scaled)
+    else:
+        _cached_rect = Rect2()
 
 func invalidate_rect_cache() -> void:
-	_rect_cache_dirty = true
+    _rect_cache_dirty = true
 
 # ============= HELPERS =============
 
 func _is_hand_slot_type() -> bool:
-	var parsed := SlotIdHelper.parse_slot_id(get_slot_id())
-	return String(parsed.get("type", "")) == "HAND"
+    var parsed := SlotIdHelper.parse_slot_id(get_slot_id())
+    return String(parsed.get("type", "")) == "HAND"
 
 func _apply_slot_type_mode() -> void:
-	var is_hand := _is_hand_slot_type()
+    var is_hand := _is_hand_slot_type()
 
-	_set_background_visible(not is_hand)
+    _set_background_visible(not is_hand)
 
-	if _collision_shape != null:
-		_collision_shape.disabled = is_hand
+    if _collision_shape != null:
+        _collision_shape.disabled = is_hand
 
-	_rect_cache_dirty = true
+    _rect_cache_dirty = true
 
 func _get_effective_server_order(card: Node2D, fallback_order: int) -> int:
-	if card != null and card.has_meta("_server_array_order"):
-		var order := int(card.get_meta("_server_array_order"))
-		if order >= 0 and order < 2147483647:
-			return order
-	return fallback_order
+    if card != null and card.has_meta("_server_array_order"):
+        var order := int(card.get_meta("_server_array_order"))
+        if order >= 0 and order < 2147483647:
+            return order
+    return fallback_order
 
 func _kill_snap_tweens() -> void:
-	for c in stacked_cards:
-		if c == null or !is_instance_valid(c):
-			continue
-		_kill_card_snap_tween(c)
+    for c in stacked_cards:
+        if c == null or !is_instance_valid(c):
+            continue
+        _kill_card_snap_tween(c)
 
 func _reset_background() -> void:
-	if _is_hand_slot_type():
-		_set_background_visible(false)
-	else:
-		_set_background_visible(true)
-		_set_background_modulate(GameLayoutConfig.PREVIEW_NORMAL_COLOR)
+    if _is_hand_slot_type():
+        _set_background_visible(false)
+    else:
+        _set_background_visible(true)
+        _set_background_modulate(GameLayoutConfig.PREVIEW_NORMAL_COLOR)
 
 func _apply_preview_visual(active: bool) -> void:
-	_set_background_modulate(GameLayoutConfig.PREVIEW_HIGHLIGHT_COLOR if active else GameLayoutConfig.PREVIEW_NORMAL_COLOR)
+    _set_background_modulate(GameLayoutConfig.PREVIEW_HIGHLIGHT_COLOR if active else GameLayoutConfig.PREVIEW_NORMAL_COLOR)
 
 func _set_background_visible(visible_state: bool) -> void:
-	if _background != null:
-		_background.visible = visible_state
+    if _background != null:
+        _background.visible = visible_state
 
 func _set_background_modulate(color: Color) -> void:
-	if _background != null:
-		_background.modulate = color
+    if _background != null:
+        _background.modulate = color
 
 func _kill_card_snap_tween(card: Node) -> void:
-	if card == null or not is_instance_valid(card):
-		return
-	if not card.has_meta("_snap_tween"):
-		return
-	var old_t := card.get_meta("_snap_tween") as Tween
-	if old_t != null and is_instance_valid(old_t):
-		old_t.kill()
+    if card == null or not is_instance_valid(card):
+        return
+    if not card.has_meta("_snap_tween"):
+        return
+    var old_t := card.get_meta("_snap_tween") as Tween
+    if old_t != null and is_instance_valid(old_t):
+        old_t.kill()

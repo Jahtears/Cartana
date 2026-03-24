@@ -10,8 +10,8 @@ const PREVIEW_CARD_GLOW_COLOR := Color(0.35, 0.95, 0.45, 0.45)
 const PREVIEW_CARD_GLOW_SIZE := 6
 const POINTER_ID_NONE := -2
 const POINTER_ID_MOUSE := -1
-const BACK_TEXTURE_DECK_A := preload("res://Client/Resource/Cartes/DosA.png")
-const BACK_TEXTURE_DECK_B := preload("res://Client/Resource/Cartes/DosB.png")
+const BACK_TEXTURE_DECK_A := preload("res://Resource/Cartes/DosA.png")
+const BACK_TEXTURE_DECK_B := preload("res://Resource/Cartes/DosB.png")
 
 # ============= EXPORTS =============
 @export var valeur: String = ""

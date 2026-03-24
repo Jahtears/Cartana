@@ -11,8 +11,8 @@ const SETTINGS_SECTION_I18N := "i18n"
 const SETTINGS_KEY_LANGUAGE := "language"
 
 const LOCALE_PATH_BY_LANG := {
-	LANG_FR: "res://Client/Lang/locales/fr.json",
-	LANG_EN: "res://Client/Lang/locales/en.json",
+	LANG_FR: "res://Lang/locales/fr.json",
+	LANG_EN: "res://Lang/locales/en.json",
 }
 
 var _current_language := DEFAULT_LANGUAGE

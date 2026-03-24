@@ -1,7 +1,7 @@
 # Lobby.gd v1.0
 extends Control
 
-const Protocol = preload("res://Client/net/Protocol.gd")
+const Protocol = preload("res://net/Protocol.gd")
 
 # ============= REQUEST ALIASES =============
 const REQ_GET_PLAYERS    := Protocol.REQ_GET_PLAYERS
@@ -706,12 +706,12 @@ func _go_to_login_safe() -> void:
         return
     _is_changing_scene = true
     await get_tree().process_frame
-    get_tree().change_scene_to_file("res://Client/Scenes/Login.tscn")
+    get_tree().change_scene_to_file("res://Scenes/Login.tscn")
 
 func _deferred_change_to_game() -> void:
     if not is_inside_tree():
         return
-    get_tree().change_scene_to_file("res://Client/Scenes/Game.tscn")
+    get_tree().change_scene_to_file("res://Scenes/Game.tscn")
 
 func _exit_tree() -> void:
     if NetworkManager.evt.is_connected(_on_evt):

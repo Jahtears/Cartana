@@ -1,6 +1,6 @@
 extends Control
 
-const Protocol = preload("res://Client/net/Protocol.gd")
+const Protocol = preload("res://net/Protocol.gd")
 
 const SETTINGS_PATH := "user://client_settings.cfg"
 const SETTINGS_SECTION_LOGIN := "login"
@@ -47,7 +47,7 @@ func _on_response(rid: String, type: String, ok: bool, data: Dictionary, error: 
         if u == "":
             u = _last_username
         Global.username = u
-        get_tree().change_scene_to_file("res://Client/Scenes/Lobby.tscn")
+        get_tree().change_scene_to_file("res://Scenes/Lobby.tscn")
     else:
         _show_login_error(error)
 
