@@ -143,9 +143,5 @@ func _send_move_if_valid(to_slot_id: String) -> bool:
 
   var card_id := get_card_id()
   print("[MOVE] Sending move: %s from %s to %s" % [card_id, from_slot_id, to_slot_id])
-  NetworkManager.request("move_request", {
-    "card_id":      card_id,
-    "from_slot_id": from_slot_id,
-    "to_slot_id":   to_slot_id
-  })
+  ClientAPI.move_card(card_id, from_slot_id, to_slot_id)
   return true

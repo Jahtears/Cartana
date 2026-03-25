@@ -2,8 +2,6 @@ extends Control
 
 const Protocol = preload("res://net/Protocol.gd")
 
-
-
 var _login_pending := false
 var _last_username: String = ""
 var _loading_preferences := false
@@ -18,14 +16,12 @@ var _network_disconnected := false
 @onready var _close_button: Button = $Fermer
 
 func _ready() -> void:
-    if not NetworkManager.is_open():
-        NetworkManager.connect_to_server()
-    if not NetworkManager.response.is_connected(_on_response):
-        NetworkManager.response.connect(_on_response)
-    if not NetworkManager.disconnected.is_connected(_on_network_disconnected):
-        NetworkManager.disconnected.connect(_on_network_disconnected)
-    if not NetworkManager.connection_restored.is_connected(_on_connection_restored):
-        NetworkManager.connection_restored.connect(_on_connection_restored)
+    if not ClientAPI.is_online():
+        ClientAPI.connect_to_server()
+    ClientAPI.login_ok.connect(_on_login_ok)
+    ClientAPI.login_failed.connect(_on_login_failed)
+    ClientAPI.disconnected.connect(_on_network_disconnected)
+    ClientAPI.connection_restored.connect(_on_connection_restored)
     if not LanguageManager.language_changed.is_connected(_on_language_changed):
         LanguageManager.language_changed.connect(_on_language_changed)
     PopupUi.hide_and_reset()
@@ -33,26 +29,19 @@ func _ready() -> void:
     _load_login_preferences()
     _apply_language_to_login_ui()
 
-func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error: Dictionary) -> void:
-    if type != "login":
-        return
+func _on_login_ok(username: String, _status: Dictionary) -> void:
+       Global.username = username
+       SceneManager.go_to_lobby()
 
-    _login_pending = false
-
-    if ok:
-        var u := String(data.get("username", ""))
-        if u == "":
-            u = _last_username
-        Global.save_username(u)
-        SceneManager.go_to_lobby()
-    else:
-        _show_login_error(error)
+func _on_login_failed(error: Dictionary) -> void:
+       _login_pending = false
+       _show_login_error(error)
 
 func _on_network_disconnected(_code: int, reason: String) -> void:
     if String(reason).strip_edges() == NetworkManager.DISCONNECT_REASON_LOGOUT:
         return
     _network_disconnected = true
-    PopupUi.show_code(PopupUi.MODE_PASSIVE, Protocol.POPUP_AUTH_CONNECTION_ERROR)
+    PopupRouter.show_info(Protocol.POPUP_AUTH_CONNECTION_ERROR)
 
 func _on_connection_restored() -> void:
     if not _network_disconnected:
@@ -61,11 +50,11 @@ func _on_connection_restored() -> void:
     PopupUi.hide_and_reset()
 
 func _show_login_error(error: Dictionary) -> void:
-    var popup := _normalize_login_error(error)
-    PopupUi.show_normalized(PopupUi.MODE_INFO, popup)
+    var normalized := _normalize_login_error(error)
+    PopupUi.show_normalized(PopupUi.MODE_INFO, normalized)
 
 func _normalize_login_error(error: Dictionary) -> Dictionary:
-    var normalized := PopupMessage.normalize_popup_error(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
+    var normalized := MessageCatalog.normalize_popup_error(error, Protocol.POPUP_AUTH_CONNECTION_ERROR)
     var message_code := String(normalized.get("message_code", "")).strip_edges()
     if message_code != Protocol.POPUP_AUTH_MAX_TRY:
         return normalized
@@ -98,26 +87,23 @@ func _on_login_button_pressed() -> void:
 
     # --- VALIDATION MINIMUM ---
     if username.length() < 3:
-        PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_INVALID_USERNAME_MIN)
+        PopupRouter.show_info(Protocol.POPUP_AUTH_INVALID_USERNAME_MIN)
         return
 
     if pin.length() < 4:
-        PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_INVALID_PIN_MIN)
+        PopupRouter.show_info(Protocol.POPUP_AUTH_INVALID_PIN_MIN)
         return
     # ---------------------------
 
     if username == "" or pin == "":
-        PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
+        PopupRouter.show_info(Protocol.POPUP_AUTH_MISSING_CREDENTIALS)
         return
 
     _last_username = username
     _login_pending = true
     _save_login_preferences(_remember_username_checkbox.button_pressed, username)
 
-    NetworkManager.request("login", {
-        "username": username,
-        "pin": pin
-    })
+    ClientAPI.login(username, pin)
 
 func _on_username_input_text_submitted(_new_text: String) -> void:
     _on_login_button_pressed()
@@ -212,16 +198,14 @@ func _save_login_preferences(remember_username: bool, username: String) -> void:
 
 
 func _exit_tree() -> void:
-    if NetworkManager.response.is_connected(_on_response):
-        NetworkManager.response.disconnect(_on_response)
-    if NetworkManager.disconnected.is_connected(_on_network_disconnected):
-        NetworkManager.disconnected.disconnect(_on_network_disconnected)
-    if NetworkManager.connection_restored.is_connected(_on_connection_restored):
-        NetworkManager.connection_restored.disconnect(_on_connection_restored)
-    if LanguageManager.language_changed.is_connected(_on_language_changed):
-        LanguageManager.language_changed.disconnect(_on_language_changed)
+   ClientAPI.login_ok.disconnect(_on_login_ok)
+   ClientAPI.login_failed.disconnect(_on_login_failed)
+   ClientAPI.disconnected.disconnect(_on_network_disconnected)
+   ClientAPI.connection_restored.disconnect(_on_connection_restored)
+   if LanguageManager.language_changed.is_connected(_on_language_changed):
+       LanguageManager.language_changed.disconnect(_on_language_changed)
 
 
 func _on_close_pressed() -> void:
-    NetworkManager.close(1000, NetworkManager.DISCONNECT_REASON_CLOSE)
+    ClientAPI.close()
     get_tree().quit()

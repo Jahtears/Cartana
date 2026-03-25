@@ -114,15 +114,22 @@ func _ready() -> void:
     _init_layout()
     _connect_network_signals()
 
+    # Connect quit button and popup actions
+    if quitter_button != null:
+        _safe_connect(quitter_button.pressed, self, "_on_quitter_pressed")
+
+    if not PopupUi.action_selected.is_connected(_on_popup_action):
+        PopupUi.action_selected.connect(_on_popup_action)
+
     PopupUi.hide_and_reset()
     _game_context.layout_manager.apply_language()
 
     if GameSession.current_game_id != "":
         var game_id: String = GameSession.current_game_id
         if GameSession.is_spectator:
-            NetworkManager.request(REQ_SPECTATE_GAME, {"game_id": game_id})
+            ClientAPI.spectate_game(game_id)
         else:
-            NetworkManager.request(REQ_JOIN_GAME, {"game_id": game_id})
+            ClientAPI.join_game(game_id)
 
     await get_tree().process_frame
     slots_ready = true
@@ -185,14 +192,29 @@ func _safe_connect(sig: Signal, target: Object, method: String) -> void:
         sig.connect(c)
 
 func _connect_network_signals() -> void:
-    _safe_connect(NetworkManager.evt,                 game_state_manager, "handle_event")
-    _safe_connect(NetworkManager.response,            game_state_manager, "on_response")
-    _safe_connect(NetworkManager.connection_lost,     game_state_manager, "on_connection_lost")
-    _safe_connect(NetworkManager.connection_restored, game_state_manager, "on_connection_restored")
-    _safe_connect(NetworkManager.reconnect_failed,    game_state_manager, "on_reconnect_failed")
-    _safe_connect(NetworkManager.server_closed,       game_state_manager, "on_server_closed")
-    _safe_connect(PopupUi.action_selected,            self,               "_on_popup_action")
-    _safe_connect(quitter_button.pressed,             self,               "_on_quitter_pressed")
+   _safe_connect(ClientAPI.evt_start_game,             game_state_manager, "_on_evt_start_game")
+   _safe_connect(ClientAPI.evt_state_snapshot,         game_state_manager, "_on_evt_state_snapshot")
+   _safe_connect(ClientAPI.evt_slot_state,             game_state_manager, "_on_evt_slot_state")
+   _safe_connect(ClientAPI.evt_table_sync,             game_state_manager, "_on_evt_table_sync")
+   _safe_connect(ClientAPI.evt_turn_update,            game_state_manager, "_on_evt_turn_update")
+   _safe_connect(ClientAPI.evt_game_end,               game_state_manager, "_on_evt_game_end")
+   _safe_connect(ClientAPI.evt_game_message,           game_state_manager, "_on_evt_game_message")
+   _safe_connect(ClientAPI.evt_opponent_disconnected,  game_state_manager, "_on_evt_opponent_disconnected")
+   _safe_connect(ClientAPI.evt_opponent_rejoined,      game_state_manager, "_on_evt_opponent_rejoined")
+   _safe_connect(ClientAPI.evt_invite_received,        game_state_manager, "_on_evt_invite_received")
+   _safe_connect(ClientAPI.evt_invite_response,        game_state_manager, "_on_evt_invite_response")
+   _safe_connect(ClientAPI.evt_invite_cancelled,       game_state_manager, "_on_evt_invite_cancelled")
+   _safe_connect(ClientAPI.evt_rematch_declined,       game_state_manager, "_on_evt_rematch_declined")
+   _safe_connect(ClientAPI.join_game_ok,               game_state_manager, "_on_join_game_ok")
+   _safe_connect(ClientAPI.move_ok,                    game_state_manager, "_on_move_ok")
+   _safe_connect(ClientAPI.move_failed,                game_state_manager, "_on_move_failed")
+   _safe_connect(ClientAPI.invite_sent,                game_state_manager, "_on_invite_sent")
+   _safe_connect(ClientAPI.invite_send_failed,         game_state_manager, "_on_invite_send_failed")
+   _safe_connect(ClientAPI.login_ok,                   game_state_manager, "_on_login_ok")
+   _safe_connect(ClientAPI.connection_lost,            game_state_manager, "on_connection_lost")
+   _safe_connect(ClientAPI.connection_restored,        game_state_manager, "on_connection_restored")
+   _safe_connect(ClientAPI.reconnect_failed,           game_state_manager, "on_reconnect_failed")
+   _safe_connect(ClientAPI.server_closed,              game_state_manager, "on_server_closed")
 
 func _connect_layout_signals() -> void:
     var vp := get_viewport()
@@ -216,7 +238,7 @@ func _reset_deck_counts() -> void:
 
 func _process(_delta: float) -> void:
     if _game_context != null and _game_context.ui_manager != null:
-        _game_context.ui_manager.update_timebar(Callable(NetworkManager, "server_now_ms"))
+        _game_context.ui_manager.update_timebar(Callable(ClientAPI, "server_now_ms"))
 
 func _set_turn_timer(turn: Dictionary) -> void:
     if _game_context != null and _game_context.ui_manager != null:
@@ -230,46 +252,22 @@ func _set_turn_timer(turn: Dictionary) -> void:
 # ============= QUITTER =============
 
 func _on_quitter_pressed() -> void:
-    PopupUi.show_code(
-        PopupUi.MODE_CONFIRM, Protocol.POPUP_QUIT_CONFIRM, {}, {},
-        {"yes_action_id": ACTION_QUIT_CANCEL, "no_action_id": ACTION_QUIT_CONFIRM,
-         "yes_label_key": "UI_LABEL_CANCEL",  "no_label_key": "UI_LABEL_QUIT"}
-    )
+    PopupRouter.show_quit_confirm()
 
 func _on_game_end(data: Dictionary) -> void:
     if _game_end_prompted:
         return
     _game_end_prompted = true
     GameSession.end_game(data.get("result", {}))
-
-    var popup_msg      := PopupMessage.game_end_popup_message(data, String(Global.username), GameSession.is_spectator)
     var rematch_allowed := bool(data.get("rematch_allowed", true)) and not _opponent_disconnected
-
-    if GameSession.is_spectator or not rematch_allowed:
-        PopupUi.show_code(
-            PopupUi.MODE_INFO,
-            String(popup_msg.get("message_code", "")),
-            popup_msg.get("message_params", {}) as Dictionary,
-            {"game_id": GameSession.current_game_id},
-            {"ok_action_id": ACTION_GAME_END_LEAVE, "ok_label_key": "UI_LABEL_BACK_LOBBY"}
-        )
-        return
-
-    PopupUi.show_code(
-        PopupUi.MODE_CONFIRM,
-        String(popup_msg.get("message_code", "")),
-        popup_msg.get("message_params", {}) as Dictionary,
-        {"game_id": GameSession.current_game_id},
-        {"yes_action_id": ACTION_GAME_END_LEAVE,    "no_action_id": ACTION_GAME_END_REMATCH,
-         "yes_label_key": "UI_LABEL_BACK_LOBBY",    "no_label_key": "UI_LABEL_REMATCH"}
+    PopupRouter.show_game_end(
+        data, String(Global.username),
+        GameSession.is_spectator, rematch_allowed,
+        GameSession.current_game_id
     )
 
 func _show_pause_choice(who: String) -> void:
-    PopupUi.show_code(
-        PopupUi.MODE_CONFIRM, Protocol.POPUP_OPPONENT_DISCONNECTED_CHOICE, {"name": who}, {},
-        {"yes_action_id": ACTION_PAUSE_WAIT, "no_action_id": ACTION_PAUSE_LEAVE,
-         "yes_label_key": "UI_LABEL_WAIT",   "no_label_key": "UI_LABEL_BACK_LOBBY"}
-    )
+    PopupRouter.show_pause_disconnect_choice(who)
 
 func _schedule_disconnect_choice(who: String) -> void:
     _disconnect_prompt_seq += 1
@@ -285,7 +283,7 @@ func _on_popup_action(action_id: String, payload: Dictionary) -> void:
         NetworkManager.retry_now()
         return
 
-    var invite_req := Protocol.invite_action_request(action_id, payload)
+    var invite_req := MessageCatalog.invite_action_request(action_id, payload)
     if not invite_req.is_empty():
         NetworkManager.request(REQ_INVITE_RESPONSE, invite_req)
         return
@@ -310,9 +308,9 @@ func _leave_current_and_go_lobby() -> void:
     var gid: String = GameSession.current_game_id
     if gid != "":
         if GameSession.is_game_ended() or GameSession.is_spectator:
-            NetworkManager.request_async(REQ_ACK_GAME_END, {"game_id": gid}, 4.0)
+            ClientAPI.request_async(REQ_ACK_GAME_END, {"game_id": gid}, 4.0)
         else:
-            NetworkManager.request(REQ_LEAVE_GAME, {"game_id": gid})
+            ClientAPI.leave_game(gid)
     GameSession.reset_game_state()
     SceneManager.go_to_lobby()
 

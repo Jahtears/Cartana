@@ -113,8 +113,6 @@ func _load_catalog(path: String) -> Dictionary:
     out[normalized_key] = String(src[raw_key])
   return out
 
-## Suppression des fonctions internes de gestion de la langue, tout passe par Global
-
 func _format_template(template: String, params: Dictionary) -> String:
   var out := String(template)
   for key in params.keys():
