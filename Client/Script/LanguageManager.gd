@@ -6,9 +6,7 @@ const LANG_FR := "fr"
 const LANG_EN := "en"
 const DEFAULT_LANGUAGE := LANG_FR
 
-const SETTINGS_PATH := "user://client_settings.cfg"
-const SETTINGS_SECTION_I18N := "i18n"
-const SETTINGS_KEY_LANGUAGE := "language"
+
 
 const LOCALE_PATH_BY_LANG := {
   LANG_FR: "res://Script/Lang/locales/fr.json",
@@ -20,17 +18,17 @@ var _catalog_by_language: Dictionary = {}
 
 func _ready() -> void:
   _load_catalogs()
-  _current_language = _load_saved_language()
+  _current_language = Global.get_language()
 
 func set_language(language_code: String, persist := true) -> void:
   var normalized := normalize_language(language_code)
   if normalized == _current_language:
     if persist:
-      _save_language(normalized)
+      Global.save_language(normalized)
     return
   _current_language = normalized
   if persist:
-    _save_language(normalized)
+    Global.save_language(normalized)
   language_changed.emit(_current_language)
 
 func get_language() -> String:
@@ -114,19 +112,6 @@ func _load_catalog(path: String) -> Dictionary:
       continue
     out[normalized_key] = String(src[raw_key])
   return out
-
-func _load_saved_language() -> String:
-  var config := ConfigFile.new()
-  var result := config.load(SETTINGS_PATH)
-  if result != OK:
-    return DEFAULT_LANGUAGE
-  return normalize_language(String(config.get_value(SETTINGS_SECTION_I18N, SETTINGS_KEY_LANGUAGE, DEFAULT_LANGUAGE)))
-
-func _save_language(language_code: String) -> void:
-  var config := ConfigFile.new()
-  config.load(SETTINGS_PATH)
-  config.set_value(SETTINGS_SECTION_I18N, SETTINGS_KEY_LANGUAGE, normalize_language(language_code))
-  config.save(SETTINGS_PATH)
 
 func _format_template(template: String, params: Dictionary) -> String:
   var out := String(template)

@@ -22,10 +22,12 @@ config/features=PackedStringArray("4.6", "GL Compatibility")
 
 Global="*res://net/Global.gd"
 NetworkManager="*res://net/NetworkManager.gd"
+ClientAPI="*uid://d4jttd8i83f1v"
 LanguageManager="*res://Script/LanguageManager.gd"
 PopupUi="*uid://3jldn8mj4lx4"
 SceneManager="*uid://cjplqqjybnynv"
 CardBackManager="*uid://yw3b5hb8t2mp"
+GameSession="*uid://c7wo1jyhr3ln4"
 
 [display]
 
@@ -38,7 +40,7 @@ version_control/autoload_on_startup=true
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
+enabled=PackedStringArray()
 
 [gui]
 

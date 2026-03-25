@@ -130,9 +130,9 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
 
         REQ_INVITE:
             if ok:
-                PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_INVITE_SENT)
+                PopupRouter.show_info(Protocol.POPUP_INVITE_SENT)
             else:
-                _show_error_popup(error, Protocol.POPUP_INVITE_FAILED)
+                PopupRouter.show_error(error, Protocol.POPUP_INVITE_FAILED)
 
 # --------------------
 # EVT (push serveur)
@@ -158,74 +158,49 @@ func _on_evt(type: String, data: Dictionary) -> void:
         "invite_request":
             var from_user := String(data.get("from", ""))
             if from_user != "":
-                var popup_payload := {
-                    "flow": PopupMessage.popup_flow("INVITE_REQUEST", FLOW_INVITE_REQUEST),
-                    "from": from_user
-                }
-                var context := String(data.get("context", "")).strip_edges()
-                var source_game_id := String(data.get("source_game_id", "")).strip_edges()
-                if context != "":
-                    popup_payload["context"] = context
-                if source_game_id != "":
-                    popup_payload["source_game_id"] = source_game_id
-                PopupUi.show_code(
-                    PopupUi.MODE_CONFIRM,
-                    Protocol.POPUP_INVITE_RECEIVED,
-                    {"from": from_user},
-                    popup_payload,
-                    {"yes_label_key": "UI_LABEL_ACCEPT", "no_label_key": "UI_LABEL_REFUSE"}
+                PopupRouter.show_invite_received(
+                    from_user,
+                    String(data.get("context", "")).strip_edges(),
+                    String(data.get("source_game_id", "")).strip_edges()
                 )
 
         REQ_INVITE_RESPONSE:
-            var ui := PopupMessage.normalize_invite_response_ui(data)
-            if String(ui.get("text", "")) != "":
-                PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
+            PopupRouter.show_invite_response(data)
 
         "invite_cancelled":
-            _handle_invite_cancelled(data)
+            PopupRouter.show_invite_cancelled(data)
 
 func _show_error_popup(error: Dictionary, fallback_message: String) -> void:
-    var popup := PopupMessage.normalize_popup_error(error, fallback_message)
-    PopupUi.show_normalized(PopupUi.MODE_INFO, popup)
+    PopupRouter.show_error(error, fallback_message)
 
 func _on_connection_lost() -> void:
     _network_disconnected = true
-    PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_DISCONNECTED)
+    PopupRouter.show_connection_lost()
 
 func _on_connection_restored() -> void:
     if not _network_disconnected:
         return
     _network_disconnected = false
-    PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_PLAYER_RECONNECTED)
+    PopupRouter.show_reconnected()
 
 func _on_reconnect_failed() -> void:
     if not _network_disconnected:
         return
-    PopupUi.show_code(
-        PopupUi.MODE_INFO,
-        Protocol.POPUP_PLAYER_RECONNECT_FAIL,
-        {},
-        {},
-        {"ok_action_id": ACTION_NETWORK_RETRY, "ok_label_key": "UI_LABEL_RETRY"}
-    )
+    PopupRouter.show_reconnect_failed()
 
 func _on_server_closed(_server_reason: String, _close_code: int, _raw_reason: String) -> void:
     _network_disconnected = false
-    PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_TECH_INTERNAL_ERROR)
+    PopupRouter.show_info(Protocol.POPUP_TECH_INTERNAL_ERROR)
 
 func _handle_invite_cancelled(data: Dictionary) -> void:
-    var ui := PopupMessage.invite_cancelled_ui(data)
-    if String(ui.get("text", "")).strip_edges() == "":
-        return
-    PopupUi.show_normalized(PopupUi.MODE_INFO, ui)
+    PopupRouter.show_invite_cancelled(data)
 
 # --------------------
 # UI / LOGIC
 # --------------------
 func start_game(game_id: String, players: Array, spectator: bool) -> void:
-    Global.current_game_id = game_id
-    Global.players_in_game = players
-    Global.is_spectator = spectator
+
+    GameSession.start_game(game_id, players, spectator)
 
     if _is_changing_scene:
         return
@@ -333,7 +308,7 @@ func update_games_list(games: Array) -> void:
             continue
         filtered_games.append(game)
         list.add_child(create_game_box(game))
-    Global.current_games = filtered_games
+    # Global.current_games supprimé (variable locale)
 
 func _player_matches_search(username: String) -> bool:
     if _search_query == "":
@@ -525,7 +500,7 @@ func _on_popup_action(action_id: String, payload: Dictionary) -> void:
         NetworkManager.retry_now()
         return
 
-    var invite_req := Protocol.invite_action_request(action_id, payload)
+    var invite_req := MessageCatalog.invite_action_request(action_id, payload)
     if not invite_req.is_empty():
         NetworkManager.request(REQ_INVITE_RESPONSE, invite_req)
         return
@@ -533,21 +508,22 @@ func _on_popup_action(action_id: String, payload: Dictionary) -> void:
     var flow := String(payload.get("flow", ""))
     match flow:
         FLOW_SPECTATE_GAME:
-            if action_id == PopupMessage.popup_action("CONFIRM_YES", Protocol.POPUP_ACTION_CONFIRM_YES):
+            if action_id == Protocol.POPUP_ACTION_CONFIRM_YES:
                 _do_spectate_game(String(payload.get("game_id", "")))
         FLOW_LOGOUT:
-            if action_id == PopupMessage.popup_action("CONFIRM_YES", Protocol.POPUP_ACTION_CONFIRM_YES):
+            if action_id == Protocol.POPUP_ACTION_CONFIRM_YES:
                 await _do_logout()
 
 func _do_logout() -> void:
     await NetworkManager.request_async(REQ_LOGOUT, {}, 3.0)
     NetworkManager.close(1000, "logout")
 
+
     #  reset "session"
     Global.username = ""
 
     #  reset "game state" (API canonique)
-    Global.reset_game_state()
+    GameSession.reset_game_state()
 
     SceneManager.go_to_login()
 

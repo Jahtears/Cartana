@@ -1,6 +1,5 @@
 # SceneManager.gd — Autoload singleton
 # Centralise tous les changements de scène.
-# À enregistrer dans Project > Project Settings > Autoload sous le nom "SceneManager".
 extends Node
 
 const SCENE_LOGIN := "res://Scenes/Login.tscn"

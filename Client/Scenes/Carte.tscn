@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://dqxpcbdewi0rn"]
 
-[ext_resource type="Script" uid="uid://dgt60tw50p0bn" path="res://game/Carte.gd" id="1_d822b"]
-[ext_resource type="Texture2D" uid="uid://birbipg4vmclp" path="res://Resource/Cartes/DosA.png" id="2_b0gi5"]
+[ext_resource type="Script" uid="uid://dgt60tw50p0bn" path="res://game/card/Carte.gd" id="1_d822b"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_d822b"]
 size = Vector2(80, 119)
@@ -17,6 +16,11 @@ border_color = Color(0, 0, 0, 1)
 [node name="Carte" type="Node2D" unique_id=616561034]
 z_index = 1
 script = ExtResource("1_d822b")
+valeur = null
+couleur = null
+dos = null
+decks_color = null
+draggable = null
 
 [node name="Area2D" type="Area2D" parent="." unique_id=759047316]
 
@@ -95,7 +99,6 @@ offset_bottom = 60.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = ExtResource("2_b0gi5")
 
 [node name="Bord" type="Panel" parent="Back" unique_id=1318504058]
 layout_mode = 1

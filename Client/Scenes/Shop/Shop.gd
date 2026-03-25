@@ -36,6 +36,7 @@ func _rebuild_shop_back_items() -> void:
         return
     for back_id in back_ids:
         _shop_grid.add_child(_create_shop_back_item(back_id))
+    # Synchronise l'état visuel des boutons avec la persistance
     _refresh_shop_selection_buttons()
 
 func _create_shop_back_item(back_id: String) -> PanelContainer:
