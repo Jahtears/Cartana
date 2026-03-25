@@ -1,4 +1,3 @@
-
 class_name CardDropPreview
 extends Node
 
@@ -11,6 +10,10 @@ var _slot_cache: Array = []
 var _slot_cache_valid := false
 
 const MIN_OVERLAP_AREA := 200.0
+
+## Appelé par CardDragController lors de l'entrée/sortie de la drag layer.
+func invalidate_slot_cache() -> void:
+  _slot_cache_valid = false
 
 func update_slot(card: Node2D, ignore_topmost: bool = false) -> void:
   # 🔥 Only preview if the card is topmost under the mouse
@@ -93,7 +96,7 @@ func _set_preview_slot(new_slot: Node, card: Node2D) -> void:
     elif _current_preview_slot.has_method("on_card_enter_preview"):
       _current_preview_slot.call("on_card_enter_preview")
 
-    card.set_state(CardElement.CardState.PREVIEW_SLOT if new_slot != null else CardElement.CardState.DRAG)
+  card.set_state(CardElement.CardState.PREVIEW_SLOT if new_slot != null else CardElement.CardState.DRAG)
 
 func update_card(card: Node2D) -> void:
   var card_rect = CardGeometry.get_card_rect(card)
@@ -117,7 +120,6 @@ func update_card(card: Node2D) -> void:
       best_overlap = overlap_area
       best_card = other_card
 
-  # If overlap is sufficient, highlight
   if best_overlap >= MIN_OVERLAP_AREA:
     _set_preview_card(best_card, card)
   else:
@@ -127,14 +129,9 @@ func _set_preview_card(new_card: Node2D, card: Node2D) -> void:
   if _current_preview_card == new_card:
     return
 
-  # Reset previous card
   if _current_preview_card != null and is_instance_valid(_current_preview_card):
     _current_preview_card._reset_card_preview()
 
   _current_preview_card = new_card
   if _current_preview_card != null and is_instance_valid(_current_preview_card):
     _current_preview_card._highlight_card_preview()
-
-# Visual feedback methods (delegated to Card)
-# These are called on the card instance, not on the preview manager itself.
-# _highlight_card_preview and _reset_card_preview remain on Card.
