@@ -1,39 +1,57 @@
-# Client/game/services/TableSyncService.gd
 extends RefCounted
-class_name TableSyncService
+class_name BoardSyncService
 
 # ============= PROPERTIES =============
-var context: GameContext = null
+var context: CardContext = null
+var _card_factory: CardFactory = null
 
 # ============= LIFECYCLE =============
-func _init(ctx: GameContext) -> void:
+func _init(ctx: CardContext) -> void:
     context = ctx
-
-# ============= GUARD =============
-func _is_ready() -> bool:
-    return context != null and context.card_context != null
+    _card_factory = CardFactory.new()
 
 # ============= PUBLIC METHODS =============
-func sync_table_slots(table: Node, slot_scene: PackedScene, allowed_table_slots: Dictionary, active_slots: Array, spacing: int = 100, start_pos: Vector2 = Vector2.ZERO) -> void:
-    if not _is_ready():
-        return
+func apply_snapshot(data: Array) -> Array:
+    """Synchronise plusieurs cartes depuis un snapshot serveur"""
+    var synced_cards: Array = []
+    for card_data in data:
+        var card = apply_slot_state(card_data.get("slot_id", ""), card_data.get("cards", []), card_data.get("count", 0), false)
+        if card != null:
+            synced_cards.append(card)
+    return synced_cards
 
+func apply_slot_state(slot_id: String, cards: Array, count: int, animate: bool) -> Node2D:
+    """Synchronise l'état d'un slot (cartes, nombre, animation)"""
+    if context == null or context.slots_by_id == null:
+        return null
+    var slot = context.slots_by_id.get(slot_id)
+    if slot == null:
+        return null
+    var last_card: Node2D = null
+    for card_data in cards:
+        var card_id: String = String(card_data.get("card_id", ""))
+        if card_id == "":
+            continue
+        var card := _card_factory.get_or_create_card(context, card_id)
+        if card == null:
+            continue
+        _card_factory.update_card_data(card, card_data)
+        _card_factory.set_card_server_order(card, card_data)
+        _card_factory.mark_card_synced(card)
+        if slot.has_method("snap_card"):
+            slot.snap_card(card, animate)
+            EventDispatcher.emit_card_snapped(card, slot, animate)
+        _card_factory.update_card_last_slot(card, slot_id)
+        last_card = card
+    return last_card
+
+func sync_table_slots(table_node: Node, active_slots: Array, slot_scene: PackedScene = null, spacing: int = 100, start_pos: Vector2 = Vector2.ZERO) -> void:
+    if context == null or context.slots_by_id == null:
+        return
     var wanted := _collect_wanted_slots(active_slots)
-    _sync_allowed_table_slots(allowed_table_slots, wanted)
-    _remove_stale_table_slots(table, wanted)
-    _upsert_wanted_table_slots(table, slot_scene, wanted)
-    update_table_positions(table, spacing, start_pos)
-
-func update_table_positions(table: Node, spacing: int = 100, start_pos: Vector2 = Vector2.ZERO) -> void:
-    if not _is_ready():
-        return
-
-    var slots := _collect_live_table_slots(table)
-    if slots.is_empty():
-        return
-
-    _sort_table_slots_by_index(slots)
-    _position_table_slots(slots, spacing, start_pos)
+    _remove_stale_table_slots(table_node, wanted)
+    _upsert_wanted_table_slots(table_node, slot_scene, wanted)
+    _update_table_positions(table_node, spacing, start_pos)
 
 # ============= PRIVATE HELPERS =============
 func _collect_wanted_slots(active_slots: Array) -> Dictionary:
@@ -44,15 +62,7 @@ func _collect_wanted_slots(active_slots: Array) -> Dictionary:
             wanted[normalized] = true
     return wanted
 
-func _sync_allowed_table_slots(allowed_table_slots: Dictionary, wanted: Dictionary) -> void:
-    allowed_table_slots.clear()
-    for slot_id in wanted.keys():
-        allowed_table_slots[slot_id] = true
-
 func _remove_stale_table_slots(table: Node, wanted: Dictionary) -> void:
-    if not _is_ready():
-        return
-
     for child in table.get_children():
         if not is_instance_valid(child):
             continue
@@ -62,39 +72,39 @@ func _remove_stale_table_slots(table: Node, wanted: Dictionary) -> void:
             continue
         if wanted.has(cid):
             continue
-
         if child.has_method("clear_slot"):
             child.clear_slot()
-
-        if context.card_context.slots_by_id != null:
-            context.card_context.slots_by_id.erase(cid)
-
+        context.slots_by_id.erase(cid)
         if child.get_parent() == table:
             table.remove_child(child)
         child.queue_free()
 
 func _upsert_wanted_table_slots(table: Node, slot_scene: PackedScene, wanted: Dictionary) -> void:
-    if not _is_ready() or context.card_context.slots_by_id == null:
+    if context.slots_by_id == null:
         return
-
     for slot_id in wanted.keys():
         var node_name := SlotIdHelper.slot_node_name(slot_id)
         var existing := table.get_node_or_null(node_name)
-
         if existing != null and existing is Node and existing.is_queued_for_deletion():
             if existing.get_parent() == table:
                 table.remove_child(existing)
             existing = null
-
-        if existing == null:
+        if existing == null and slot_scene != null:
             var slot := slot_scene.instantiate()
             slot.name = node_name
             slot.slot_id = slot_id
             table.add_child(slot)
-            context.card_context.slots_by_id[slot_id] = slot
-        else:
+            context.slots_by_id[slot_id] = slot
+        elif existing != null:
             existing.slot_id = slot_id
-            context.card_context.slots_by_id[slot_id] = existing
+            context.slots_by_id[slot_id] = existing
+
+func _update_table_positions(table: Node, spacing: int, start_pos: Vector2) -> void:
+    var slots := _collect_live_table_slots(table)
+    if slots.is_empty():
+        return
+    _sort_table_slots_by_index(slots)
+    _position_table_slots(slots, spacing, start_pos)
 
 func _collect_live_table_slots(table: Node) -> Array:
     var slots: Array = []
@@ -119,7 +129,6 @@ func _sort_table_slots_by_index(slots: Array) -> void:
 func _position_table_slots(slots: Array, spacing: int, start_pos: Vector2) -> void:
     if slots.is_empty():
         return
-
     var start_offset := -float(slots.size() - 1) / 2.0 * spacing
     for i in range(slots.size()):
         slots[i].position = start_pos + Vector2(start_offset + i * spacing, 0)

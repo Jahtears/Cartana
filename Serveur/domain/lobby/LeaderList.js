@@ -1,7 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-
-export let LEADERBOARD_FILE = './app/saves/Leaderboard.json';
+import { dbGetLeaderboardObject, dbUpsertLeaderboardEntry } from '../../app/db.js';
 
 function ensurePositiveInt(value) {
   const num = Number(value);
@@ -33,56 +30,63 @@ function normalizeLeaderboard(raw) {
     if (!username) {
       continue;
     }
+    if (!isSafeUsername(username)) {
+      continue;
+    }
+    /* eslint-disable security/detect-object-injection */
     normalized[username] = normalizeLeaderboardEntry(stats);
+    /* eslint-enable security/detect-object-injection */
   }
 
   return normalized;
 }
 
-function ensureLeaderboardDir() {
-  const dir = path.dirname(LEADERBOARD_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-
-export function setLeaderboardFileForTests(filePath) {
-  LEADERBOARD_FILE = filePath;
+function isSafeUsername(u) {
+  if (typeof u !== 'string') return false;
+  // allow alphanum, dash, underscore, max length 32
+  return /^[A-Za-z0-9_-]{1,32}$/.test(u);
 }
 
 export function loadLeaderboard() {
-  ensureLeaderboardDir();
-  if (!fs.existsSync(LEADERBOARD_FILE)) {
-    fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify({}, null, 2), 'utf8');
-    return {};
-  }
-
   try {
-    const rawContent = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
-    if (!rawContent.trim()) {
-      return {};
-    }
-    const parsed = JSON.parse(rawContent);
-    return normalizeLeaderboard(parsed);
+    return normalizeLeaderboard(dbGetLeaderboardObject());
   } catch (err) {
-    console.error('[LEADERBOARD] Corrupted Leaderboard.json, fallback empty', err);
+    console.error('[LEADERBOARD] DB error, fallback empty', err);
     return {};
   }
 }
 
 export function saveLeaderboard(data) {
-  ensureLeaderboardDir();
   const normalized = normalizeLeaderboard(data);
-  fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(normalized, null, 2), 'utf8');
+  for (const [username, stats] of Object.entries(normalized)) {
+    const { wins, losses, draws } = stats;
+    try {
+      if (!isSafeUsername(username)) {
+        console.warn('[LEADERBOARD] skipping unsafe username', username);
+        continue;
+      }
+
+      dbUpsertLeaderboardEntry(username, wins, losses, draws);
+    } catch (err) {
+      console.warn('[LEADERBOARD] upsert failed for', username, err);
+    }
+  }
 }
 
 function ensurePlayerStats(board, username) {
+  if (!isSafeUsername(username)) {
+    return { wins: 0, losses: 0, draws: 0 };
+  }
+
+  /* eslint-disable security/detect-object-injection */
   if (!board[username]) {
     board[username] = { wins: 0, losses: 0, draws: 0 };
   } else {
     board[username] = normalizeLeaderboardEntry(board[username]);
   }
-  return board[username];
+  const out = board[username];
+  /* eslint-enable security/detect-object-injection */
+  return out;
 }
 
 export function recordLeaderboardResult(players, winner) {

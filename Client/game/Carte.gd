@@ -4,8 +4,8 @@ extends "res://game/base/CardElement.gd"
 const MIN_OVERLAP_AREA := 200.0
 const POINTER_ID_NONE := -2
 const POINTER_ID_MOUSE := -1
-const BACK_TEXTURE_DECK_A := preload("res://assets/Cartes/DosA.png")
-const BACK_TEXTURE_DECK_B := preload("res://assets/Cartes/DosB.png")
+const BACK_TEXTURE_DECK_A := preload("res://assets/Cartes/Dos01.png")
+const BACK_TEXTURE_DECK_B := preload("res://assets/Cartes/Dos02.png")
 
 # ============= EXPORTS =============
 @export var valeur: String = ""
@@ -182,10 +182,10 @@ func _input(event: InputEvent) -> void:
 
 # ============= GAME STATE =============
 func _is_game_end() -> bool:
-  return Global.result.size() > 0
+  return GameSession.is_game_ended()
 
 func _can_interact() -> bool:
-  if Global.is_spectator:
+  if GameSession.is_spectator:
     return false
   if _is_game_end():
     return false
@@ -278,9 +278,16 @@ func _get_back_color(code: String) -> Color:
   return Color(0.2, 0.4, 1.0)
 
 func _get_back_texture(code: String) -> Texture2D:
-  var source := String(code).strip_edges().to_upper()
-  var selected_id := CardBackManager.get_selected_back_for_source(source)
-  var selected_texture := CardBackManager.get_back_texture_by_id(selected_id)
+  var source: String = String(code).strip_edges().to_upper()
+  var selected_id: String = CardBackManager.get_selected_back_for_source(source)
+  if selected_id == "" and source == "A":
+    # Fallback sur le dos global si rien n'est sélectionné
+    if "card_back_a" in Global:
+      selected_id = Global.card_back_a
+  elif selected_id == "" and source == "B":
+    if "card_back_b" in Global:
+      selected_id = Global.card_back_b
+  var selected_texture: Texture2D = CardBackManager.get_back_texture_by_id(selected_id)
   if selected_texture != null:
     return selected_texture
   if source == "A":

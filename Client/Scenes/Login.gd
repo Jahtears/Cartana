@@ -2,10 +2,7 @@ extends Control
 
 const Protocol = preload("res://net/Protocol.gd")
 
-const SETTINGS_PATH := "user://client_settings.cfg"
-const SETTINGS_SECTION_LOGIN := "login"
-const SETTINGS_KEY_REMEMBER_USERNAME := "remember_username"
-const SETTINGS_KEY_USERNAME := "username"
+
 
 var _login_pending := false
 var _last_username: String = ""
@@ -46,7 +43,7 @@ func _on_response(_rid: String, type: String, ok: bool, data: Dictionary, error:
         var u := String(data.get("username", ""))
         if u == "":
             u = _last_username
-        Global.username = u
+        Global.save_username(u)
         SceneManager.go_to_lobby()
     else:
         _show_login_error(error)
@@ -190,25 +187,27 @@ func _on_language_changed(_language_code: String) -> void:
 func _load_login_preferences() -> void:
     _loading_preferences = true
     var config := ConfigFile.new()
-    var load_result := config.load(SETTINGS_PATH)
+    var load_result := config.load(Global.SETTINGS_PATH)
     if load_result != OK:
         _remember_username_checkbox.button_pressed = false
         _username_input.text = ""
         _loading_preferences = false
         return
 
-    var remember := bool(config.get_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_REMEMBER_USERNAME, false))
-    var saved_username := String(config.get_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_USERNAME, "")).strip_edges()
+    var remember := bool(config.get_value(Global.SETTINGS_SECTION_LOGIN, "remember_username", false))
+    var saved_username := Global.get_username().strip_edges()
     _remember_username_checkbox.button_pressed = remember
     _username_input.text = saved_username if remember else ""
     _loading_preferences = false
 
 func _save_login_preferences(remember_username: bool, username: String) -> void:
     var config := ConfigFile.new()
-    config.load(SETTINGS_PATH)
-    config.set_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_REMEMBER_USERNAME, remember_username)
-    config.set_value(SETTINGS_SECTION_LOGIN, SETTINGS_KEY_USERNAME, username if remember_username else "")
-    config.save(SETTINGS_PATH)
+    config.load(Global.SETTINGS_PATH)
+    config.set_value(Global.SETTINGS_SECTION_LOGIN, "remember_username", remember_username)
+    config.set_value(Global.SETTINGS_SECTION_LOGIN, Global.SETTINGS_KEY_USERNAME, username if remember_username else "")
+    config.save(Global.SETTINGS_PATH)
+    if remember_username:
+        Global.save_username(username)
 
 
 

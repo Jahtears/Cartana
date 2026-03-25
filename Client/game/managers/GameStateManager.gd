@@ -28,16 +28,14 @@ const REQ_INVITE := "invite"
 
 # ============= PROPERTIES =============
 var context: GameContext             = null
-var _card_sync_service: CardSyncService  = null
-var _table_sync_service: TableSyncService = null
+var _board_sync_service: BoardSyncService = null
 var _waiting_for_reauth := false
 
 # ============= LIFECYCLE =============
 func _init(game_context: GameContext) -> void:
     context = game_context
     if context != null and context.card_context != null:
-        _card_sync_service  = CardSyncService.new(context.card_context)
-        _table_sync_service = TableSyncService.new(context)
+        _board_sync_service = BoardSyncService.new(context.card_context)
 
 # ============= EVENT ROUTING =============
 func handle_event(type: String, data: Dictionary) -> void:
@@ -174,7 +172,6 @@ func _handle_start_game(data: Dictionary) -> void:
 
 
 func _handle_state_snapshot(data: Dictionary) -> void:
-
     # Clear all slots first
     if context.card_context != null and context.card_context.slots_by_id != null:
         for slot in context.card_context.slots_by_id.values():
@@ -182,18 +179,17 @@ func _handle_state_snapshot(data: Dictionary) -> void:
                 slot.clear_slot()
 
     # Sync table slots
-    if _table_sync_service != null:
+    if _board_sync_service != null:
         var table_node: Node = null
         if context.game_node != null:
             table_node = context.game_node.get_node_or_null("Board/Table")
         if table_node != null:
             var table_slots_val = data.get("table", [])
             var table_slots: Array = table_slots_val if table_slots_val is Array else []
-            _table_sync_service.sync_table_slots(
+            _board_sync_service.sync_table_slots(
                 table_node,
-                preload("res://Scenes/Slot.tscn"),
-                {},
                 table_slots,
+                preload("res://Scenes/Slot.tscn"),
                 100,
                 Vector2.ZERO
             )
@@ -208,15 +204,17 @@ func _handle_state_snapshot(data: Dictionary) -> void:
 
     var counts_raw = data.get("slot_counts", null)
     var slot_counts_dict: Dictionary = counts_raw if counts_raw is Dictionary else {}
-
-    if _card_sync_service != null:
+    if _board_sync_service != null:
         for slot_id in slots_dict.keys():
-            var card_ids_raw = slots_dict.get(slot_id, null)
-            var card_ids_array: Array = card_ids_raw if card_ids_raw is Array else []
-            var count_for_slot: int = card_ids_array.size()
+            var card_datas = slots_dict.get(slot_id, null)
+            var card_datas_array: Array = card_datas if card_datas is Array else []
+            var count_for_slot: int = card_datas_array.size()
             if slot_counts_dict.has(slot_id):
                 count_for_slot = maxi(0, int(slot_counts_dict.get(slot_id, count_for_slot)))
-            _apply_slot_cards_update(slot_id, card_ids_array, count_for_slot, false)
+            _board_sync_service.apply_slot_state(slot_id, card_datas_array, count_for_slot, false)
+            if context.game_node != null and "_deck_count_state" in context.game_node:
+                var deck_count_state = context.game_node._deck_count_state
+                DeckCountUtil.update_from_slot(deck_count_state, slot_id, count_for_slot)
 
     # Turn data
     var turn_raw = data.get("turn", null)
@@ -224,16 +222,15 @@ func _handle_state_snapshot(data: Dictionary) -> void:
         _handle_turn_update(turn_raw as Dictionary)
 
 func _handle_table_sync(data: Dictionary) -> void:
-    if _table_sync_service == null:
+    if _board_sync_service == null:
         return
     var table_node = context.game_node.get_node_or_null("Board/Table") if context.game_node else null
     if table_node == null:
         return
-    _table_sync_service.sync_table_slots(
+    _board_sync_service.sync_table_slots(
         table_node,
-        preload("res://Scenes/Slot.tscn"),
-        data.get("allowed_slots", {}),
         data.get("slots", []),
+        preload("res://Scenes/Slot.tscn"),
         GameLayoutConfig.TABLE_SPACING,
         GameLayoutConfig.START_POS
     )
@@ -246,10 +243,14 @@ func _handle_slot_state(data: Dictionary) -> void:
     var count_for_slot := arr.size()
     if data.has("count"):
         count_for_slot = maxi(0, int(data.get("count", count_for_slot)))
-    _apply_slot_cards_update(slot_id, arr, count_for_slot, true)
+    if _board_sync_service != null:
+        _board_sync_service.apply_slot_state(slot_id, arr, count_for_slot, true)
+        if context.game_node != null and "_deck_count_state" in context.game_node:
+            var deck_count_state = context.game_node._deck_count_state
+            DeckCountUtil.update_from_slot(deck_count_state, slot_id, count_for_slot)
 
 func _handle_game_end(data: Dictionary) -> void:
-    context.result = data.get("result", {})
+    GameSession.result = data.get("result", {})
     if context.game_node and context.game_node.has_method("_on_game_end"):
         context.game_node._on_game_end(data)
 
@@ -258,7 +259,7 @@ func _handle_turn_update(data: Dictionary) -> void:
         context.ui_manager.set_turn_timer(
             data,
             Callable(NetworkManager, "sync_server_clock"),
-            context.is_spectator,
+            GameSession.is_spectator,
             String(Global.username)
         )
 
@@ -322,32 +323,7 @@ func _handle_rematch_declined(data: Dictionary) -> void:
         }
     )
 
-# ============= SLOT & CARD SYNCHRONIZATION =============
-func _apply_slot_cards_update(slot_id: String, card_array: Array, count_for_slot: int, animate: bool) -> void:
-    if context.card_context == null:
-        return
-
-    var slot = context.card_context.slots_by_id.get(slot_id)
-    var normalized_count := maxi(0, count_for_slot)
-
-    if slot != null and slot.has_method("set_server_count"):
-        slot.call("set_server_count", normalized_count)
-
-    if context.game_node:
-        DeckCountUtil.update_from_slot(context.game_node._deck_count_state, slot_id, normalized_count)
-
-    if slot != null and slot.has_method("begin_server_sync"):
-        slot.call("begin_server_sync", animate)
-
-    for i in range(card_array.size()):
-        var payload = card_array[i]
-        if payload is Dictionary:
-            payload["_array_order"] = i
-            if _card_sync_service != null:
-                _card_sync_service.sync_card(payload)
-
-    if slot != null and slot.has_method("finalize_server_sync"):
-        slot.call("finalize_server_sync")
+## plus de _apply_slot_cards_update : tout est géré par BoardSyncService
 
 # ============= HELPERS =============
 func _rollback_invalid_move(move_data: Dictionary) -> void:
@@ -403,7 +379,7 @@ func _show_game_feedback(message_data: Dictionary) -> void:
         context.ui_manager.show_game_feedback(message_data)
 
 func _request_game_sync() -> void:
-    var game_id := String(Global.current_game_id)
+    var game_id: String = String(Global.current_game_id)
     if game_id == "":
         return
     var req_type := "spectate_game" if bool(Global.is_spectator) else "join_game"
@@ -437,19 +413,20 @@ func on_server_closed(_server_reason: String, _close_code: int, _raw_reason: Str
     PopupUi.show_code(PopupUi.MODE_INFO, Protocol.POPUP_TECH_INTERNAL_ERROR)
 
 # ============= FIN DE PARTIE =============
+
 func _ack_end_and_go_lobby() -> void:
-    var gid := String(Global.current_game_id)
+    var gid: String = String(GameSession.current_game_id)
     if gid != "":
-        await NetworkManager.request_async("ack_game_end", {"game_id": gid}, 6.0)
-    Global.current_game_id  = ""
-    Global.players_in_game  = []
-    Global.is_spectator     = false
-    Global.result           = {}
+        NetworkManager.request_async("ack_game_end", {"game_id": gid}, 6.0)
+    GameSession.current_game_id  = ""
+    GameSession.players_in_game  = []
+    GameSession.is_spectator     = false
+    GameSession.result           = {}
     if context.game_node and context.game_node.has_method("_go_to_lobby_safe"):
-        await context.game_node._go_to_lobby_safe()
+        context.game_node._go_to_lobby_safe()
 
 func _ack_end_invite_rematch_in_game() -> void:
-    var gid            := String(Global.current_game_id)
+    var gid: String = String(Global.current_game_id)
     var source_game_id := gid
     var opponent_name  := _resolve_rematch_target_username()
 

@@ -223,9 +223,8 @@ func _handle_invite_cancelled(data: Dictionary) -> void:
 # UI / LOGIC
 # --------------------
 func start_game(game_id: String, players: Array, spectator: bool) -> void:
-    Global.current_game_id = game_id
-    Global.players_in_game = players
-    Global.is_spectator = spectator
+
+    GameSession.start_game(game_id, players, spectator)
 
     if _is_changing_scene:
         return
@@ -333,7 +332,7 @@ func update_games_list(games: Array) -> void:
             continue
         filtered_games.append(game)
         list.add_child(create_game_box(game))
-    Global.current_games = filtered_games
+    # Global.current_games supprimé (variable locale)
 
 func _player_matches_search(username: String) -> bool:
     if _search_query == "":
@@ -543,11 +542,12 @@ func _do_logout() -> void:
     await NetworkManager.request_async(REQ_LOGOUT, {}, 3.0)
     NetworkManager.close(1000, "logout")
 
+
     #  reset "session"
     Global.username = ""
 
     #  reset "game state" (API canonique)
-    Global.reset_game_state()
+    GameSession.reset_game_state()
 
     SceneManager.go_to_login()
 

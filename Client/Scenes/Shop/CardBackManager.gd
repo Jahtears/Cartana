@@ -1,17 +1,18 @@
+
 # CardBackManager.gd
-# Gestion indépendante des dos de carte (découplée de Global.gd)
 extends Node
+
 
 const CARD_BACKS_DIR := "res://assets/Cartes"
 const CARD_BACKS_PREFIX := "Dos"
 const CARD_BACKS_EXTENSION := ".png"
-const CARD_BACK_CANDIDATE_LETTERS := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const CARD_BACK_MIN_NUMERIC_CANDIDATE := 1
 const CARD_BACK_MAX_NUMERIC_CANDIDATE := 99
 
 const SOURCE_A := "A"
 const SOURCE_B := "B"
-const DEFAULT_BACK_A := "DosA"
-const DEFAULT_BACK_B := "DosB"
+const DEFAULT_BACK_A := "Dos01"
+const DEFAULT_BACK_B := "Dos02"
 
 var _available_back_ids: Array[String] = []
 var _back_path_by_id: Dictionary = {}
@@ -23,6 +24,13 @@ var _selected_back_by_source: Dictionary = {
 
 func _ready() -> void:
     _discover_available_backs()
+    # Initialisation des dos depuis Global
+    var global_back_a = Global.card_back_a if "card_back_a" in Global else ""
+    if global_back_a != "":
+        _selected_back_by_source[SOURCE_A] = global_back_a
+    var global_back_b = Global.card_back_b if "card_back_b" in Global else ""
+    if global_back_b != "":
+        _selected_back_by_source[SOURCE_B] = global_back_b
     _sanitize_selected_back_mapping()
 
 func get_available_back_ids() -> Array[String]:
@@ -60,6 +68,11 @@ func assign_back_to_source(source: String, back_id: String) -> void:
         _selected_back_by_source[other_source] = replacement
     else:
         _selected_back_by_source[normalized_source] = normalized_back_id
+    # Synchronise la sélection avec Global
+    if normalized_source == SOURCE_A:
+        Global.save_card_back_a(normalized_back_id)
+    elif normalized_source == SOURCE_B:
+        Global.save_card_back_b(normalized_back_id)
     _sanitize_selected_back_mapping()
 
 func _discover_available_backs() -> void:
@@ -83,11 +96,8 @@ func _discover_available_backs() -> void:
     _register_back_candidate(DEFAULT_BACK_B)
     _register_back_candidate(String(_selected_back_by_source.get(SOURCE_A, "")))
     _register_back_candidate(String(_selected_back_by_source.get(SOURCE_B, "")))
-    for i in range(CARD_BACK_CANDIDATE_LETTERS.length()):
-        var suffix := CARD_BACK_CANDIDATE_LETTERS.substr(i, 1)
-        _register_back_candidate("%s%s" % [CARD_BACKS_PREFIX, suffix])
-    for i in range(1, CARD_BACK_MAX_NUMERIC_CANDIDATE + 1):
-        _register_back_candidate("%s%d" % [CARD_BACKS_PREFIX, i])
+    for i in range(CARD_BACK_MIN_NUMERIC_CANDIDATE, CARD_BACK_MAX_NUMERIC_CANDIDATE + 1):
+        _register_back_candidate("%s%02d" % [CARD_BACKS_PREFIX, i])
     _available_back_ids.sort()
 
 func _is_card_back_file(file_name: String) -> bool:

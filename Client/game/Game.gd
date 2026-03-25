@@ -107,10 +107,7 @@ func _ready() -> void:
     _game_context.card_context    = _card_ctx
     _game_context.ui_manager      = ui_manager
     _game_context.layout_manager  = layout_manager
-    _game_context.current_game_id = String(Global.current_game_id)
-    _game_context.is_spectator    = bool(Global.is_spectator)
-    _game_context.players_in_game = Global.players_in_game.duplicate()
-    _game_context.result          = Global.result.duplicate() if Global.result is Dictionary else {}
+
 
     game_state_manager = preload("res://game/managers/GameStateManager.gd").new(_game_context)
 
@@ -120,9 +117,9 @@ func _ready() -> void:
     PopupUi.hide_and_reset()
     _game_context.layout_manager.apply_language()
 
-    if String(Global.current_game_id) != "":
-        var game_id := String(Global.current_game_id)
-        if bool(Global.is_spectator):
+    if GameSession.current_game_id != "":
+        var game_id: String = GameSession.current_game_id
+        if GameSession.is_spectator:
             NetworkManager.request(REQ_SPECTATE_GAME, {"game_id": game_id})
         else:
             NetworkManager.request(REQ_JOIN_GAME, {"game_id": game_id})
@@ -226,7 +223,7 @@ func _set_turn_timer(turn: Dictionary) -> void:
         _game_context.ui_manager.set_turn_timer(
             turn,
             Callable(NetworkManager, "sync_server_clock"),
-            bool(Global.is_spectator),
+            GameSession.is_spectator,
             String(Global.username)
         )
 
@@ -243,17 +240,17 @@ func _on_game_end(data: Dictionary) -> void:
     if _game_end_prompted:
         return
     _game_end_prompted = true
-    Global.result = data.get("result", {})
+    GameSession.end_game(data.get("result", {}))
 
-    var popup_msg      := PopupMessage.game_end_popup_message(data, String(Global.username), bool(Global.is_spectator))
+    var popup_msg      := PopupMessage.game_end_popup_message(data, String(Global.username), GameSession.is_spectator)
     var rematch_allowed := bool(data.get("rematch_allowed", true)) and not _opponent_disconnected
 
-    if bool(Global.is_spectator) or not rematch_allowed:
+    if GameSession.is_spectator or not rematch_allowed:
         PopupUi.show_code(
             PopupUi.MODE_INFO,
             String(popup_msg.get("message_code", "")),
             popup_msg.get("message_params", {}) as Dictionary,
-            {"game_id": String(Global.current_game_id)},
+            {"game_id": GameSession.current_game_id},
             {"ok_action_id": ACTION_GAME_END_LEAVE, "ok_label_key": "UI_LABEL_BACK_LOBBY"}
         )
         return
@@ -262,7 +259,7 @@ func _on_game_end(data: Dictionary) -> void:
         PopupUi.MODE_CONFIRM,
         String(popup_msg.get("message_code", "")),
         popup_msg.get("message_params", {}) as Dictionary,
-        {"game_id": String(Global.current_game_id)},
+        {"game_id": GameSession.current_game_id},
         {"yes_action_id": ACTION_GAME_END_LEAVE,    "no_action_id": ACTION_GAME_END_REMATCH,
          "yes_label_key": "UI_LABEL_BACK_LOBBY",    "no_label_key": "UI_LABEL_REMATCH"}
     )
@@ -295,30 +292,29 @@ func _on_popup_action(action_id: String, payload: Dictionary) -> void:
 
     match action_id:
         ACTION_QUIT_CONFIRM, ACTION_PAUSE_LEAVE:
-            await _leave_current_and_go_lobby()
+            _leave_current_and_go_lobby()
         ACTION_GAME_END_LEAVE:
             if game_state_manager != null and game_state_manager.has_method("_ack_end_and_go_lobby"):
-                await game_state_manager._ack_end_and_go_lobby()
+                game_state_manager._ack_end_and_go_lobby()
         ACTION_GAME_END_REMATCH:
             if game_state_manager != null and game_state_manager.has_method("_ack_end_invite_rematch_in_game"):
-                await game_state_manager._ack_end_invite_rematch_in_game()
+                game_state_manager._ack_end_invite_rematch_in_game()
         ACTION_REMATCH_DECLINED_LEAVE:
             if game_state_manager != null and game_state_manager.has_method("_ack_end_and_go_lobby"):
-                await game_state_manager._ack_end_and_go_lobby()
+                game_state_manager._ack_end_and_go_lobby()
 
 func _leave_current_and_go_lobby() -> void:
     if _leave_sent:
         return
     _leave_sent = true
-    var gid := String(Global.current_game_id)
+    var gid: String = GameSession.current_game_id
     if gid != "":
-        var has_result := Global.result is Dictionary and (Global.result as Dictionary).size() > 0
-        if has_result or bool(Global.is_spectator):
-            await NetworkManager.request_async(REQ_ACK_GAME_END, {"game_id": gid}, 4.0)
+        if GameSession.is_game_ended() or GameSession.is_spectator:
+            NetworkManager.request_async(REQ_ACK_GAME_END, {"game_id": gid}, 4.0)
         else:
             NetworkManager.request(REQ_LEAVE_GAME, {"game_id": gid})
-    Global.reset_game_state()
-    await _go_to_lobby_safe()
+    GameSession.reset_game_state()
+    SceneManager.go_to_lobby()
 
 func _go_to_lobby_safe() -> void:
     if _is_changing_scene:
@@ -329,8 +325,8 @@ func _go_to_lobby_safe() -> void:
 # ============= CLEANUP =============
 
 func _exit_tree() -> void:
-    if String(Global.current_game_id) != "":
-        NetworkManager.request(REQ_ACK_GAME_END, {"game_id": String(Global.current_game_id)})
+    if GameSession.current_game_id != "":
+        NetworkManager.request(REQ_ACK_GAME_END, {"game_id": GameSession.current_game_id})
 
     if game_state_manager != null:
         for pair in [
@@ -355,5 +351,5 @@ func _exit_tree() -> void:
         _game_context.ui_manager.cleanup()
 
 func _notification(what: int) -> void:
-    if what == NOTIFICATION_WM_CLOSE_REQUEST and String(Global.current_game_id) != "":
-        NetworkManager.request(REQ_ACK_GAME_END, {"game_id": String(Global.current_game_id)})
+    if what == NOTIFICATION_WM_CLOSE_REQUEST and GameSession.current_game_id != "":
+        NetworkManager.request(REQ_ACK_GAME_END, {"game_id": GameSession.current_game_id})

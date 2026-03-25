@@ -11,10 +11,7 @@ var layout_manager: RefCounted = null
 var game_node: Node = null
 
 # ============= STATE =============
-var current_game_id: String = ""
-var players_in_game: Array = []
-var is_spectator: bool = false
-var result: Dictionary = {}
+
 var pending_events: Array = []
 var slots_ready: bool = false
 
@@ -35,11 +32,8 @@ func _init(game: Node) -> void:
     pending_events = []
 
 # ============= PUBLIC METHODS =============
-func reset_game_state() -> void:
-    current_game_id = ""
-    players_in_game = []
-    is_spectator = false
-    result = {}
+
+func reset_flags() -> void:
     is_changing_scene = false
     game_end_prompted = false
     leave_sent = false
@@ -47,11 +41,15 @@ func reset_game_state() -> void:
     network_disconnected = false
     disconnect_prompt_seq += 1
 
+
 func is_playing() -> bool:
-    return not is_spectator and current_game_id != ""
+    # L’état de partie est maintenant dans GameSession
+    return false
+
 
 func is_game_end() -> bool:
-    return result.size() > 0
+    # L’état de fin de partie est maintenant dans GameSession
+    return false
 
 # ============= SAFE ACCESSORS =============
 func get_card(card_id: String) -> Variant:
