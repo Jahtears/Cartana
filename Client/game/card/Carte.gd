@@ -1,4 +1,4 @@
-extends "res://game/base/CardElement.gd"
+extends "res://game/card/CardElement.gd"
 
 # ============= CONSTANTS =============
 const MIN_OVERLAP_AREA := 200.0
@@ -31,8 +31,7 @@ var _drag_started_frame := -1
 var _drag_canceled_frame := -1
 
 # ============= PREVIEW & SLOT =============
-var _current_preview_slot: Node2D = null
-var _current_preview_card: Node2D = null
+var preview: CardDropPreview = null
 var slot: Node2D = null
 var _slot_cache: Array = []
 var _slot_cache_valid := false
@@ -47,66 +46,31 @@ func _ready() -> void:
   _pointer_valid = true
   update_card()
 
+  # Injection automatique du CardDropPreview comme enfant caché
+  if preview == null:
+    preview = CardDropPreview.new()
+    add_child(preview)
+    # preview is a logic node, not a visual node; no need to hide
+
 func _process(_delta: float) -> void:
   if state == CardState.DRAG or state == CardState.PREVIEW_SLOT:
     global_position = _get_pointer_global_position() - drag_offset
 
     var frame = get_tree().get_frame()
     if frame - _last_preview_frame >= PREVIEW_CHECK_INTERVAL:
-      _preview_slot_under_card()
-      _preview_card_under_card()
+      preview.update_slot(self)
+      preview.update_card(self)
       _last_preview_frame = frame
   else:
     # ===== HOVER STATE MANAGEMENT =====
     _update_hover_state()
 
 # ============= PREVIEW CARD (VISUAL FEEDBACK) =============
-func _preview_card_under_card() -> void:
-  var card_rect = _get_card_rect_global()
-  var cards_group = get_tree().get_nodes_in_group("cards")
-  
-  var best_card: Node2D = null
-  var best_overlap := 0.0
-  
-  for card in cards_group:
-    if not (card is Node2D):
-      continue
-    if card == self:  # Ignore self
-      continue
-    if not is_instance_valid(card):
-      continue
-    if not card.has_method("_get_card_rect_global"):
-      continue
-    
-    var other_rect: Rect2 = card.call("_get_card_rect_global")
-    var intersection = _rect_intersection(card_rect, other_rect)
-    var overlap_area = intersection.get_area()
-    
-    if overlap_area > best_overlap:
-      best_overlap = overlap_area
-      best_card = card
-  
-  # Si overlap suffisant, on highlight
-  if best_overlap >= MIN_OVERLAP_AREA:
-    _set_preview_card(best_card)
-  else:
-    _set_preview_card(null)
+# Preview logic moved to CardDropPreview.gd
 
-func _set_preview_card(card: Node2D) -> void:
-  # Si c'est la même, rien à faire
-  if _current_preview_card == card:
-    return
-  
-  # Reset l'ancienne carte
-  if _current_preview_card != null and is_instance_valid(_current_preview_card):
-    _current_preview_card._reset_card_preview()
-  
-  # Set la nouvelle
-  _current_preview_card = card
-  if _current_preview_card != null and is_instance_valid(_current_preview_card):
-    _current_preview_card._highlight_card_preview()
 
 # ============= VISUAL METHODS =============
+# _highlight_card_preview and _reset_card_preview are called by CardDropPreview
 func _highlight_card_preview() -> void:
   """Applique un glow léger pendant le drag"""
   _set_border_glow($Front/Bord, true)
@@ -307,7 +271,7 @@ func _show_back() -> void:
 func _is_topmost_card_at_mouse() -> bool:
   var mouse_pos = _get_pointer_global_position()
   var cards_group = get_tree().get_nodes_in_group("cards")
-  var topmost := _pick_topmost_node_at_point(cards_group, mouse_pos)
+  var topmost := CardGeometry.pick_topmost_node_at_point(cards_group, mouse_pos)
   return topmost == self
 
 # ============= DRAG INPUT =============
@@ -350,8 +314,9 @@ func _start_drag(mouse_pos: Vector2, pointer_id: int = POINTER_ID_MOUSE) -> void
   _enter_drag_layer()
   set_state(CardElement.CardState.DRAG)
 
-  if _current_preview_slot != null:
-    _set_preview_slot(null)
+  # Reset preview slot if needed
+  if preview:
+    preview.update_slot(self, true)
 
 func _end_drag() -> void:
   if not _is_drag_in_progress():
@@ -361,31 +326,30 @@ func _end_drag() -> void:
   _active_pointer_id = POINTER_ID_NONE
   _drag_started_frame = -1
   
-  # Reset preview card
-  _set_preview_card(null)
-  # Recalculer une dernière fois le slot sous la carte au moment du release.
-  # Evite les drops ratés si PREVIEW_CHECK_INTERVAL n'a pas encore rafraichi.
-  _preview_slot_under_card(true)
+
+  # Reset preview card and slot using preview manager
+  if preview:
+    preview.update_card(self)
+    preview.update_slot(self, true)
 
   if not _can_interact():
     _rollback_drag()
     return
 
-  if _current_preview_slot == null:
-    _rollback_drag()
-    return
-
+  # Récupérer le slot cible via le preview manager
   var to_slot_id := ""
-  var target_slot := _current_preview_slot as Slot
-  if target_slot != null:
-    to_slot_id = target_slot.get_slot_id()
+  if preview and preview._current_preview_slot != null:
+    var target_slot := preview._current_preview_slot as Slot
+    if target_slot != null:
+      to_slot_id = target_slot.get_slot_id()
 
   if not _send_move_if_valid(to_slot_id):
     _rollback_drag()
     return
 
   set_state(CardElement.CardState.DROP)
-  _set_preview_slot(null)
+  if preview:
+    preview.update_slot(self, true)
 
 func _cancel_drag() -> void:
   if not _is_drag_in_progress():
@@ -410,11 +374,13 @@ func _rollback_drag() -> void:
   dragging = false
   _active_pointer_id = POINTER_ID_NONE
   _drag_started_frame = -1
-  _set_preview_card(null)  # ← Reset card preview aussi
+  if preview:
+    preview.update_card(self)
+    preview.update_slot(self, true)
   _leave_drag_layer_to_original()
   global_position = original_position
   set_state(CardElement.CardState.IDLE)
-  _set_preview_slot(null)
+  # preview slot reset is now handled by preview instance
 
 # ============= DRAG LAYER =============
 func _get_drag_root() -> Node:
@@ -469,163 +435,12 @@ func _leave_drag_layer_to_original() -> void:
   _slot_cache_valid = false
 
 # ============= PREVIEW SLOT =============
-func _preview_slot_under_card(ignore_topmost: bool = false) -> void:
-  # 🔥 Ne preview que si la carte est topmost sous la souris
-  if not ignore_topmost and not _is_topmost_card_at_mouse():
-    _set_preview_slot(null)
-    return
-
-  if not _slot_cache_valid:
-    _slot_cache = get_tree().get_nodes_in_group("slots")
-    _slot_cache_valid = true
-
-  var card_rect = _get_card_rect_global()
-  var best_slot: Node = null
-  var best_area := 0.0
-
-  for s in _slot_cache:
-    if s == null or not is_instance_valid(s):
-      continue
-    if not _is_drop_target_allowed(s):
-      continue
-
-    var slot_rect: Rect2
-    if s.has_method("get_cached_rect"):
-      slot_rect = s.call("get_cached_rect")
-    else:
-      if s is Node2D:
-        slot_rect = _rect_from_collision_shape_node(s as Node2D)
-      else:
-        slot_rect = Rect2()
-
-    if slot_rect.size == Vector2.ZERO:
-      continue
-
-    var inter = _rect_intersection(card_rect, slot_rect)
-    var area = inter.size.x * inter.size.y
-
-    if area > best_area:
-      best_area = area
-      best_slot = s
-
-  if best_area < MIN_OVERLAP_AREA:
-    best_slot = null
-
-  _set_preview_slot(best_slot)
-
-func _is_drop_target_allowed(slot_node: Node) -> bool:
-  if slot_node == null:
-    return false
-
-  var target_slot_id := ""
-  var target_slot := slot_node as Slot
-  if target_slot != null:
-    target_slot_id = target_slot.get_slot_id()
-
-  if target_slot_id == "":
-    return false
-
-  var parsed := SlotIdHelper.parse_slot_id(target_slot_id)
-  var slot_type := String(parsed.get("type", ""))
-  if slot_type == "DECK" or slot_type == "PILE":
-    return false
-
-  return true
-
-func _set_preview_slot(new_slot: Node) -> void:
-  if _current_preview_slot == new_slot:
-    return
-
-  if _current_preview_slot != null:
-    if _current_preview_slot.has_method("_set_preview"):
-      _current_preview_slot.call("_set_preview", false)
-    elif _current_preview_slot.has_method("on_card_exit_preview"):
-      _current_preview_slot.call("on_card_exit_preview")
-
-  _current_preview_slot = new_slot
-
-  if _current_preview_slot != null:
-    if _current_preview_slot.has_method("_set_preview"):
-      _current_preview_slot.call("_set_preview", true)
-    elif _current_preview_slot.has_method("on_card_enter_preview"):
-      _current_preview_slot.call("on_card_enter_preview")
-
-    set_state(CardElement.CardState.PREVIEW_SLOT if new_slot != null else CardElement.CardState.DRAG)
+# Preview slot logic moved to CardDropPreview.gd
 
 # ============= GEOMETRY =============
-func _get_card_rect_global() -> Rect2:
-  var size := Vector2(80, 120)
-  var shape = $Area2D/CollisionShape2D.shape
-  if shape is RectangleShape2D:
-    size = (shape as RectangleShape2D).size
-  return Rect2(global_position - size * 0.5, size)
 
-func _rect_intersection(a: Rect2, b: Rect2) -> Rect2:
-  var x1 = maxf(a.position.x, b.position.x)
-  var y1 = maxf(a.position.y, b.position.y)
-  var x2 = minf(a.position.x + a.size.x, b.position.x + b.size.x)
-  var y2 = minf(a.position.y + a.size.y, b.position.y + b.size.y)
+# Utilitaires géométriques extraits dans CardGeometry.gd
 
-  var w = x2 - x1
-  var h = y2 - y1
-  if w <= 0.0 or h <= 0.0:
-    return Rect2()
-
-  return Rect2(Vector2(x1, y1), Vector2(w, h))
-
-func _rect_from_collision_shape_node(node: Node2D) -> Rect2:
-  if node == null:
-    return Rect2()
-
-  var shape_node := node.get_node_or_null("CollisionShape2D") as CollisionShape2D
-  if shape_node == null:
-    shape_node = node.find_child("CollisionShape2D", true, false) as CollisionShape2D
-  if shape_node == null:
-    return Rect2()
-
-  var shape := shape_node.shape
-  if shape is RectangleShape2D:
-    var size := (shape as RectangleShape2D).size
-    var shape_scale := shape_node.global_transform.get_scale()
-    var scaled := Vector2(size.x * absf(shape_scale.x), size.y * absf(shape_scale.y))
-    return Rect2(shape_node.global_position - scaled * 0.5, scaled)
-
-  return Rect2()
-
-func _contains_global_point(node: Node2D, global_point: Vector2) -> bool:
-  var rect := _rect_from_collision_shape_node(node)
-  if rect.size == Vector2.ZERO:
-    return false
-  return rect.has_point(global_point)
-
-func _pick_topmost_node_at_point(candidates: Array, global_point: Vector2) -> Node2D:
-  var best: Node2D = null
-  var best_z := -2147483648
-  var best_order := -2147483648
-
-  for item in candidates:
-    if not (item is Node2D):
-      continue
-    var node := item as Node2D
-    if not is_instance_valid(node):
-      continue
-    if not _contains_global_point(node, global_point):
-      continue
-
-    var node_z := node.z_index
-    var node_order := node.get_index()
-    if best == null:
-      best = node
-      best_z = node_z
-      best_order = node_order
-      continue
-
-    if node_z > best_z or (node_z == best_z and node_order > best_order):
-      best = node
-      best_z = node_z
-      best_order = node_order
-
-  return best
 
 # ============= NETWORK =============
 func get_card_id() -> String:

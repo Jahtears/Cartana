@@ -79,7 +79,7 @@ func _ready() -> void:
     board_factory = preload("res://game/factories/BoardFactory.gd").new()
     board_factory.setup(slot_scene, slots_by_id, START_POS)
 
-    _card_ctx = preload("res://game/types/CardContext.gd").new(cards, card_scene, slots_by_id, self)
+    _card_ctx = preload("res://game/card/CardContext.gd").new(cards, card_scene, slots_by_id, self)
 
     var layout_manager: GameLayoutManager = preload("res://game/managers/GameLayoutManager.gd").new()
     layout_manager.setup(self, {
