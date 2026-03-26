@@ -1,5 +1,4 @@
 // net/transport.js v3.0 - Transport et réponses
-// Le heartbeat est maintenant centralisé dans heartbeat.js
 import { POPUP_MESSAGE } from '../shared/popupMessages.js';
 
 /**
