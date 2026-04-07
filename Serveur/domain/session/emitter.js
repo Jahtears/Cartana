@@ -21,7 +21,7 @@ function isSocketOpen(ws) {
 
 function isRematchAllowedForPlayer(
   game,
-  gameId,
+  game_id,
   meta,
   wsByUser,
   userToGame,
@@ -38,12 +38,12 @@ function isRematchAllowedForPlayer(
   const inSameGame = Boolean(
     userToGame &&
     typeof userToGame.get === 'function' &&
-    String(userToGame.get(opponent) ?? '') === String(gameId ?? ''),
+    String(userToGame.get(opponent) ?? '') === String(game_id ?? ''),
   );
   const inSameEndGame = Boolean(
     userToEndGame &&
     typeof userToEndGame.get === 'function' &&
-    String(userToEndGame.get(opponent) ?? '') === String(gameId ?? ''),
+    String(userToEndGame.get(opponent) ?? '') === String(game_id ?? ''),
   );
   if (!inSameGame && !inSameEndGame) {
     return false;

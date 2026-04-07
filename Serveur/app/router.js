@@ -70,8 +70,6 @@ export function createRouter({
   handleAckGameEnd,
   handleGetLeaderboard,
 
-  // metrics (optional)
-  metrics,
 }) {
   const ridStateByWs = new WeakMap();
 
@@ -149,11 +147,11 @@ export function createRouter({
 
       //  Routes mapping (handlers externes)
       const routes = {
-        ping: async () => {
+        ping: () => {
           sendResWithRidCache(ws, req, true, { server_ms: Date.now() });
         },
 
-        get_players: async () => {
+        get_players: () => {
           ctx.trace?.('get_players');
           sendResWithRidCache(ws, req, true, {
             players: ctx.playersList?.() ?? [],
@@ -162,15 +160,15 @@ export function createRouter({
           });
         },
 
-        logout: async () => handleLogout(ctx, ws, req, data, actor),
-        invite: async () => handleInvite(ctx, ws, req, data, actor),
-        invite_response: async () => handleInviteResponse(ctx, ws, req, data, actor),
-        join_game: async () => handleJoinGame(ctx, ws, req, data, actor),
-        spectate_game: async () => handleSpectateGame(ctx, ws, req, data, actor),
-        move_request: async () => handleMoveRequest(ctx, ws, req, data, actor),
-        leave_game: async () => handleLeaveGame(ctx, ws, req, data, actor),
-        ack_game_end: async () => handleAckGameEnd(ctx, ws, req, data, actor),
-        get_leaderboard: async () => handleGetLeaderboard(ctx, ws, req, data, actor),
+        logout: () => handleLogout(ctx, ws, req, data, actor),
+        invite: () => handleInvite(ctx, ws, req, data, actor),
+        invite_response: () => handleInviteResponse(ctx, ws, req, data, actor),
+        join_game: () => handleJoinGame(ctx, ws, req, data, actor),
+        spectate_game: () => handleSpectateGame(ctx, ws, req, data, actor),
+        move_request: () => handleMoveRequest(ctx, ws, req, data, actor),
+        leave_game: () => handleLeaveGame(ctx, ws, req, data, actor),
+        ack_game_end: () => handleAckGameEnd(ctx, ws, req, data, actor),
+        get_leaderboard: () => handleGetLeaderboard(ctx, ws, req, data, actor),
       };
 
       const fn = routes[req.type];

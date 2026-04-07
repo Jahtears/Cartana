@@ -75,7 +75,7 @@ export function getGameIdFromDataOrMapping(
     }
 
     // si le client envoie une clé "proche" non autorisée, on renvoie une erreur explicite
-    // (évite silence si data contient gameId au lieu de game_id)
+    // (évite un silence si le client envoie une variante camelCase au lieu de game_id)
     const norm = (s) => String(s).toLowerCase().replace(/_/g, '');
     const expected = norm(key);
     const dataKeys = data && typeof data === 'object' ? Object.keys(data) : [];
@@ -83,7 +83,7 @@ export function getGameIdFromDataOrMapping(
       if (allowedKeys.includes(k)) {
         continue;
       }
-      // détecte gameId vs game_id (ou autres variantes équivalentes)
+      // détecte les variantes équivalentes (camelCase, underscores, etc.)
       if (norm(k) === expected) {
         resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_REQUEST, {
           field: k,

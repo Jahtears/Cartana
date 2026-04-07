@@ -1,4 +1,4 @@
-// server.js v3.0 - Refactorisé avec hearbeat + monitoring centralisés
+// server.js v3.0 - Refactorise avec heartbeat centralise
 
 import { WebSocketServer } from 'ws';
 import http from 'http';
@@ -22,7 +22,6 @@ import { createWSManager } from '../net/wsManager.js';
 
 // ============= IMPORTS NETWORK =============
 import { stopHeartbeatManager } from '../net/heartbeat.js';
-import { metrics, createMetricsMiddleware } from '../net/monitoring.js';
 
 const DEBUG_TRACE_ENABLED = process.env.DEBUG_TRACE === '1';
 const SERVER_MODE = String(process.env.SERVER_MODE ?? 'tls_direct')
@@ -43,20 +42,11 @@ let wsManager = null;
 // 1️⃣ Créer le contexte (état + helpers)
 const { baseCtx, loginCtx, onSocketClose } = createServerContext({
   onTransportSend: (ws) => {
-    metrics.recordMessageSent();
     wsManager?.markActivity(ws, 'outbound');
   },
 });
 
 function requestHandler(req, res) {
-  // Health check + Metrics endpoint
-  if (req.method === 'GET' && req.url === '/metrics') {
-    const snapshot = metrics.getSnapshot();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(snapshot, null, 2));
-    return;
-  }
-
   // Health check simple
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -111,28 +101,20 @@ const router = createRouter({
   handleLeaveGame,
   handleAckGameEnd,
   handleGetLeaderboard,
-  metrics, // Passer les métriques au router
 });
 
 // ============= WEBSOCKET EVENTS =============
 
-wss.on('connection', async (ws) => {
+wss.on('connection', (ws) => {
   console.log(' Client connecté');
-  metrics.recordConnection();
 
   // Init heartbeat + meta
   wsManager.initClient(ws);
 
-  // Wrapper le onMessage avec metrics
-  const onMessageWithMetrics = createMetricsMiddleware(
-    (ws, msg) => router.onMessage(ws, msg),
-    metrics,
-  );
-
   ws.on('message', async (msg) => {
     try {
       wsManager.markActivity(ws, 'inbound');
-      await onMessageWithMetrics(ws, msg.toString());
+      await router.onMessage(ws, msg.toString());
     } catch (err) {
       console.error('[MESSAGE_ERROR]', err);
     }
@@ -140,7 +122,6 @@ wss.on('connection', async (ws) => {
 
   ws.on('close', () => {
     console.log('❌ Client déconnecté');
-    metrics.recordDisconnection();
     wsManager.unregisterClient(ws);
     onSocketClose(ws);
   });
@@ -196,12 +177,10 @@ transportServer.listen(PORT, HOST, () => {
   if (BACKEND_HTTP_MODE) {
     console.log(`🚀 Backend listening on http://${HOST}:${PORT}`);
     console.log(`🔌 Internal WebSocket endpoint ws://${HOST}:${PORT}`);
-    console.log(`📊 Internal metrics at http://${HOST}:${PORT}/metrics`);
     console.log(`❤️ Internal health at http://${HOST}:${PORT}/health`);
   } else {
     console.log(`🚀 Server listening on https://${HOST}:${PORT}`);
     console.log(`🔌 WebSocket endpoint wss://${HOST}:${PORT}`);
-    console.log(`📊 Metrics available at https://${HOST}:${PORT}/metrics`);
     console.log(`❤️ Health check at https://${HOST}:${PORT}/health`);
   }
   if (DEBUG_TRACE_ENABLED || process.env.GAME_DEBUG === '1') {

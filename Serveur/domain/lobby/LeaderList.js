@@ -33,9 +33,9 @@ function normalizeLeaderboard(raw) {
     if (!isSafeUsername(username)) {
       continue;
     }
-    /* eslint-disable security/detect-object-injection */
+     
     normalized[username] = normalizeLeaderboardEntry(stats);
-    /* eslint-enable security/detect-object-injection */
+     
   }
 
   return normalized;
@@ -78,14 +78,14 @@ function ensurePlayerStats(board, username) {
     return { wins: 0, losses: 0, draws: 0 };
   }
 
-  /* eslint-disable security/detect-object-injection */
+   
   if (!board[username]) {
     board[username] = { wins: 0, losses: 0, draws: 0 };
   } else {
     board[username] = normalizeLeaderboardEntry(board[username]);
   }
   const out = board[username];
-  /* eslint-enable security/detect-object-injection */
+   
   return out;
 }
 

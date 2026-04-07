@@ -19,7 +19,7 @@ import { technicalDenied } from '../../helpers/deniedHelpers.js';
  */
 export function orchestrateMove(params) {
   const {
-    game_id: gameId,
+    game_id,
     game,
     actor,
     card_id: cardId,
@@ -107,7 +107,7 @@ export function orchestrateMove(params) {
   if (shouldFlushBeforeTurnSwitch) {
     const tableSlots = getTableSlots(game);
     withGameUpdate(
-      gameId,
+      game_id,
       (fx) => {
         if (moveResult.createdTableSlotId) {
           fx.syncTable(tableSlots);
@@ -165,7 +165,7 @@ export function orchestrateMove(params) {
   const fromExists = game?.slots instanceof Map && game.slots.has(fromSlotId);
 
   withGameUpdate(
-    gameId,
+    game_id,
     (fx) => {
       if (recycled?.recycledSlots?.length) {
         const freshTableSlots = getTableSlots(game);

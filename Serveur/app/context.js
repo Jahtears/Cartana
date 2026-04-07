@@ -151,13 +151,13 @@ export function createServerContext({ onTransportSend } = {}) {
     fl.flush();
   }
 
-  function processTurnTimeout(gameId, now = Date.now()) {
-    const game = state.games.get(gameId);
+  function processTurnTimeout(game_id, now = Date.now()) {
+    const game = state.games.get(game_id);
     if (!game?.turn) {
       return false;
     }
 
-    const meta = state.gameMeta.get(gameId);
+    const meta = state.gameMeta.get(game_id);
     if (game.turn.paused || meta?.result) {
       return false;
     }
@@ -172,7 +172,7 @@ export function createServerContext({ onTransportSend } = {}) {
     const endGamePatch = timeoutResult.endGamePatch;
     const pileSlotId = SlotId.create(0, SLOT_TYPES.PILE, 1);
 
-    withGameUpdate(gameId, (fx) => {
+    withGameUpdate(game_id, (fx) => {
       const recycledSlots = timeoutResult.recycled?.recycledSlots;
       if (
         timeoutResult.tableSyncNeeded ||
@@ -217,10 +217,10 @@ export function createServerContext({ onTransportSend } = {}) {
       }
     });
 
-    saveGameState(gameId, game);
+    saveGameState(game_id, game);
     if (endGamePatch) {
-      emitGameEndOnce(gameId, endGamePatch);
-      emitSnapshotsToAudience(gameId, { reason: 'game_end' });
+      emitGameEndOnce(game_id, endGamePatch);
+      emitSnapshotsToAudience(game_id, { reason: 'game_end' });
     }
     return timeoutResult;
   }

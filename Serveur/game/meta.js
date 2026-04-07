@@ -2,8 +2,8 @@ import { GAME_END_REASONS, normalizeGameEndReason } from './constants/gameEnd.js
 
 // meta.js
 
-export function ensureGameMeta(gameMeta, gameId, { initialSent } = {}) {
-  let meta = gameMeta.get(gameId);
+export function ensureGameMeta(gameMeta, game_id, { initialSent } = {}) {
+  let meta = gameMeta.get(game_id);
 
   if (!meta || typeof meta !== 'object') {
     meta = {};
@@ -33,7 +33,7 @@ export function ensureGameMeta(gameMeta, gameId, { initialSent } = {}) {
     meta.result = null;
   }
 
-  gameMeta.set(gameId, meta);
+  gameMeta.set(game_id, meta);
   return meta;
 }
 
