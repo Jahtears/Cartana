@@ -5,14 +5,12 @@ import Database from 'better-sqlite3';
 let DB_PATH = process.env.DB_PATH || './app/saves/cartana.db';
 let db = null;
 
- 
 function ensureDbDir() {
   const dir = path.dirname(DB_PATH);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 }
- 
 
 function initDb() {
   if (db) return db;

@@ -1,6 +1,6 @@
 // handlers/login.js v2.1
 import { resError } from '../../net/transport.js';
-import { POPUP_MESSAGE } from '../../shared/popupMessages.js';
+import { POPUP } from '../../shared/messages.js';
 
 const LOGIN_RATE_MAX_ATTEMPTS = parsePositiveInt(process.env.LOGIN_RATE_MAX_ATTEMPTS, 5);
 const LOGIN_RATE_WINDOW_MS = parsePositiveInt(process.env.LOGIN_RATE_WINDOW_MS, 60_000);
@@ -113,7 +113,7 @@ function buildMaxTryError(retryAfterMs) {
   const safeMs = Math.max(0, Number(retryAfterMs) || 0);
   const retryAfterS = retryAfterSeconds(safeMs);
   return {
-    message_code: POPUP_MESSAGE.AUTH_MAX_TRY,
+    message_code: POPUP.AUTH_MAX_TRY,
     message_params: { retry_after_s: retryAfterS },
     details: { retry_after_ms: safeMs },
   };
@@ -164,7 +164,7 @@ export async function handleLogin(ctx, ws, req, data) {
   const rateLimitKeys = buildLoginRateKeys(ws, username);
 
   if (!username || !pin) {
-    resError(sendRes, ws, req, POPUP_MESSAGE.AUTH_MISSING_CREDENTIALS);
+    resError(sendRes, ws, req, POPUP.AUTH_MISSING);
     return true;
   }
 
@@ -182,7 +182,7 @@ export async function handleLogin(ctx, ws, req, data) {
         sendRes(ws, req, false, buildMaxTryError(blockedForMs));
       } else {
         sendRes(ws, req, false, {
-          message_code: POPUP_MESSAGE.AUTH_BAD_PIN,
+          message_code: POPUP.AUTH_BAD_PIN,
         });
       }
       return true;
@@ -199,7 +199,7 @@ export async function handleLogin(ctx, ws, req, data) {
 
     if (state.getWS(username)) {
       sendRes(ws, req, false, {
-        message_code: POPUP_MESSAGE.AUTH_ALREADY_CONNECTED,
+        message_code: POPUP.AUTH_ALREADY,
       });
       return true;
     }
@@ -229,7 +229,7 @@ export async function handleLogin(ctx, ws, req, data) {
     return true;
   } catch (err) {
     console.error('Erreur login:', err);
-    resError(sendRes, ws, req, POPUP_MESSAGE.TECH_INTERNAL_ERROR);
+    resError(sendRes, ws, req, POPUP.INTERNAL_ERROR);
     return true;
   }
 }

@@ -3,202 +3,115 @@ import { refillHandIfEmpty } from '../helpers/pileFlowHelpers.js';
 import { slotTopHasAce, slotAnyHasAce } from '../state/cardStore.js';
 import { hasCardInSlot, getSlotStack } from '../state/slotStore.js';
 import { getSlotValidator } from './slotValidators.js';
-import { debugLog } from '../helpers/debugHelpers.js';
-import { deniedTracePayload, technicalDenied, userDenied } from '../helpers/deniedHelpers.js';
+
+// ── Helpers inline ──────────────────────────────────────────────────────────
+
+const DEBUG = process.env.DEBUG_TRACE === '1' || process.env.GAME_DEBUG === '1';
+const log = (...a) => DEBUG && console.log(...a);
+
+const user = (code, params) => ({
+  valid: false,
+  kind: 'user',
+  code,
+  ...(params && Object.keys(params).length && { params }),
+});
+const tech = (reason) => ({ valid: false, kind: 'technical', debug_reason: reason });
+
+// ── Règles globales ─────────────────────────────────────────────────────────
 
 function hasWonByEmptyDeckSlot(game, player) {
-  if (!player || !game) {
-    return false;
-  }
-
-  const playerArrayIndex = game.players.indexOf(player);
-  if (playerArrayIndex === -1) {
-    return false;
-  }
-
-  const playerIndex = playerArrayIndex + 1;
-  const deckSlot = SlotId.create(playerIndex, SLOT_TYPES.DECK, 1);
-  const deckStack = getSlotStack(game, deckSlot);
-
-  return deckStack.length === 0;
+  if (!player || !game) return false;
+  const idx = game.players.indexOf(player);
+  if (idx === -1) return false;
+  const deck = SlotId.create(idx + 1, SLOT_TYPES.DECK, 1);
+  return getSlotStack(game, deck).length === 0;
 }
 
 function hasLoseByEmptyPileSlot(game, player) {
-  if (!game) {
-    return false;
-  }
-  if (player && !game.players.includes(player)) {
-    return false;
-  }
-
-  const pileSlot = SlotId.create(0, SLOT_TYPES.PILE, 1);
-  const pileStack = getSlotStack(game, pileSlot);
-
-  return pileStack.length === 0;
+  if (!game) return false;
+  if (player && !game.players.includes(player)) return false;
+  return getSlotStack(game, SlotId.create(0, SLOT_TYPES.PILE, 1)).length === 0;
 }
 
-function ruleCardMustBeInFromSlot(game, player, card, fromSlotId, toSlotId) {
-  if (!card || !card.id) {
-    return technicalDenied('card_unknown');
-  }
+function ruleCardMustBeInFromSlot(game, _p, card, fromSlotId) {
+  if (!card?.id) return tech('card_unknown');
   if (!hasCardInSlot(game, fromSlotId, card.id)) {
-    // Debug helper: log effective slot state.
-    const slotContent = getSlotStack(game, fromSlotId);
-    const allSlots =
-      game?.slots instanceof Map ? Array.from(game.slots.keys()).map((k) => k.toString()) : [];
-    debugLog('[RULES] DEBUG slotContent', {
+    log('[RULES] source_slot_missing_card', {
       from_slot: fromSlotId,
-      requested_card_id: card.id,
-      slot_content: slotContent,
-      slot_is_empty: !slotContent || (Array.isArray(slotContent) && slotContent.length === 0),
-      card_in_game: Boolean(card),
-      all_slots: allSlots,
+      card_id: card.id,
+      slot_content: getSlotStack(game, fromSlotId),
     });
-    return technicalDenied('source_slot_missing_card');
+    return tech('source_slot_missing_card');
   }
   return { valid: true };
 }
 
-function ruleFromMustBeClientPlayableSource(game, player, card, fromSlotId, toSlotId) {
-  if (
-    fromSlotId.type === SLOT_TYPES.HAND ||
-    fromSlotId.type === SLOT_TYPES.DECK ||
-    fromSlotId.type === SLOT_TYPES.BENCH
-  ) {
+function ruleFromMustBeClientPlayableSource(_g, _p, _c, fromSlotId) {
+  const t = fromSlotId.type;
+  if (t === SLOT_TYPES.HAND || t === SLOT_TYPES.DECK || t === SLOT_TYPES.BENCH)
     return { valid: true };
-  }
-
-  if (fromSlotId.type === SLOT_TYPES.PILE || fromSlotId.type === SLOT_TYPES.TABLE) {
-    return technicalDenied('source_shared_forbidden');
-  }
-
-  return technicalDenied('invalid_from_slot_type');
+  if (t === SLOT_TYPES.PILE || t === SLOT_TYPES.TABLE) return tech('source_shared_forbidden');
+  return tech('invalid_from_slot_type');
 }
 
-function ruleFromAndToMustDiffer(game, player, card, fromSlotId, toSlotId) {
-  if (String(fromSlotId) === String(toSlotId)) {
-    return technicalDenied('same_slot_forbidden');
-  }
-  return { valid: true };
+function ruleFromAndToMustDiffer(_g, _p, _c, fromSlotId, toSlotId) {
+  return String(fromSlotId) === String(toSlotId) ? tech('same_slot_forbidden') : { valid: true };
 }
 
-function ruleTopOnlyForDeckAndBenchSource(game, player, card, fromSlotId, toSlotId) {
-  if (fromSlotId.type !== SLOT_TYPES.DECK && fromSlotId.type !== SLOT_TYPES.BENCH) {
+function ruleTopOnlyForDeckAndBenchSource(game, _p, card, fromSlotId) {
+  if (fromSlotId.type !== SLOT_TYPES.DECK && fromSlotId.type !== SLOT_TYPES.BENCH)
     return { valid: true };
-  }
+  const stack = getSlotStack(game, fromSlotId);
+  const top = stack.length ? stack[stack.length - 1] : null;
+  return top && top === card.id ? { valid: true } : tech('source_card_not_top');
+}
 
-  const sourceStack = getSlotStack(game, fromSlotId);
-  const topCardId = sourceStack.length ? sourceStack[sourceStack.length - 1] : null;
-
-  if (!topCardId || topCardId !== card.id) {
-    return technicalDenied('source_card_not_top');
-  }
-
+function ruleNotOnOpponentSide(game, player, _c, fromSlotId, toSlotId) {
+  if (fromSlotId.player === 0 || toSlotId.player === 0) return { valid: true };
+  const pi = player === game.players[0] ? 1 : player === game.players[1] ? 2 : null;
+  if (pi === null) return tech('unknown_player');
+  if (fromSlotId.player && fromSlotId.player !== 0 && fromSlotId.player !== pi)
+    return user('RULE_OPPONENT_SLOT_FORBIDDEN');
+  if (toSlotId.player && toSlotId.player !== 0 && toSlotId.player !== pi)
+    return user('RULE_OPPONENT_SLOT_FORBIDDEN');
   return { valid: true };
 }
 
-function ruleNotOnOpponentSide(game, player, card, fromSlotId, toSlotId) {
-  const fromPlayer = fromSlotId.player;
-  const toPlayer = toSlotId.player;
-  if (fromPlayer === 0 || toPlayer === 0) {
-    return { valid: true };
-  }
+function ruleDeckMustPlayOnTable(_g, _p, _c, fromSlotId, toSlotId) {
+  return fromSlotId.type === SLOT_TYPES.DECK && toSlotId.type !== SLOT_TYPES.TABLE
+    ? user('RULE_DECK_TO_TABLE')
+    : { valid: true };
+}
 
-  // Resolve current player index (1 or 2).
-  const playerIndex = player === game.players[0] ? 1 : player === game.players[1] ? 2 : null;
+function ruleIsPlayersTurn(game, player) {
+  if (!game?.turn?.current) return { valid: true };
+  return game.turn.current !== player ? user('RULE_NOT_YOUR_TURN') : { valid: true };
+}
 
-  if (playerIndex === null) {
-    return technicalDenied('unknown_player');
-  }
+function ruleBenchMustPlayOnTable(_g, _p, _c, fromSlotId, toSlotId) {
+  return fromSlotId.type === SLOT_TYPES.BENCH && toSlotId.type !== SLOT_TYPES.TABLE
+    ? user('RULE_BENCH_TO_TABLE')
+    : { valid: true };
+}
 
-  // Source slot cannot be opponent-owned.
-  if (fromPlayer !== null && fromPlayer !== 0 && fromPlayer !== playerIndex) {
-    return userDenied('RULE_OPPONENT_SLOT_FORBIDDEN');
-  }
-
-  // Target slot cannot be opponent-owned.
-  if (toPlayer !== null && toPlayer !== 0 && toPlayer !== playerIndex) {
-    return userDenied('RULE_OPPONENT_SLOT_FORBIDDEN');
-  }
-
+function ruleAceMustBePlayed(game, player, _c, _from, toSlotId) {
+  if (toSlotId.type !== SLOT_TYPES.BENCH) return { valid: true };
+  const pi = game.players.indexOf(player);
+  if (pi === -1) return tech('unknown_player');
+  const si = pi + 1;
+  if (slotTopHasAce(game, SlotId.create(si, SLOT_TYPES.DECK, 1))) return user('RULE_ACE_ON_DECK');
+  if (slotAnyHasAce(game, SlotId.create(si, SLOT_TYPES.HAND, 1))) return user('RULE_ACE_IN_HAND');
   return { valid: true };
 }
 
-function ruleDeckMustPlayOnTable(game, player, card, fromSlotId, toSlotId) {
-  const fromIsDeck = fromSlotId.type === SLOT_TYPES.DECK;
-  const toIsTable = toSlotId.type === SLOT_TYPES.TABLE;
-
-  if (fromIsDeck && !toIsTable) {
-    return userDenied('RULE_DECK_TO_TABLE');
-  }
-  return { valid: true };
-}
-
-// Turn system: only current player can play.
-function ruleIsPlayersTurn(game, player, card, fromSlotId, toSlotId) {
-  if (!game || !game.turn || !game.turn.current) {
-    return { valid: true };
-  }
-  if (game.turn.current !== player) {
-    return userDenied('RULE_NOT_YOUR_TURN');
-  }
-  return { valid: true };
-}
-
-function ruleBenchMustPlayOnTable(game, player, card, fromSlotId, toSlotId) {
-  // BENCH can only play to TABLE.
-  const fromIsBench = fromSlotId.type === SLOT_TYPES.BENCH;
-  const toIsTable = toSlotId.type === SLOT_TYPES.TABLE;
-
-  if (fromIsBench && !toIsTable) {
-    return userDenied('RULE_BENCH_TO_TABLE');
-  }
-  return { valid: true };
-}
-
-// If an Ace is on top (deck) or in hand, BENCH play is blocked.
-function ruleAceMustBePlayed(game, player, card, fromSlotId, toSlotId) {
-  if (toSlotId.type !== SLOT_TYPES.BENCH) {
-    return { valid: true };
-  }
-
-  const playerIndex = game.players.indexOf(player);
-  if (playerIndex === -1) {
-    return technicalDenied('unknown_player');
-  }
-
-  // Convert array index (0/1) to slot player index (1/2).
-  const slotPlayerIndex = playerIndex + 1;
-
-  // 1) Ace on top of deck
-  const deckSlot = SlotId.create(slotPlayerIndex, SLOT_TYPES.DECK, 1);
-  if (slotTopHasAce(game, deckSlot)) {
-    return userDenied('RULE_ACE_ON_DECK');
-  }
-
-  // 2) Ace anywhere in hand
-  const handSlot = SlotId.create(slotPlayerIndex, SLOT_TYPES.HAND, 1);
-  if (slotAnyHasAce(game, handSlot)) {
-    return userDenied('RULE_ACE_IN_HAND');
-  }
-
-  return { valid: true };
-}
-
-/* =========================
-   SINGLE ENTRY POINT
-========================= */
+// ── Point d'entrée unique ────────────────────────────────────────────────────
 
 function validateMove(game, player, card, fromSlotId, toSlotId) {
-  if (!card) {
-    debugLog('[RULES] Carte inconnue', { player, from_slot_id: fromSlotId, to_slot_id: toSlotId });
-    return technicalDenied('card_unknown');
-  }
-  if (!(fromSlotId instanceof SlotId) || !(toSlotId instanceof SlotId)) {
-    return technicalDenied('slot_id_not_canonical');
-  }
+  if (!card) return tech('card_unknown');
+  if (!(fromSlotId instanceof SlotId) || !(toSlotId instanceof SlotId))
+    return tech('slot_id_not_canonical');
 
-  const globalRules = [
+  const rules = [
     ruleFromMustBeClientPlayableSource,
     ruleFromAndToMustDiffer,
     ruleCardMustBeInFromSlot,
@@ -210,47 +123,31 @@ function validateMove(game, player, card, fromSlotId, toSlotId) {
     ruleAceMustBePlayed,
   ];
 
-  for (const rule of globalRules) {
-    const result = rule(game, player, card, fromSlotId, toSlotId);
-    if (!result.valid) {
-      debugLog('[RULES] RULE_MOVE_DENIED', {
+  for (const rule of rules) {
+    const r = rule(game, player, card, fromSlotId, toSlotId);
+    if (!r.valid) {
+      log('[RULES] DENIED', {
         player,
         card_id: card.id,
-        from_slot_id: fromSlotId,
-        to_slot_id: toSlotId,
-        ...deniedTracePayload(result),
+        from: String(fromSlotId),
+        to: String(toSlotId),
+        kind: r.kind,
+        code: r.code ?? r.debug_reason,
       });
-      return result;
+      return r;
     }
   }
 
-  // Slot-specific validation
   const validator = getSlotValidator(toSlotId);
+  if (!validator) return tech('slot_validator_missing');
 
-  if (!validator) {
-    debugLog('[RULES] WARNING Aucun validateur pour', toSlotId);
-    return technicalDenied('slot_validator_missing');
+  const sr = validator(game, card, fromSlotId, toSlotId);
+  if (!sr.valid) {
+    log('[RULES] DENIED_SLOT', { player, card_id: card.id, to: String(toSlotId) });
+    return sr;
   }
 
-  const slotResult = validator(game, card, fromSlotId, toSlotId);
-  if (!slotResult.valid) {
-    debugLog('[RULES] MOVE_DENIED_SLOT', {
-      player,
-      card_id: card.id,
-      from_slot_id: fromSlotId,
-      to_slot_id: toSlotId,
-      ...deniedTracePayload(slotResult),
-    });
-    return slotResult;
-  }
-
-  debugLog('[RULES] RULE_OK', {
-    player,
-    card_id: card.id,
-    from_slot_id: fromSlotId,
-    to_slot_id: toSlotId,
-  });
-
+  log('[RULES] OK', { player, card_id: card.id, from: String(fromSlotId), to: String(toSlotId) });
   return { valid: true };
 }
 

@@ -11,7 +11,9 @@ import {
   putCardtoHandFromPile,
   getHandSize,
 } from '../state/slotStore.js';
-import { debugLog } from './debugHelpers.js';
+
+const DEBUG = process.env.DEBUG_TRACE === '1';
+const log = (...a) => DEBUG && console.log(...a);
 
 function refillEmptyHandSlotsFromPile(game, player, maxCards = DEFAULT_HAND_SIZE) {
   if (!game || !Array.isArray(game.players)) {
@@ -99,7 +101,7 @@ function recycleFullTableSlotsToPile(game) {
       recycledSlots.push(slotId);
     }
 
-    debugLog('[PILE] RECYCLE_TABLE_TO_PILE', {
+    log('[PILE] RECYCLE_TABLE_TO_PILE', {
       slotId,
       count: ids.length,
       pileLength: pile.length,

@@ -1,7 +1,6 @@
 import { SLOT_TYPES, SlotId } from '../../constants/slots.js';
 import { DEFAULT_HAND_SIZE } from '../../constants/turnFlow.js';
 import { GAME_END_REASONS } from '../../constants/gameEnd.js';
-import { technicalDenied } from '../../helpers/deniedHelpers.js';
 
 /**
  * Orchestrate a complete move: validate -> apply -> refill -> track updates -> check win.
@@ -52,12 +51,6 @@ export function orchestrateMove(params) {
   // 1) FIND CARD
   // ========================
   const card = getCardById(game, cardId);
-  if (!card) {
-    return technicalDenied('card_not_found');
-  }
-  if (!(fromSlotId instanceof SlotId) || !(toSlotId instanceof SlotId)) {
-    return technicalDenied('slot_id_not_canonical');
-  }
 
   // ========================
   // 2) VALIDATE MOVE
@@ -67,16 +60,12 @@ export function orchestrateMove(params) {
     if (validation && typeof validation === 'object') {
       return validation;
     }
-    return technicalDenied('validate_move_denied');
   }
 
   // ========================
   // 3) APPLY MOVE
   // ========================
   const moveResult = applyMove(game, card, fromSlotId, toSlotId, actor);
-  if (!moveResult) {
-    return technicalDenied('apply_move_rejected');
-  }
 
   // ========================
   // 4) DETERMINE IF BENCH PLAY (ends turn)

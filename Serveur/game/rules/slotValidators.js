@@ -1,25 +1,21 @@
 import { SlotId, SLOT_TYPES } from '../constants/slots.js';
 import { getSlotStack } from '../state/slotStore.js';
-import { debugLog } from '../helpers/debugHelpers.js';
-import { technicalDenied, userDenied } from '../helpers/deniedHelpers.js';
 
-/**
- * Validate placement on Table slot
- * Rules: empty=[A,R], count=1=[2,R], count=2=[3,R], ... count=9=[10,R], count=10=[D]
- */
-export function validateTableSlot(game, card, fromSlotId, toSlotId) {
-  if (!(toSlotId instanceof SlotId)) {
-    return technicalDenied('slot_id_not_canonical');
-  }
+const DEBUG = process.env.DEBUG_TRACE === '1';
+const log = (...a) => DEBUG && console.log(...a);
 
-  if (!(game?.slots instanceof Map) || !game.slots.has(toSlotId)) {
-    return technicalDenied('table_slot_not_found');
-  }
+const user = (code) => ({ valid: false, kind: 'user', code });
+const tech = (reason) => ({ valid: false, kind: 'technical', debug_reason: reason });
+const staticDeny = (code) => () => user(code);
 
-  const slot = getSlotStack(game, toSlotId);
-  const count = slot.length;
+export function validateTableSlot(game, card, _from, toSlotId) {
+  if (!(toSlotId instanceof SlotId)) return tech('slot_id_not_canonical');
+  if (!(game?.slots instanceof Map) || !game.slots.has(toSlotId))
+    return tech('table_slot_not_found');
 
-  const allowedByCount = [
+  const count = getSlotStack(game, toSlotId).length;
+
+  const allowed = [
     ['A', 'R'],
     ['2', 'R'],
     ['3', 'R'],
@@ -32,73 +28,32 @@ export function validateTableSlot(game, card, fromSlotId, toSlotId) {
     ['10', 'R'],
     ['V', 'R'],
     ['D'],
-  ];
-
-  const allowed = allowedByCount[count];
+  ][count];
 
   if (!allowed || !allowed.includes(card.value)) {
-    const acceptedStr = allowed ? allowed.join(' ou ') : 'aucune';
-    debugLog('[RULES] MOVE_DENIED_SLOT Table', {
-      card_id: card.id,
-      to_slot_id: toSlotId,
-      count,
-      tried: card.value,
-      accepted: allowed ?? [],
-    });
-
-    return {
-      valid: false,
-      kind: 'user',
-      code: 'RULE_ALLOWED_ON_TABLE',
-      params: { accepted: acceptedStr },
-    };
+    const accepted = allowed ? allowed.join(' ou ') : 'aucune';
+    log('[RULES] TABLE_DENIED', { card: card.value, count, accepted });
+    return { valid: false, kind: 'user', code: 'RULE_ALLOWED_ON_TABLE', params: { accepted } };
   }
-
   return { valid: true };
-}
-
-/**
- * Validate placement on Deck slot (not allowed)
- */
-function staticDeny(code) {
-  return () => userDenied(code);
 }
 
 export const validateDeckSlot = staticDeny('RULE_MOVE_DENIED');
-
-/**
- * Validate placement on Hand slot (not allowed)
- */
 export const validateHandSlot = staticDeny('RULE_MOVE_DENIED');
-
-/**
- * Validate placement on Bench slot (always allowed)
- */
-export function validateBenchSlot(game, card, fromSlotId, toSlotId) {
+export const validateDrawPileSlot = staticDeny('RULE_MOVE_DENIED');
+export function validateBenchSlot() {
   return { valid: true };
 }
 
-/**
- * Validate placement on Draw Pile slot (not allowed)
- */
-export const validateDrawPileSlot = staticDeny('RULE_MOVE_DENIED');
-
-/**
- * Get appropriate validator for slot type
- * @param {SlotId} slotId - Canonical SlotId
- * @returns {Function|null} Validator function or null
- */
 export function getSlotValidator(slotId) {
-  if (!(slotId instanceof SlotId)) {
-    return null;
-  }
-
-  const validators = {
-    [SLOT_TYPES.TABLE]: validateTableSlot,
-    [SLOT_TYPES.DECK]: validateDeckSlot,
-    [SLOT_TYPES.HAND]: validateHandSlot,
-    [SLOT_TYPES.BENCH]: validateBenchSlot,
-    [SLOT_TYPES.PILE]: validateDrawPileSlot,
-  };
-  return validators[slotId.type] ?? null;
+  if (!(slotId instanceof SlotId)) return null;
+  return (
+    {
+      [SLOT_TYPES.TABLE]: validateTableSlot,
+      [SLOT_TYPES.DECK]: validateDeckSlot,
+      [SLOT_TYPES.HAND]: validateHandSlot,
+      [SLOT_TYPES.BENCH]: validateBenchSlot,
+      [SLOT_TYPES.PILE]: validateDrawPileSlot,
+    }[slotId.type] ?? null
+  );
 }

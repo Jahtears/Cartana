@@ -2,8 +2,7 @@
 import { ensureGameMeta } from '../../game/meta.js';
 import { requireParam } from '../../net/guards.js';
 import { resError } from '../../net/transport.js';
-import { emitPopupMessage } from '../../shared/uiMessage.js';
-import { POPUP_MESSAGE } from '../../shared/popupMessages.js';
+import { emitEvt, POPUP } from '../../shared/messages.js';
 import { cleanupIfOrphaned, ensureGameEndMeta, POST_GAME_STATES } from '../game/gameEnd.js';
 
 const INVITE_CONTEXT_REMATCH = 'rematch';
@@ -43,7 +42,7 @@ function validateRematchInviteOrRes(ctx, ws, req, actor, to, source_game_id) {
   const { games, gameMeta, wsByUser, userToEndGame } = state;
 
   if (!source_game_id) {
-    resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_REQUEST, {
+    resError(sendRes, ws, req, POPUP.BAD_REQUEST, {
       field: 'source_game_id',
       message_params: { field: 'source_game_id' },
     });
@@ -52,25 +51,25 @@ function validateRematchInviteOrRes(ctx, ws, req, actor, to, source_game_id) {
 
   const sourceGame = games.get(source_game_id);
   if (!sourceGame) {
-    resError(sendRes, ws, req, POPUP_MESSAGE.TECH_NOT_FOUND);
+    resError(sendRes, ws, req, POPUP.NOT_FOUND);
     return null;
   }
 
   const opponent = resolveRematchOpponent(sourceGame, actor);
   if (!opponent || opponent !== to) {
-    resError(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN);
+    resError(sendRes, ws, req, POPUP.FORBIDDEN);
     return null;
   }
 
   const sourceMeta = ensureGameEndMeta(gameMeta, source_game_id, { initialSent: true });
   if (!sourceMeta?.result) {
-    resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_STATE);
+    resError(sendRes, ws, req, POPUP.BAD_STATE);
     return null;
   }
 
   const actorInEndGame = String(userToEndGame?.get(actor) ?? '') === source_game_id;
   if (!actorInEndGame) {
-    resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_STATE);
+    resError(sendRes, ws, req, POPUP.BAD_STATE);
     return null;
   }
 
@@ -78,7 +77,7 @@ function validateRematchInviteOrRes(ctx, ws, req, actor, to, source_game_id) {
   const targetDisconnected =
     sourceMeta.disconnected instanceof Set && sourceMeta.disconnected.has(to);
   if (!targetOnline || targetDisconnected) {
-    resError(sendRes, ws, req, POPUP_MESSAGE.TECH_BAD_STATE);
+    resError(sendRes, ws, req, POPUP.BAD_STATE);
     return null;
   }
 
@@ -117,20 +116,20 @@ export function handleInvite(ctx, ws, req, data, actor) {
 
   // destinataire a déjà une invite reçue
   if (pendingInviteTo.has(to)) {
-    return resError(sendRes, ws, req, POPUP_MESSAGE.INVITE_TARGET_ALREADY_INVITED);
+    return resError(sendRes, ws, req, POPUP.INVITE_TARGET_INVITED);
   }
   // destinataire invite déjà quelqu'un
   if (inviteFrom.has(to)) {
-    return resError(sendRes, ws, req, POPUP_MESSAGE.INVITE_TARGET_ALREADY_INVITING);
+    return resError(sendRes, ws, req, POPUP.INVITE_TARGET_INVITING);
   }
 
   // acteur a déjà une invite reçue
   if (pendingInviteTo.has(actor)) {
-    return resError(sendRes, ws, req, POPUP_MESSAGE.INVITE_ACTOR_ALREADY_INVITED);
+    return resError(sendRes, ws, req, POPUP.INVITE_ACTOR_INVITED);
   }
   // acteur invite déjà quelqu'un
   if (inviteFrom.has(actor)) {
-    return resError(sendRes, ws, req, POPUP_MESSAGE.INVITE_ACTOR_ALREADY_INVITING);
+    return resError(sendRes, ws, req, POPUP.INVITE_ACTOR_INVITING);
   }
 
   if (rematchMeta) {
@@ -197,7 +196,7 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
 
   const pending = pendingInviteTo.get(actor);
   if (!pending || pending.from !== to) {
-    return resError(sendRes, ws, req, POPUP_MESSAGE.INVITE_NOT_FOUND);
+    return resError(sendRes, ws, req, POPUP.INVITE_NOT_FOUND);
   }
 
   const context = String(pending.context ?? '')
@@ -212,7 +211,7 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
     if (context === INVITE_CONTEXT_REMATCH) {
       markRematchResolved(state, source_game_id);
 
-      emitPopupMessage(
+      emitEvt(
         sendEvtUser,
         [to, actor],
         'rematch_declined',
@@ -223,10 +222,8 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
           context,
           source_game_id,
         },
-        {
-          message_code: POPUP_MESSAGE.INVITE_DECLINED,
-          message_params: { actor },
-        },
+        POPUP.INVITE_DECLINED,
+        { actor },
       );
 
       setUserActivity(actor, Activity.LOBBY, null);
@@ -245,7 +242,7 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
       return true;
     }
 
-    emitPopupMessage(
+    emitEvt(
       sendEvtUser,
       to,
       'invite_response',
@@ -254,10 +251,8 @@ export function handleInviteResponse(ctx, ws, req, data, actor) {
         from: actor,
         to,
       },
-      {
-        message_code: POPUP_MESSAGE.INVITE_DECLINED,
-        message_params: { actor },
-      },
+      POPUP.INVITE_DECLINED,
+      { actor },
     );
     sendRes(ws, req, true, { accepted: false, context, source_game_id });
 

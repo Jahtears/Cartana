@@ -2,7 +2,9 @@ import crypto from 'crypto';
 import { SlotId, SLOT_CONFIG } from '../constants/slots.js';
 import { DEFAULT_HAND_SIZE } from '../constants/turnFlow.js';
 import { shuffle } from '../state/cardStore.js';
-import { debugLog } from '../helpers/debugHelpers.js';
+
+const DEBUG = process.env.DEBUG_TRACE === '1';
+const log = (...a) => DEBUG && console.log(...a);
 
 const CARD_VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'V', 'D', 'R'];
 const CARD_COLORS = ['H', 'C', 'P', 'S'];
@@ -178,7 +180,7 @@ function createGame(player1, player2) {
   // 5) Build card lookup index.
   initCardsById(game, allCards);
 
-  debugLog('[GAME] CREATE', { player1, player2 });
+  log('[GAME] CREATE', { player1, player2 });
   return game;
 }
 

@@ -1,5 +1,5 @@
 import { slotIdToString } from '../../game/state/slotStore.js';
-import { toUiMessage } from '../../shared/uiMessage.js';
+import { toUiMessage } from '../../shared/messages.js';
 
 const GAME_MESSAGE_EVENT = 'show_game_message';
 

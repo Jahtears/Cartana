@@ -1,5 +1,5 @@
 // net/transport.js v3.0 - Transport et réponses
-import { POPUP_MESSAGE } from '../shared/popupMessages.js';
+import { POPUP } from '../shared/messages.js';
 
 /**
  * Vérifier si un WebSocket est ouvert
@@ -15,7 +15,7 @@ function safeObject(value) {
   return value;
 }
 
-function normalizeMessageCode(raw, fallback = POPUP_MESSAGE.TECH_ERROR_GENERIC) {
+function normalizeMessageCode(raw, fallback = POPUP.ERROR) {
   const candidate = String(raw ?? '').trim();
   if (!candidate) {
     return fallback;
@@ -30,7 +30,7 @@ function normalizeErrorPayload(payload) {
   const src = safeObject(payload);
   const details = safeObject(src.details);
 
-  const message_code = normalizeMessageCode(src.message_code, POPUP_MESSAGE.TECH_ERROR_GENERIC);
+  const message_code = normalizeMessageCode(src.message_code, POPUP.ERROR);
 
   const message_params = {
     ...safeObject(details.message_params),

@@ -2,7 +2,10 @@ import { TURN_MS, addBonusToTurnClock } from '../turnClock.js';
 import { addTableSlot } from '../helpers/tableHelper.js';
 import { getTableSlots, getSlotStack, removeCardFromSlot } from '../state/slotStore.js';
 import { SlotId, SLOT_TYPES } from '../constants/slots.js';
-import { debugLog, debugWarn } from '../helpers/debugHelpers.js';
+
+const DEBUG = process.env.DEBUG_TRACE === '1';
+const log = (...a) => DEBUG && console.log(...a);
+const warn = (...a) => DEBUG && console.warn(...a);
 
 /* =========================
    APPLY MOVE (PUBLIC)
@@ -13,7 +16,7 @@ import { debugLog, debugWarn } from '../helpers/debugHelpers.js';
  * @returns {{from, to, createdTableSlotId}|null}
  */
 function applyMove(game, card, fromSlotId, toSlotId, actor) {
-  debugLog('[APPLY] MOVE_START', {
+  log('[APPLY] MOVE_START', {
     card_id: card.id,
     value: card.value,
     color: card.color,
@@ -24,7 +27,7 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
 
   // Internal engine expects canonical SlotId objects at this stage.
   if (!(fromSlotId instanceof SlotId) || !(toSlotId instanceof SlotId)) {
-    debugWarn('[APPLY] MOVE_DENIED_INVALID_SLOT', {
+    warn('[APPLY] MOVE_DENIED_INVALID_SLOT', {
       from_slot_id: fromSlotId,
       to_slot_id: toSlotId,
       actor,
@@ -40,7 +43,7 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
     const actorPlayerIndex = actorArrayIndex + 1; // 1 or 2
 
     if (fromSlotId.player !== actorPlayerIndex) {
-      debugWarn('[APPLY] MOVE_DENIED_NOT_OWNER', {
+      warn('[APPLY] MOVE_DENIED_NOT_OWNER', {
         actor,
         from_slot_id: fromSlotId,
         fromPlayerIndex: fromSlotId.player,
@@ -54,7 +57,7 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
   // Remove card from source slot.
   const removed = removeCardFromSlot(game, fromSlotId, card.id);
   if (!removed) {
-    debugWarn('[APPLY] MOVE_SOURCE_MISSING_CARD', {
+    warn('[APPLY] MOVE_SOURCE_MISSING_CARD', {
       actor,
       from_slot_id: fromSlotId,
       card_id: card.id,
@@ -93,7 +96,7 @@ function applyMove(game, card, fromSlotId, toSlotId, actor) {
     }
   }
 
-  debugLog('[APPLY] MOVE_DONE', {
+  log('[APPLY] MOVE_DONE', {
     card_id: card.id,
     from: fromSlotId,
     to: toSlotId,

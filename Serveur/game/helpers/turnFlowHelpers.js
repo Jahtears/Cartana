@@ -12,7 +12,9 @@ import { compareCardsByTurnValue, findAceCardInHand, slotTopHasAce } from '../st
 import { addTableSlot } from './tableHelper.js';
 import { getTableSlots, getSlotStack, removeCardFromSlot } from '../state/slotStore.js';
 import { recycleFullTableSlotsToPile, refillEmptyHandSlotsFromPile } from './pileFlowHelpers.js';
-import { debugLog } from './debugHelpers.js';
+
+const DEBUG = process.env.DEBUG_TRACE === '1';
+const log = (...a) => DEBUG && console.log(...a);
 
 function ensureTimeoutStreakMap(game) {
   if (!game || typeof game !== 'object') {
@@ -101,7 +103,7 @@ function initTurnForGame(game) {
   ensureTimeoutStreakMap(game);
   startTurnClock(game.turn, Date.now(), TURN_MS);
 
-  debugLog('[TURN] INIT', {
+  log('[TURN] INIT', {
     starter,
     p1_top: top1 ? top1.value : null,
     p2_top: top2 ? top2.value : null,
@@ -122,7 +124,7 @@ function endTurnAfterBenchPlay(game, actor) {
   game.turn.number = (game.turn.number ?? INITIAL_TURN_NUMBER) + 1;
   startTurnClock(game.turn, Date.now(), TURN_MS);
 
-  debugLog('[TURN] SWITCH', { endedBy: actor, next, turnNumber: game.turn.number });
+  log('[TURN] SWITCH', { endedBy: actor, next, turnNumber: game.turn.number });
 
   return { next, given, recycled };
 }
@@ -180,10 +182,6 @@ function tryExpireTurn(game, now = Date.now()) {
     const tableSlots = getTableSlots(game);
     const tableSlot = tableSlots.length ? tableSlots[tableSlots.length - 1] : addTableSlot(game);
 
-    if (!tableSlots.length) {
-      tableSyncNeeded = true;
-    }
-
     const tableStack = getSlotStack(game, tableSlot);
     tableStack.push(ace.cardId);
     playedAce = true;
@@ -197,7 +195,7 @@ function tryExpireTurn(game, now = Date.now()) {
     addTableSlot(game);
     tableSyncNeeded = true;
 
-    debugLog('[TURN] TIMEOUT_AUTO_ACE', { prev, from: ace.slotId, to: tableSlot });
+    log('[TURN] TIMEOUT_AUTO_ACE', { prev, from: ace.slotId, to: tableSlot });
   }
 
   const { next, given, recycled } = endTurnAfterBenchPlay(game, prev);
@@ -243,7 +241,7 @@ function tryExpireTurn(game, now = Date.now()) {
     endGamePatch,
   };
 
-  debugLog('[TURN] TIMEOUT_EXPIRED', {
+  log('[TURN] TIMEOUT_EXPIRED', {
     prev: result.prev,
     next: result.next,
     playedAce: result.playedAce,

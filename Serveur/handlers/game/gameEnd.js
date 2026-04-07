@@ -4,7 +4,7 @@ import { getExistingGameOrRes, getGameIdFromDataOrMapping } from '../../net/guar
 import { resError } from '../../net/transport.js';
 import { ensureGameMeta } from '../../game/meta.js';
 import { GAME_END_REASONS } from '../../game/constants/gameEnd.js';
-import { POPUP_MESSAGE } from '../../shared/popupMessages.js';
+import { POPUP } from '../../shared/messages.js';
 
 const CLEANUP_TTL_MS = 2 * 60 * 1000;
 const ACK_INTENT_REMATCH = 'rematch';
@@ -214,7 +214,7 @@ export function handleLeaveGame(ctx, ws, req, data, actor) {
   }
 
   if (!game.players.includes(actor)) {
-    return resError(sendRes, ws, req, POPUP_MESSAGE.TECH_FORBIDDEN);
+    return resError(sendRes, ws, req, POPUP.FORBIDDEN);
   }
 
   // abandonneur sort (l’adversaire / specs restent attachés jusqu’à ack)

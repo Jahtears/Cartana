@@ -33,9 +33,8 @@ function normalizeLeaderboard(raw) {
     if (!isSafeUsername(username)) {
       continue;
     }
-     
+
     normalized[username] = normalizeLeaderboardEntry(stats);
-     
   }
 
   return normalized;
@@ -78,14 +77,13 @@ function ensurePlayerStats(board, username) {
     return { wins: 0, losses: 0, draws: 0 };
   }
 
-   
   if (!board[username]) {
     board[username] = { wins: 0, losses: 0, draws: 0 };
   } else {
     board[username] = normalizeLeaderboardEntry(board[username]);
   }
   const out = board[username];
-   
+
   return out;
 }
 

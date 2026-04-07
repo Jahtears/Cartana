@@ -42,10 +42,8 @@ export async function verifyOrCreateUser(username, pin) {
   }
 
   const hash = await argon2.hash(pin);
-  try {
+  {
     dbInsertUser(username, hash);
     return true;
-  } catch (err) {
-    return false;
   }
 }
