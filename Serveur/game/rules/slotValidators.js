@@ -3,15 +3,10 @@ import { getSlotStack } from '../state/slotStore.js';
 
 const DEBUG = process.env.DEBUG_TRACE === '1';
 const log = (...a) => DEBUG && console.log(...a);
-
 const user = (code) => ({ valid: false, kind: 'user', code });
-const tech = (reason) => ({ valid: false, kind: 'technical', debug_reason: reason });
 const staticDeny = (code) => () => user(code);
 
 export function validateTableSlot(game, card, _from, toSlotId) {
-  if (!(toSlotId instanceof SlotId)) return tech('slot_id_not_canonical');
-  if (!(game?.slots instanceof Map) || !game.slots.has(toSlotId))
-    return tech('table_slot_not_found');
 
   const count = getSlotStack(game, toSlotId).length;
 
