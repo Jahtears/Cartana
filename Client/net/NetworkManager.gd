@@ -26,7 +26,7 @@ const DISCONNECT_REASON_LOGOUT := "logout"
 const DISCONNECT_REASON_RECONNECT_MAX := "Max reconnect attempts exceeded"
 
 const SERVER_CLOSE_REASON_PREFIX := "SERVER_"
-const LOCAL_ERROR_MESSAGE_CODE := "POPUP_TECH_ERROR_GENERIC"
+const LOCAL_ERROR_CODE := "technical_error"
 
 const FORCED_WSS_URL := "wss://192.168.1.40/ws"
 const TLS_ROOT_CERT_PATH := "res://certs/caddy-root.crt"
@@ -446,7 +446,7 @@ func _check_request_timeouts() -> void:
         else:
             _pending_requests.erase(rid)
             response.emit(rid, req["type"], false, {}, {
-                "message_code": LOCAL_ERROR_MESSAGE_CODE
+                "code": LOCAL_ERROR_CODE
             })
 
 func _handle_packet(pkt: String) -> void:
@@ -537,7 +537,7 @@ func request_async(
             "type": type,
             "ok": false,
             "data": {},
-            "error": {"message_code": LOCAL_ERROR_MESSAGE_CODE}
+            "error": {"code": LOCAL_ERROR_CODE}
         }
 
     var deadline_msec := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
@@ -554,7 +554,7 @@ func request_async(
         "type": type,
         "ok": false,
         "data": {},
-        "error": {"message_code": LOCAL_ERROR_MESSAGE_CODE}
+        "error": {"code": LOCAL_ERROR_CODE}
     }
 
 func local_epoch_ms() -> int:

@@ -1,7 +1,5 @@
 import { slotIdToString } from '../../game/state/slotStore.js';
-import { toUiMessage } from '../../shared/messages.js';
-
-const GAME_MESSAGE_EVENT = 'show_game_message';
+import { GAME_FEEDBACK_EVENT, normalizeFeedbackPayload } from '../../shared/messages.js';
 
 export function createFlush(bc, trace) {
   const slots = new Set();
@@ -37,7 +35,7 @@ export function createFlush(bc, trace) {
     if (!type) {
       return;
     }
-    const payload = type === GAME_MESSAGE_EVENT ? toUiMessage(data ?? {}) : (data ?? {});
+    const payload = type === GAME_FEEDBACK_EVENT ? normalizeFeedbackPayload(data ?? {}) : (data ?? {});
     messages.push({ type, data: payload, to });
   };
 

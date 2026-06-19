@@ -1,5 +1,5 @@
 // net/transport.js v3.0 - Transport et réponses
-import { POPUP } from '../shared/messages.js';
+import { ERROR } from '../shared/messages.js';
 
 /**
  * Vérifier si un WebSocket est ouvert
@@ -15,12 +15,12 @@ function safeObject(value) {
   return value;
 }
 
-function normalizeMessageCode(raw, fallback = POPUP.ERROR) {
+function normalizeCode(raw, fallback = ERROR.TECHNICAL_ERROR) {
   const candidate = String(raw ?? '').trim();
   if (!candidate) {
     return fallback;
   }
-  if (candidate.startsWith('POPUP_') || candidate.startsWith('RULE_')) {
+  if (/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(candidate)) {
     return candidate;
   }
   return fallback;
@@ -30,19 +30,19 @@ function normalizeErrorPayload(payload) {
   const src = safeObject(payload);
   const details = safeObject(src.details);
 
-  const message_code = normalizeMessageCode(src.message_code, POPUP.ERROR);
+  const code = normalizeCode(src.code, ERROR.TECHNICAL_ERROR);
 
-  const message_params = {
-    ...safeObject(details.message_params),
-    ...safeObject(src.message_params),
+  const params = {
+    ...safeObject(details.params),
+    ...safeObject(src.params),
   };
 
   const out = {
-    message_code,
+    code,
   };
 
-  if (Object.keys(message_params).length > 0) {
-    out.message_params = message_params;
+  if (Object.keys(params).length > 0) {
+    out.params = params;
   }
   if (Object.keys(details).length > 0) {
     out.details = details;
@@ -153,11 +153,11 @@ export function createTransport({ wsByUser, onSend }) {
  * @param {Function} sendRes - Fonction sendRes
  * @param {WebSocket} ws - Client WebSocket
  * @param {Object} req - Requête originale
- * @param {string} message_code - Code de message UI (POPUP_* / RULE_*)
+ * @param {string} code - Code d'erreur métier
  * @param {Object} details - Détails additionnels
  */
-export function resError(sendRes, ws, req, message_code, details) {
-  const error = { message_code };
+export function resError(sendRes, ws, req, code, details) {
+  const error = { code };
   if (details && typeof details === 'object') {
     error.details = details;
   }

@@ -8,36 +8,23 @@ import { resError } from '../../net/transport.js';
 import { orchestrateMove } from '../../game/usecases/move/orchestrateMove.js';
 import { ensureGameMeta } from '../../game/meta.js';
 import { GAME_END_REASONS } from '../../game/constants/gameEnd.js';
-import { POPUP } from '../../shared/messages.js';
+import { ERROR, toErrorCode } from '../../shared/messages.js';
 import { mapSlotForClient, mapSlotFromClientToServer } from '../../game/boundary/slotIdMapper.js';
 
 // ── Helpers inline ──────────────────────────────────────────────────────────
 
 const tech = (reason) => ({ valid: false, kind: 'technical', debug_reason: reason });
 
-const RULE_CODES = new Set([
-  'RULE_OK',
-  'RULE_MOVE_DENIED',
-  'RULE_DECK_TO_TABLE',
-  'RULE_NOT_YOUR_TURN',
-  'RULE_BENCH_TO_TABLE',
-  'RULE_ACE_ON_DECK',
-  'RULE_ACE_IN_HAND',
-  'RULE_ALLOWED_ON_TABLE',
-  'RULE_OPPONENT_SLOT_FORBIDDEN',
-  'RULE_TURN_START_FIRST',
-  'RULE_TURN_START',
-  'RULE_TURN_TIMEOUT',
-]);
-
 function buildErrorPayload(moveError, cardId, fromSlotId) {
-  const code =
-    moveError?.kind === 'user' && RULE_CODES.has(moveError.code)
-      ? moveError.code
-      : 'RULE_MOVE_DENIED';
+  let code = ERROR.TECHNICAL_ERROR;
+  if (moveError?.kind === 'user') {
+    code = toErrorCode(moveError.code, ERROR.MOVE_DENIED);
+  } else if (String(moveError?.debug_reason ?? '').trim() === ERROR.INVALID_CLIENT_SLOT) {
+    code = ERROR.INVALID_CLIENT_SLOT;
+  }
 
-  const payload = { message_code: code };
-  if (moveError?.kind === 'user' && moveError.params) payload.message_params = moveError.params;
+  const payload = { code };
+  if (moveError?.kind === 'user' && moveError.params) payload.params = moveError.params;
 
   const details = {};
   if (cardId) details.card_id = String(cardId);
@@ -63,14 +50,14 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
 
   ensureGameMeta(ctx.state.gameMeta, game_id, { initialSent: Boolean(game?.turn) });
 
-  if (rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, POPUP.FORBIDDEN)) return true;
+  if (rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, ERROR.FORBIDDEN)) return true;
   if (rejectIfEndedOrRes(ctx, ws, req, game_id, game)) return true;
-  if (game?.turn?.paused) return resError(sendRes, ws, req, POPUP.GAME_PAUSED, { game_id });
+  if (game?.turn?.paused) return resError(sendRes, ws, req, ERROR.GAME_PAUSED, { game_id });
 
   if (typeof processTurnTimeout === 'function') {
     const expired = processTurnTimeout(game_id);
     if (expired && String(game?.turn?.current ?? '') !== actor)
-      return resError(sendRes, ws, req, 'RULE_TURN_TIMEOUT', { game_id });
+      return resError(sendRes, ws, req, ERROR.TURN_TIMEOUT, { game_id });
   }
 
   const card_id = String(data.card_id ?? '').trim();
@@ -81,7 +68,7 @@ export function handleMoveRequest(ctx, ws, req, data, actor) {
   const to_slot_id = mapFromClient(raw_to, actor, game);
 
   if (!from_slot_id || !to_slot_id) {
-    sendRes(ws, req, false, buildErrorPayload(tech('invalid_client_slot'), card_id, raw_from));
+    sendRes(ws, req, false, buildErrorPayload(tech(ERROR.INVALID_CLIENT_SLOT), card_id, raw_from));
     return true;
   }
 

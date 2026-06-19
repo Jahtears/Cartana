@@ -1,5 +1,5 @@
 import { ensureGameMeta } from '../../game/meta.js';
-import { emitRule, POPUP } from '../../shared/messages.js';
+import { emitFeedback, ERROR } from '../../shared/messages.js';
 import { requireParam, getExistingGameOrRes } from '../../net/guards.js';
 import { resError } from '../../net/transport.js';
 import { saveGameState } from '../../domain/session/Saves.js';
@@ -19,11 +19,11 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
   const game = getExistingGameOrRes(ctx, ws, req, game_id);
   if (!game) return true;
 
-  if (!game.players.includes(actor)) return resError(sendRes, ws, req, POPUP.FORBIDDEN);
+  if (!game.players.includes(actor)) return resError(sendRes, ws, req, ERROR.FORBIDDEN);
 
   const currentGameId = String(userToGame.get(actor) ?? '');
   if (currentGameId && currentGameId !== game_id)
-    return resError(sendRes, ws, req, POPUP.BAD_STATE);
+    return resError(sendRes, ws, req, ERROR.BAD_STATE);
 
   const alreadyInThisGame = currentGameId === game_id;
   const meta = ensureGameMeta(gameMeta, game_id, { initialSent: Boolean(game?.turn) });
@@ -58,7 +58,7 @@ export function handleJoinGame(ctx, ws, req, data, actor) {
   const { starter, reason } = initTurnForGame(game);
   meta.initialSent = true;
 
-  if (starter) emitRule(sendEvtUser, starter, reason); // ← emitRule au lieu de emitGameMessage
+  if (starter) emitFeedback(sendEvtUser, starter, reason);
 
   emitSnapshotsToAudience(game_id, { reason: 'init' });
   saveGameState(game_id, game);

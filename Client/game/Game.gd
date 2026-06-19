@@ -194,7 +194,7 @@ func _connect_network_signals() -> void:
   _safe_connect(ClientAPI.evt_table_sync,             game_state_manager, "_on_evt_table_sync")
   _safe_connect(ClientAPI.evt_turn_update,            game_state_manager, "_on_evt_turn_update")
   _safe_connect(ClientAPI.evt_game_end,               game_state_manager, "_on_evt_game_end")
-  _safe_connect(ClientAPI.evt_game_message,           game_state_manager, "_on_evt_game_message")
+  _safe_connect(ClientAPI.evt_game_feedback,          game_state_manager, "_on_evt_game_feedback")
   _safe_connect(ClientAPI.evt_opponent_disconnected,  game_state_manager, "_on_evt_opponent_disconnected")
   _safe_connect(ClientAPI.evt_opponent_rejoined,      game_state_manager, "_on_evt_opponent_rejoined")
   _safe_connect(ClientAPI.evt_invite_received,        game_state_manager, "_on_evt_invite_received")
@@ -338,7 +338,7 @@ func _exit_tree() -> void:
       [ClientAPI.evt_table_sync,             "_on_evt_table_sync"],
       [ClientAPI.evt_turn_update,            "_on_evt_turn_update"],
       [ClientAPI.evt_game_end,               "_on_evt_game_end"],
-      [ClientAPI.evt_game_message,           "_on_evt_game_message"],
+      [ClientAPI.evt_game_feedback,          "_on_evt_game_feedback"],
       [ClientAPI.evt_opponent_disconnected,  "_on_evt_opponent_disconnected"],
       [ClientAPI.evt_opponent_rejoined,      "_on_evt_opponent_rejoined"],
       [ClientAPI.evt_invite_received,        "_on_evt_invite_received"],

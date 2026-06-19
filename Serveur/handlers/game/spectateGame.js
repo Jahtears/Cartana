@@ -1,7 +1,7 @@
 //handlers\spectateGame.js
 import { ensureGameMeta } from '../../game/meta.js';
 import { requireParam, getExistingGameOrRes, rejectIfBusyOrRes } from '../../net/guards.js';
-import { POPUP } from '../../shared/messages.js';
+import { ERROR } from '../../shared/messages.js';
 
 export function handleSpectateGame(ctx, ws, req, data, actor) {
   const sessionUsecases = ctx.usecases?.session ?? ctx;
@@ -21,7 +21,7 @@ export function handleSpectateGame(ctx, ws, req, data, actor) {
   }
 
   // joueur interdit spectateur OK
-  if (rejectIfBusyOrRes(ctx, ws, req, actor, POPUP.BAD_STATE)) {
+  if (rejectIfBusyOrRes(ctx, ws, req, actor, ERROR.BAD_STATE)) {
     return true;
   }
 

@@ -1,6 +1,6 @@
 // router.js v2.0
 
-import { POPUP } from '../shared/messages.js';
+import { ERROR } from '../shared/messages.js';
 const DEV_TRACE = process.env.DEBUG_TRACE === '1';
 const RID_CACHE_LIMIT = 200;
 
@@ -20,7 +20,7 @@ function requireAuth(ws, req, { state, sendRes }) {
   const user = state.getUsername(ws);
   if (!user) {
     sendRes(ws, req, false, {
-      message_code: POPUP.AUTH_REQUIRED,
+      code: ERROR.AUTH_REQUIRED,
     });
     return null;
   }
@@ -129,7 +129,7 @@ export function createRouter({
         } catch (err) {
           console.error('[ROUTE_ERROR] login', err);
           sendResWithRidCache(ws, req, false, {
-            message_code: POPUP.INTERNAL_ERROR,
+            code: ERROR.INTERNAL_ERROR,
           });
           return;
         }
@@ -173,7 +173,7 @@ export function createRouter({
       const fn = routes[req.type];
       if (!fn) {
         sendResWithRidCache(ws, req, false, {
-          message_code: POPUP.NOT_IMPLEMENTED,
+          code: ERROR.NOT_IMPLEMENTED,
         });
         return;
       }
@@ -187,7 +187,7 @@ export function createRouter({
         console.error('[ROUTE_ERROR]', req.type, err);
         ctx.trace?.('ERROR', String(err?.message ?? err));
         sendResWithRidCache(ws, req, false, {
-          message_code: POPUP.INTERNAL_ERROR,
+          code: ERROR.INTERNAL_ERROR,
         });
       }
     } finally {

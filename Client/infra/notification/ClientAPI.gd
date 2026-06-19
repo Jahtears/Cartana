@@ -14,6 +14,8 @@
 
 extends Node
 
+const Protocol = preload("res://net/Protocol.gd")
+
 # ══════════════════════════════════════════════════════════
 # SIGNAUX — CONNEXION
 # ══════════════════════════════════════════════════════════
@@ -75,8 +77,8 @@ signal evt_turn_update(data: Dictionary)
 # --- Fin de partie ---
 signal evt_game_end(data: Dictionary)
 
-# --- Message in-game (RULE_*) ---
-signal evt_game_message(message_code: String, message_params: Dictionary)
+# --- Message in-game (feedback métier) ---
+signal evt_game_feedback(code: String, params: Dictionary)
 
 # --- Adversaire ---
 signal evt_opponent_disconnected(game_id: String, username: String)
@@ -347,10 +349,10 @@ func _on_evt(type: String, data: Dictionary) -> void:
     "game_end":
       evt_game_end.emit(data)
 
-    "show_game_message":
-      evt_game_message.emit(
-        String(data.get("message_code", "")),
-        _coerce_dict(data.get("message_params", {}))
+    Protocol.EVT_GAME_FEEDBACK:
+      evt_game_feedback.emit(
+        String(data.get("code", "")),
+        _coerce_dict(data.get("params", {}))
       )
 
     "opponent_disconnected":

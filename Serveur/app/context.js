@@ -34,6 +34,7 @@ import { buildStateSnapshotPayload } from '../game/payload/snapshotPayload.js';
 import { saveGameState, loadGameState, deleteGameState } from '../domain/session/Saves.js';
 import { verifyOrCreateUser } from '../handlers/auth/usersStore.js';
 import { createStateManager } from './stateManager.js';
+import { FEEDBACK, GAME_FEEDBACK_EVENT } from '../shared/messages.js';
 
 export function createServerContext({ onTransportSend } = {}) {
   // ========================
@@ -210,10 +211,10 @@ export function createServerContext({ onTransportSend } = {}) {
       fx.turn();
 
       if (prev) {
-        fx.message('show_game_message', { message_code: 'RULE_TURN_TIMEOUT' }, { to: prev });
+        fx.message(GAME_FEEDBACK_EVENT, { code: FEEDBACK.TURN_TIMEOUT }, { to: prev });
       }
       if (next && !endGamePatch) {
-        fx.message('show_game_message', { message_code: 'RULE_TURN_START' }, { to: next });
+        fx.message(GAME_FEEDBACK_EVENT, { code: FEEDBACK.TURN_START }, { to: next });
       }
     });
 

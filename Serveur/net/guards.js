@@ -2,7 +2,7 @@
 
 import { ensureGameMeta } from '../game/meta.js';
 import { resError } from './transport.js';
-import { POPUP } from '../shared/messages.js';
+import { ERROR } from '../shared/messages.js';
 
 function getResponder(ctx) {
   return ctx?.sendRes;
@@ -11,9 +11,9 @@ function getResponder(ctx) {
 export function requireParam(sendRes, ws, req, data, key, label = key) {
   const value = String(data?.[key] ?? '').trim();
   if (!value) {
-    resError(sendRes, ws, req, POPUP.BAD_REQUEST, {
+    resError(sendRes, ws, req, ERROR.BAD_REQUEST, {
       field: label,
-      message_params: { field: label },
+      params: { field: label },
     });
     return null;
   }
@@ -25,7 +25,7 @@ export function getExistingGameOrRes(ctx, ws, req, game_id) {
   const sendRes = getResponder(ctx);
 
   if (!game_id || !state.games.has(game_id)) {
-    resError(sendRes, ws, req, POPUP.NOT_FOUND);
+    resError(sendRes, ws, req, ERROR.NOT_FOUND);
     return null;
   }
   return state.games.get(game_id);
@@ -40,7 +40,7 @@ export function getPlayerGameOrRes(ctx, ws, req, actor) {
 
   const game_id = state.userToGame.get(actor);
   if (!game_id || !state.games.has(game_id)) {
-    resError(sendRes, ws, req, POPUP.NOT_FOUND);
+    resError(sendRes, ws, req, ERROR.NOT_FOUND);
     return null;
   }
   return { game_id, game: state.games.get(game_id) };
@@ -66,9 +66,9 @@ export function getGameIdFromDataOrMapping(
   if (Array.isArray(allowedKeys) && allowedKeys.length) {
     if (!allowedKeys.includes(key)) {
       if (required) {
-        resError(sendRes, ws, req, POPUP.BAD_REQUEST, {
+        resError(sendRes, ws, req, ERROR.BAD_REQUEST, {
           key,
-          message_params: { key },
+          params: { key },
         });
       }
       return null;
@@ -85,10 +85,10 @@ export function getGameIdFromDataOrMapping(
       }
       // détecte les variantes équivalentes (camelCase, underscores, etc.)
       if (norm(k) === expected) {
-        resError(sendRes, ws, req, POPUP.BAD_REQUEST, {
+        resError(sendRes, ws, req, ERROR.BAD_REQUEST, {
           field: k,
           allowed_keys: allowedKeys,
-          message_params: { field: k, allowed: allowedKeys.join(', ') },
+          params: { field: k, allowed: allowedKeys.join(', ') },
         });
         return null;
       }
@@ -112,7 +112,7 @@ export function getGameIdFromDataOrMapping(
   return game_id;
 }
 
-export function rejectIfBusyOrRes(ctx, ws, req, username, message = POPUP.BAD_STATE) {
+export function rejectIfBusyOrRes(ctx, ws, req, username, message = ERROR.BAD_STATE) {
   const sendRes = getResponder(ctx);
   const state = ctx.state;
 
@@ -126,7 +126,7 @@ export function rejectIfBusyOrRes(ctx, ws, req, username, message = POPUP.BAD_ST
   return false;
 }
 
-export function rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, message = POPUP.FORBIDDEN) {
+export function rejectIfSpectatorOrRes(ctx, ws, req, game_id, actor, message = ERROR.FORBIDDEN) {
   const sendRes = getResponder(ctx);
   const state = ctx.state;
 
@@ -146,7 +146,7 @@ export function rejectIfEndedOrRes(ctx, ws, req, game_id, game) {
   const sendRes = getResponder(ctx);
   const meta = ensureGameMeta(state.gameMeta, game_id, { initialSent: Boolean(game?.turn) });
   if (meta?.result) {
-    resError(sendRes, ws, req, POPUP.GAME_ENDED);
+    resError(sendRes, ws, req, ERROR.GAME_ENDED);
     return true;
   }
   return false;

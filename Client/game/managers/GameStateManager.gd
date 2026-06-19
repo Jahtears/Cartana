@@ -2,10 +2,10 @@
 #
 # ROUTAGE DES MESSAGES — règle absolue :
 #
-#   RULE_*  → événement "show_game_message"
+#   feedback métier → événement "game_feedback"
 #             → _show_game_feedback()
 #             → GameUIManager.show_game_feedback()
-#             → GameMessage.normalize_rule_message()   (filtre RULE_* strict)
+#             → GameMessage.normalize_rule_message()   (mapping local RULE_*)
 #             → GameMessage label (panneau in-game)
 #
 #   POPUP_* → événements métier (invite_request, opponent_disconnected, game_end…)
@@ -167,10 +167,10 @@ func _on_evt_turn_update(data: Dictionary) -> void:
       String(Global.username)
     )
 
-func _on_evt_game_message(message_code: String, params: Dictionary) -> void:
+func _on_evt_game_feedback(code: String, params: Dictionary) -> void:
   _show_game_feedback({
-    "message_code": message_code,
-    "message_params": params,
+    "code": code,
+    "params": params,
   })
 
 func _on_evt_opponent_disconnected(game_id: String, username: String) -> void:
@@ -217,7 +217,7 @@ func _on_move_ok(response_data: Dictionary) -> void:
     if card and card.has_method("_reset_move_pending"):
       card._reset_move_pending()
 
-  _show_game_feedback({"message_code": GameMessage.RULE_OK})
+  _show_game_feedback({"code": GameMessage.FEEDBACK_OK})
 
   if context.game_node and context.game_node.has_method("_on_move_success"):
     context.game_node._on_move_success(response_data)
@@ -272,29 +272,27 @@ func _rollback_invalid_move(move_data: Dictionary) -> void:
     from_slot.snap_card(card, false)
 
 func _normalize_move_error(error: Dictionary) -> Dictionary:
-  var message_code := String(error.get("message_code", "")).strip_edges()
-  var text := String(error.get("text", "")).strip_edges()
-  var message_params := _merge_error_message_params(error)
+  var code := String(error.get("code", "")).strip_edges()
+  var params := _merge_error_params(error)
 
   var normalized := GameMessage.normalize_rule_message({
-    "message_code": message_code,
-    "text": text,
-    "message_params": message_params,
+    "code": code,
+    "params": params,
   })
   if not normalized.is_empty():
     return normalized
 
   return GameMessage.normalize_rule_message({
-    "message_code": GameMessage.RULE_MOVE_DENIED,
-    "message_params": message_params,
+    "code": GameMessage.FEEDBACK_MOVE_DENIED,
+    "params": params,
   })
 
-func _merge_error_message_params(error: Dictionary) -> Dictionary:
+func _merge_error_params(error: Dictionary) -> Dictionary:
   var details_val: Variant = error.get("details", {})
   var details: Dictionary = details_val if details_val is Dictionary else {}
-  var top_params_val: Variant = error.get("message_params", {})
+  var top_params_val: Variant = error.get("params", {})
   var top_params: Dictionary = top_params_val if top_params_val is Dictionary else {}
-  var details_params_val: Variant = details.get("message_params", {})
+  var details_params_val: Variant = details.get("params", {})
   var details_params: Dictionary = details_params_val if details_params_val is Dictionary else {}
 
   var out: Dictionary = {}
